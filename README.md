@@ -104,6 +104,10 @@ Credenciais locais vêm do `.env`; os valores de `.env.example` destinam-se some
 
 ## Build e verificação
 
+Nesta entrega de fundação, o `spring-boot:repackage` está desabilitado porque os
+fontes Java serão adicionados em uma etapa posterior. Ao incluir as classes de
+aplicação, remova a propriedade `spring-boot.repackage.skip` do `pom.xml` raiz.
+
 ```bash
 ./mvnw clean verify
 ./mvnw -pl services/video-api -am verify
