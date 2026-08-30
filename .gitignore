@@ -1,0 +1,9 @@
+target/
+*.java
+.idea/
+.vscode/
+*.iml
+.DS_Store
+.env
+data/
+uploads/

@@ -1,0 +1,14 @@
+asyncapi: 3.0.0
+info: { title: FIAP X asynchronous contracts, version: 1.0.0 }
+channels:
+  jobRequested: { address: video.job.requested.v1, messages: { event: { $ref: '#/components/messages/JobRequested' } } }
+  jobStarted: { address: video.job.started.v1, messages: { event: { $ref: '#/components/messages/JobResult' } } }
+  jobCompleted: { address: video.job.completed.v1, messages: { event: { $ref: '#/components/messages/JobResult' } } }
+  jobFailed: { address: video.job.failed.v1, messages: { event: { $ref: '#/components/messages/JobResult' } } }
+operations:
+  requestProcessing: { action: send, channel: { $ref: '#/channels/jobRequested' } }
+  consumeRequested: { action: receive, channel: { $ref: '#/channels/jobRequested' } }
+components:
+  messages:
+    JobRequested: { payload: { type: object, required: [eventId, jobId, userId, sourceKey], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string } } } }
+    JobResult: { payload: { type: object, required: [eventId, jobId, type], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, type: { enum: [PROCESSING, COMPLETED, FAILED] }, resultKey: { type: string }, terminal: { type: boolean }, reason: { type: string }, recipient: { type: string, format: email } } } }
