@@ -1,0 +1,22 @@
+server.port: ${SERVER_PORT:8081}
+spring:
+  application.name: video-processor
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    username: ${RABBITMQ_USER:fiapx}
+    password: ${RABBITMQ_PASSWORD:fiapx}
+    listener.simple:
+      acknowledge-mode: auto
+      retry.enabled: true
+      retry.initial-interval: 2s
+      retry.multiplier: 2
+      retry.max-interval: 30s
+      retry.max-attempts: 4
+      default-requeue-rejected: false
+app.storage:
+  endpoint: ${S3_ENDPOINT:http://localhost:9000}
+  access-key: ${S3_ACCESS_KEY:fiapx}
+  secret-key: ${S3_SECRET_KEY:fiapx-secret}
+  bucket: ${S3_BUCKET:videos}
+management.endpoints.web.exposure.include: health,info,prometheus
+management.endpoint.health.probes.enabled: true

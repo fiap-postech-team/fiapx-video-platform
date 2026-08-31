@@ -1,0 +1,20 @@
+openapi: 3.1.0
+info: { title: FIAP X Video API, version: 0.1.0 }
+servers: [{ url: http://localhost:8080 }]
+paths:
+  /v1/jobs:
+    post:
+      summary: Cria um job a partir de um objeto já enviado
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [sourceKey], properties: { sourceKey: { type: string } } } } } }
+      responses: { '201': { description: Job criado, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } } }
+  /v1/jobs/{id}:
+    get:
+      summary: Consulta o estado de um job
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: Estado atual, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } } }
+components:
+  securitySchemes: { bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT } }
+  schemas:
+    Job: { type: object, properties: { id: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string }, resultKey: { type: [string, 'null'] }, status: { enum: [PENDING, PROCESSING, COMPLETED, FAILED] }, createdAt: { type: string, format: date-time } } }
