@@ -1,4 +1,22 @@
 target/
 **/target/
+build/
+out/
+
+# Logs
+*.log
+
+# IDEs
 .idea/
 **/.idea/
+*.iml
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
