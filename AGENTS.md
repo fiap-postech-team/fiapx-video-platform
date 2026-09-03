@@ -69,6 +69,25 @@ service.
 - Update the relevant README, contract, and operational documentation whenever
   setup or externally observable behavior changes.
 
+## Pull request standards
+
+- Keep each pull request focused on one cohesive purpose. Separate unrelated
+  refactors, dependency updates, and behavior changes when they can be reviewed
+  independently.
+- Use a Conventional Commits-style PR title:
+  `<type>(optional-scope): imperative summary`.
+- Complete `.github/pull_request_template.md` with concrete context and remove
+  guidance that does not apply.
+- Describe the reason for the change, its implementation, validation evidence,
+  and any contract, migration, security, deployment, or rollback impact.
+- Link existing issues and ADRs when relevant; never invent references.
+- Update the branch with the current target branch and resolve conflicts before
+  requesting final review.
+- Open a draft PR when known work remains. A non-draft PR should have relevant
+  local verification completed and no known unresolved correctness issue.
+- Do not merge until required checks pass, required approvals are present, and
+  GitHub reports no merge conflict. Merge only when explicitly authorized.
+
 ## Code Review Rules
 
 - Flag secrets or sensitive data in source, configuration, logs, fixtures, or
