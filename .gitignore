@@ -17,6 +17,11 @@ out/
 .classpath
 .settings/
 
+# Local environment and runtime data
+.env
+data/
+uploads/
+
 # OS
 .DS_Store
 Thumbs.db

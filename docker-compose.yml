@@ -1,0 +1,43 @@
+name: fiap-x
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment: { POSTGRES_USER: "${POSTGRES_USER:-fiapx}", POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-fiapx}", POSTGRES_DB: "${POSTGRES_DB:-fiapx}" }
+    ports: ["5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data", "./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"], interval: 5s, timeout: 3s, retries: 20 }
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment: { RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-fiapx}", RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:-fiapx}" }
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 5s, timeout: 5s, retries: 20 }
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    environment: { MINIO_ROOT_USER: "${MINIO_ROOT_USER:-fiapx}", MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-fiapx-secret}" }
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio-data:/data"]
+  minio-init:
+    image: minio/mc:latest
+    depends_on: [minio]
+    entrypoint: ["/bin/sh", "-c", "until mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done; mc mb --ignore-existing local/videos"]
+    environment: { MINIO_ROOT_USER: "${MINIO_ROOT_USER:-fiapx}", MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-fiapx-secret}" }
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports: ["1025:1025", "8025:8025"]
+  video-api:
+    build: { context: ., dockerfile: services/video-api/Dockerfile }
+    environment: { DATABASE_URL: "jdbc:postgresql://postgres:5432/fiapx", RABBITMQ_HOST: rabbitmq, JWT_SECRET: "${JWT_SECRET:-change-me-with-at-least-32-characters}" }
+    ports: ["8080:8080"]
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+  video-processor:
+    build: { context: ., dockerfile: services/video-processor/Dockerfile }
+    environment: { RABBITMQ_HOST: rabbitmq, S3_ENDPOINT: "http://minio:9000" }
+    ports: ["8081:8081"]
+    depends_on: { rabbitmq: { condition: service_healthy }, minio-init: { condition: service_completed_successfully } }
+  notification-worker:
+    build: { context: ., dockerfile: services/notification-worker/Dockerfile }
+    environment: { NOTIFICATION_DATABASE_URL: "jdbc:postgresql://postgres:5432/fiapx_notifications", RABBITMQ_HOST: rabbitmq, SMTP_HOST: mailhog }
+    ports: ["8082:8082"]
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+volumes: { postgres-data: {}, minio-data: {} }

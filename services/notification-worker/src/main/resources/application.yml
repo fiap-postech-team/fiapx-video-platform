@@ -1,0 +1,23 @@
+server.port: ${SERVER_PORT:8082}
+spring:
+  application.name: notification-worker
+  datasource:
+    url: ${NOTIFICATION_DATABASE_URL:jdbc:postgresql://localhost:5432/fiapx_notifications}
+    username: ${DATABASE_USER:fiapx}
+    password: ${DATABASE_PASSWORD:fiapx}
+  jpa.hibernate.ddl-auto: validate
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    username: ${RABBITMQ_USER:fiapx}
+    password: ${RABBITMQ_PASSWORD:fiapx}
+    listener.simple:
+      retry.enabled: true
+      retry.initial-interval: 2s
+      retry.multiplier: 2
+      retry.max-attempts: 4
+      default-requeue-rejected: false
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+management.endpoints.web.exposure.include: health,info,prometheus
+management.endpoint.health.probes.enabled: true
