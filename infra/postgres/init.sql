@@ -1,1 +1,2 @@
-CREATE DATABASE fiapx_notifications;
+CREATE
+DATABASE fiapx_notifications;

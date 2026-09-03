@@ -5,7 +5,8 @@
 
 ## Contexto
 
-Usuários, jobs, transições, outbox, tentativas e auditoria exigem consistência, constraints, consultas operacionais e migrations reproduzíveis. Object storage e RabbitMQ não oferecem o mesmo modelo transacional para esses dados.
+Usuários, jobs, transições, outbox, tentativas e auditoria exigem consistência, constraints, consultas operacionais e
+migrations reproduzíveis. Object storage e RabbitMQ não oferecem o mesmo modelo transacional para esses dados.
 
 ## Alternativas consideradas
 
@@ -16,7 +17,9 @@ Usuários, jobs, transições, outbox, tentativas e auditoria exigem consistênc
 
 ## Decisão
 
-PostgreSQL será a fonte de verdade. A API será proprietária de usuários, jobs, histórico e outbox. O notification worker manterá armazenamento lógico separado para idempotência e auditoria. O processor não atualizará tabelas da API. Migrations serão aplicadas com Flyway por aplicação.
+PostgreSQL será a fonte de verdade. A API será proprietária de usuários, jobs, histórico e outbox. O notification worker
+manterá armazenamento lógico separado para idempotência e auditoria. O processor não atualizará tabelas da API.
+Migrations serão aplicadas com Flyway por aplicação.
 
 ## Consequências positivas
 
@@ -32,4 +35,6 @@ PostgreSQL será a fonte de verdade. A API será proprietária de usuários, job
 
 ## Mitigações e revisão
 
-Credenciais distintas por serviço, migrations backward-compatible, backups testados e métricas de conexão/latência. Integrações entre contextos devem usar eventos ou APIs. Rever apenas diante de requisitos mensuráveis que o PostgreSQL não atenda.
+Credenciais distintas por serviço, migrations backward-compatible, backups testados e métricas de conexão/latência.
+Integrações entre contextos devem usar eventos ou APIs. Rever apenas diante de requisitos mensuráveis que o PostgreSQL
+não atenda.

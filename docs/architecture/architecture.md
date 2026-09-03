@@ -2,7 +2,9 @@
 
 ## Objetivo e escopo
 
-Esta arquitetura separa a interação HTTP, o processamento pesado de mídia e a notificação de falhas. O objetivo é absorver picos, permitir escala independente e impedir que operações longas de FFmpeg consumam recursos da API. O desenho representa a fundação atual; lacunas conhecidas aparecem no final do documento.
+Esta arquitetura separa a interação HTTP, o processamento pesado de mídia e a notificação de falhas. O objetivo é
+absorver picos, permitir escala independente e impedir que operações longas de FFmpeg consumam recursos da API. O
+desenho representa a fundação atual; lacunas conhecidas aparecem no final do documento.
 
 ## Diagrama de contexto
 
@@ -47,13 +49,13 @@ flowchart LR
 
 ## Responsabilidades e propriedade
 
-| Componente | Responsabilidades | Dados próprios | Não deve fazer |
-|---|---|---|---|
-| `video-api` | validar JWT, criar/consultar jobs, registrar outbox, aplicar resultados | jobs, histórico, outbox | processar mídia ou acessar banco de notificações |
-| `video-processor` | validar vídeo, extrair frames, gerar ZIP, publicar resultados | arquivos temporários efêmeros | atualizar tabelas da API ou transportar binários no broker |
-| `notification-worker` | consumir falhas terminais, enviar e-mail, auditar entrega | entregas de notificação | consultar jobs/usuários diretamente no banco da API |
-| RabbitMQ | filas de trabalho, fan-out lógico, retry e DLQ | mensagens pequenas e temporárias | armazenar vídeos ou ZIPs |
-| MinIO/S3 | objetos de entrada e saída | vídeo e ZIP | atuar como fonte de verdade do estado do job |
+| Componente            | Responsabilidades                                                       | Dados próprios                   | Não deve fazer                                             |
+|-----------------------|-------------------------------------------------------------------------|----------------------------------|------------------------------------------------------------|
+| `video-api`           | validar JWT, criar/consultar jobs, registrar outbox, aplicar resultados | jobs, histórico, outbox          | processar mídia ou acessar banco de notificações           |
+| `video-processor`     | validar vídeo, extrair frames, gerar ZIP, publicar resultados           | arquivos temporários efêmeros    | atualizar tabelas da API ou transportar binários no broker |
+| `notification-worker` | consumir falhas terminais, enviar e-mail, auditar entrega               | entregas de notificação          | consultar jobs/usuários diretamente no banco da API        |
+| RabbitMQ              | filas de trabalho, fan-out lógico, retry e DLQ                          | mensagens pequenas e temporárias | armazenar vídeos ou ZIPs                                   |
+| MinIO/S3              | objetos de entrada e saída                                              | vídeo e ZIP                      | atuar como fonte de verdade do estado do job               |
 
 ## Fluxo principal
 
@@ -109,7 +111,9 @@ flowchart TD
     MAILOK -->|não, após retries| NDLQ[notification failure DLQ]
 ```
 
-Publicar `failed.v1` em cada tentativa pode produzir notificações prematuras na implementação inicial. A evolução recomendada é classificar erros e publicar falha terminal somente depois de esgotar o retry, preferencialmente por um recoverer associado à DLQ.
+Publicar `failed.v1` em cada tentativa pode produzir notificações prematuras na implementação inicial. A evolução
+recomendada é classificar erros e publicar falha terminal somente depois de esgotar o retry, preferencialmente por um
+recoverer associado à DLQ.
 
 ## Estados do job
 
@@ -124,7 +128,8 @@ stateDiagram-v2
     FAILED --> [*]
 ```
 
-Transições duplicadas precisam ser seguras, pois a entrega é pelo menos uma vez. Regressões de estado e eventos fora de ordem devem ser rejeitados quando a máquina de estados for endurecida.
+Transições duplicadas precisam ser seguras, pois a entrega é pelo menos uma vez. Regressões de estado e eventos fora de
+ordem devem ser rejeitados quando a máquina de estados for endurecida.
 
 ## Topologia RabbitMQ
 
@@ -163,23 +168,31 @@ flowchart TB
     end
 ```
 
-Em produção, cada aplicação deve ser uma unidade de deploy independente. Banco, broker, storage e SMTP devem ser serviços gerenciados ou operados com políticas próprias de backup, disponibilidade, TLS e credenciais.
+Em produção, cada aplicação deve ser uma unidade de deploy independente. Banco, broker, storage e SMTP devem ser
+serviços gerenciados ou operados com políticas próprias de backup, disponibilidade, TLS e credenciais.
 
 ## Consistência e garantias
 
 - Criar o job e registrar a intenção de publicação é atômico dentro do banco da API.
 - Publicar no RabbitMQ e marcar a outbox não formam uma única transação distribuída; duplicatas são possíveis.
 - Consumers recebem mensagens pelo menos uma vez e devem deduplicar por `eventId`.
-- A tabela do notification worker já possui `event_id` único. A deduplicação persistente do processor e do result listener permanece no roadmap.
-- Object storage e banco têm consistência eventual: o job só deve virar `COMPLETED` depois que o upload do ZIP finalizar.
+- A tabela do notification worker já possui `event_id` único. A deduplicação persistente do processor e do result
+  listener permanece no roadmap.
+- Object storage e banco têm consistência eventual: o job só deve virar `COMPLETED` depois que o upload do ZIP
+  finalizar.
 
 ## Segurança
 
-O limite HTTP exige bearer JWT, mas a emissão e a gestão de identidades não fazem parte desta fundação. Object keys não devem ser expostas como autorização de acesso; URLs pré-assinadas curtas e validação de propriedade devem mediar upload e download. Produção também requer TLS, chaves assimétricas, rotação de segredos, usuário de banco por serviço e políticas mínimas de bucket e RabbitMQ.
+O limite HTTP exige bearer JWT, mas a emissão e a gestão de identidades não fazem parte desta fundação. Object keys não
+devem ser expostas como autorização de acesso; URLs pré-assinadas curtas e validação de propriedade devem mediar upload
+e download. Produção também requer TLS, chaves assimétricas, rotação de segredos, usuário de banco por serviço e
+políticas mínimas de bucket e RabbitMQ.
 
 ## Observabilidade e operação
 
-Actuator oferece health/probes e Micrometer expõe Prometheus. Para operação real ainda são necessários logs estruturados com `jobId`/`eventId`, tracing entre HTTP e AMQP, métricas de lag, idade da outbox, duração de FFmpeg, taxa de falha, profundidade das DLQs, dashboards e alertas. Consulte [quality-attributes.md](quality-attributes.md).
+Actuator oferece health/probes e Micrometer expõe Prometheus. Para operação real ainda são necessários logs estruturados
+com `jobId`/`eventId`, tracing entre HTTP e AMQP, métricas de lag, idade da outbox, duração de FFmpeg, taxa de falha,
+profundidade das DLQs, dashboards e alertas. Consulte [quality-attributes.md](quality-attributes.md).
 
 ## Lacunas conhecidas
 

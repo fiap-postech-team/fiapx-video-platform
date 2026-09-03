@@ -5,7 +5,9 @@
 
 ## Contexto
 
-API, processor e worker têm deploy e escala independentes, mas compartilham ciclo inicial de desenvolvimento, padrões de qualidade e contratos. É necessário equilibrar autonomia dos serviços com uma experiência simples para a equipe e para a avaliação do projeto.
+API, processor e worker têm deploy e escala independentes, mas compartilham ciclo inicial de desenvolvimento, padrões de
+qualidade e contratos. É necessário equilibrar autonomia dos serviços com uma experiência simples para a equipe e para a
+avaliação do projeto.
 
 ## Forças de decisão
 
@@ -16,13 +18,17 @@ API, processor e worker têm deploy e escala independentes, mas compartilham cic
 
 ## Alternativas consideradas
 
-1. **Monorepo Maven multi-module:** coordenação simples e refactors visíveis, com risco de pipeline e ownership acoplados.
-2. **Um repositório por serviço:** maior isolamento e permissões granulares, ao custo de sincronização de contratos e configuração duplicada.
-3. **Aplicação única modular:** operação mais simples no início, mas não permite escala e falha independentes para FFmpeg e notificações.
+1. **Monorepo Maven multi-module:** coordenação simples e refactors visíveis, com risco de pipeline e ownership
+   acoplados.
+2. **Um repositório por serviço:** maior isolamento e permissões granulares, ao custo de sincronização de contratos e
+   configuração duplicada.
+3. **Aplicação única modular:** operação mais simples no início, mas não permite escala e falha independentes para
+   FFmpeg e notificações.
 
 ## Decisão
 
-Manter os três serviços em um monorepo com parent POM apenas para versionamento e plugins. Nenhum serviço terá dependência Maven direta de outro. Contratos HTTP e assíncronos ficam em diretório neutro e versionado.
+Manter os três serviços em um monorepo com parent POM apenas para versionamento e plugins. Nenhum serviço terá
+dependência Maven direta de outro. Contratos HTTP e assíncronos ficam em diretório neutro e versionado.
 
 ## Consequências positivas
 
@@ -38,4 +44,5 @@ Manter os três serviços em um monorepo com parent POM apenas para versionament
 
 ## Mitigações e revisão
 
-Manter builds isoláveis com `-pl`, Dockerfiles próprios e CODEOWNERS quando necessário. Considerar extração se equipes, permissões, cadências de release ou tempo de CI divergirem de forma sustentada.
+Manter builds isoláveis com `-pl`, Dockerfiles próprios e CODEOWNERS quando necessário. Considerar extração se equipes,
+permissões, cadências de release ou tempo de CI divergirem de forma sustentada.

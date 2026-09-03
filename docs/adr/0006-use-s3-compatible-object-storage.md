@@ -5,18 +5,24 @@
 
 ## Contexto
 
-Vídeos e ZIPs podem ser grandes, têm ciclo de vida próprio e não devem consumir banco relacional ou memória do broker. A solução local precisa ser executável sem depender de uma nuvem específica, mantendo portabilidade para produção.
+Vídeos e ZIPs podem ser grandes, têm ciclo de vida próprio e não devem consumir banco relacional ou memória do broker. A
+solução local precisa ser executável sem depender de uma nuvem específica, mantendo portabilidade para produção.
 
 ## Alternativas consideradas
 
-1. **API S3 com MinIO local:** separa binários do domínio e oferece portabilidade, mas introduz consistência eventual e políticas de bucket.
-2. **Filesystem compartilhado:** simples numa única máquina, porém dificulta escala horizontal, durabilidade e deploy multi-host.
-3. **BYTEA/large objects no PostgreSQL:** transação unificada, ao custo de backups maiores, I/O competitivo e baixa eficiência operacional.
+1. **API S3 com MinIO local:** separa binários do domínio e oferece portabilidade, mas introduz consistência eventual e
+   políticas de bucket.
+2. **Filesystem compartilhado:** simples numa única máquina, porém dificulta escala horizontal, durabilidade e deploy
+   multi-host.
+3. **BYTEA/large objects no PostgreSQL:** transação unificada, ao custo de backups maiores, I/O competitivo e baixa
+   eficiência operacional.
 4. **Payload no RabbitMQ:** rejeitado por tamanho, memória, throughput e retenção.
 
 ## Decisão
 
-Armazenar entradas e resultados em object storage compatível com S3. Usar MinIO no desenvolvimento local e permitir serviços S3-compatible nos demais ambientes. Mensagens e banco guardam apenas object keys e metadados. Arquivos temporários do processor são efêmeros e removidos ao final.
+Armazenar entradas e resultados em object storage compatível com S3. Usar MinIO no desenvolvimento local e permitir
+serviços S3-compatible nos demais ambientes. Mensagens e banco guardam apenas object keys e metadados. Arquivos
+temporários do processor são efêmeros e removidos ao final.
 
 ## Consequências positivas
 
@@ -32,4 +38,5 @@ Armazenar entradas e resultados em object storage compatível com S3. Usar MinIO
 
 ## Mitigações e revisão
 
-Definir prefixos por tenant/job, lifecycle policies, checksums, limites de tamanho, criptografia e reconciliação de órfãos. Criar testes de contrato contra MinIO e o provedor escolhido antes de produção.
+Definir prefixos por tenant/job, lifecycle policies, checksums, limites de tamanho, criptografia e reconciliação de
+órfãos. Criar testes de contrato contra MinIO e o provedor escolhido antes de produção.

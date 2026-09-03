@@ -2,7 +2,9 @@
 
 ## Summary
 
-Aplicação de entrada e proprietária do ciclo de vida dos jobs. Valida bearer JWT, cria e consulta jobs, grava comandos em uma outbox transacional e consome eventos do processor para atualizar o estado. Não processa mídia e nenhum outro serviço deve escrever em suas tabelas.
+Aplicação de entrada e proprietária do ciclo de vida dos jobs. Valida bearer JWT, cria e consulta jobs, grava comandos
+em uma outbox transacional e consome eventos do processor para atualizar o estado. Não processa mídia e nenhum outro
+serviço deve escrever em suas tabelas.
 
 ## Responsabilidades de negócio
 
@@ -28,20 +30,23 @@ flowchart LR
 
 ## API atual
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `POST` | `/v1/jobs` | cria job a partir de `sourceKey` |
-| `GET` | `/v1/jobs/{id}` | consulta job |
-| `GET` | `/actuator/health` | health check |
-| `GET` | `/actuator/prometheus` | métricas |
+| Método | Endpoint               | Descrição                        |
+|--------|------------------------|----------------------------------|
+| `POST` | `/v1/jobs`             | cria job a partir de `sourceKey` |
+| `GET`  | `/v1/jobs/{id}`        | consulta job                     |
+| `GET`  | `/actuator/health`     | health check                     |
+| `GET`  | `/actuator/prometheus` | métricas                         |
 
-Todas as rotas de negócio exigem JWT. O contrato detalhado está em [`../../contracts/openapi.yaml`](../../contracts/openapi.yaml).
+Todas as rotas de negócio exigem JWT. O contrato detalhado está em [
+`../../contracts/openapi.yaml`](../../contracts/openapi.yaml).
 
 ## Persistência
 
-Flyway cria `jobs`, `job_status_history` e `outbox_events`. PostgreSQL é a fonte de verdade. `spring.jpa.hibernate.ddl-auto=validate` impede que Hibernate altere o schema silenciosamente.
+Flyway cria `jobs`, `job_status_history` e `outbox_events`. PostgreSQL é a fonte de verdade.
+`spring.jpa.hibernate.ddl-auto=validate` impede que Hibernate altere o schema silenciosamente.
 
-Limitação atual: a tabela de histórico existe, mas ainda não é populada; o result listener também precisa de uma inbox persistente e validação de transições fora de ordem.
+Limitação atual: a tabela de histórico existe, mas ainda não é populada; o result listener também precisa de uma inbox
+persistente e validação de transições fora de ordem.
 
 ## Eventos
 
@@ -52,16 +57,16 @@ Limitação atual: a tabela de histórico existe, mas ainda não é populada; o 
 
 ## Configuração
 
-| Variável | Padrão local | Uso |
-|---|---|---|
-| `SERVER_PORT` | `8080` | porta HTTP |
-| `DATABASE_URL` | `jdbc:postgresql://localhost:5432/fiapx` | JDBC URL |
-| `DATABASE_USER` | `fiapx` | usuário PostgreSQL |
-| `DATABASE_PASSWORD` | `fiapx` | senha PostgreSQL |
-| `RABBITMQ_HOST` | `localhost` | host do broker |
-| `RABBITMQ_USER` | `fiapx` | usuário do broker |
-| `RABBITMQ_PASSWORD` | `fiapx` | senha do broker |
-| `JWT_SECRET` | valor inseguro local | chave HMAC para validar JWT |
+| Variável            | Padrão local                             | Uso                         |
+|---------------------|------------------------------------------|-----------------------------|
+| `SERVER_PORT`       | `8080`                                   | porta HTTP                  |
+| `DATABASE_URL`      | `jdbc:postgresql://localhost:5432/fiapx` | JDBC URL                    |
+| `DATABASE_USER`     | `fiapx`                                  | usuário PostgreSQL          |
+| `DATABASE_PASSWORD` | `fiapx`                                  | senha PostgreSQL            |
+| `RABBITMQ_HOST`     | `localhost`                              | host do broker              |
+| `RABBITMQ_USER`     | `fiapx`                                  | usuário do broker           |
+| `RABBITMQ_PASSWORD` | `fiapx`                                  | senha do broker             |
+| `JWT_SECRET`        | valor inseguro local                     | chave HMAC para validar JWT |
 
 ## Executar e testar
 
@@ -76,15 +81,21 @@ Para execução funcional, PostgreSQL e RabbitMQ devem estar disponíveis. O Com
 
 ## Segurança
 
-A aplicação é resource server e não emite tokens. Produção deve migrar de HMAC compartilhado para OIDC/JWKS, validar issuer/audience e autorizar leitura por proprietário. O endpoint atual busca por ID sem filtrar `userId`; isso é uma lacuna conhecida e deve ser corrigida antes de exposição real.
+A aplicação é resource server e não emite tokens. Produção deve migrar de HMAC compartilhado para OIDC/JWKS, validar
+issuer/audience e autorizar leitura por proprietário. O endpoint atual busca por ID sem filtrar `userId`; isso é uma
+lacuna conhecida e deve ser corrigida antes de exposição real.
 
 ## Observabilidade
 
-Health, readiness/liveness e Prometheus são expostos pelo Actuator. Métricas recomendadas: jobs por estado, duração por estado, idade e tamanho da outbox, falhas de publicação, duplicatas e mensagens na DLQ.
+Health, readiness/liveness e Prometheus são expostos pelo Actuator. Métricas recomendadas: jobs por estado, duração por
+estado, idade e tamanho da outbox, falhas de publicação, duplicatas e mensagens na DLQ.
 
 ## CI/CD
 
-O CI raiz compila o módulo em Java 21 durante `clean verify`. Uma esteira de entrega deverá construir `services/video-api/Dockerfile`, escanear dependências e imagem, publicar por digest e promover a mesma imagem entre ambientes. Migrations devem ser testadas antes do rollout; deploy deve aguardar readiness e manter compatibilidade com consumidores da versão anterior.
+O CI raiz compila o módulo em Java 21 durante `clean verify`. Uma esteira de entrega deverá construir
+`services/video-api/Dockerfile`, escanear dependências e imagem, publicar por digest e promover a mesma imagem entre
+ambientes. Migrations devem ser testadas antes do rollout; deploy deve aguardar readiness e manter compatibilidade com
+consumidores da versão anterior.
 
 ## Próximos passos
 
