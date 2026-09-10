@@ -1,4 +1,11 @@
+---
+name: video-api-http
+description: Aplicar regras de controllers, JWT, autorização e contratos HTTP ao alterar endpoints em services/video-api. Não use para mudanças internas sem comportamento HTTP observável.
+---
+
 # HTTP e autorização
+
+Use esta skill ao alterar endpoints, autenticação, autorização, DTOs ou contratos HTTP em `services/video-api`.
 
 - Controllers tratam autenticação, validação, mapeamento de DTOs, status e headers;
   delegam regras de negócio a casos de uso.
@@ -14,19 +21,10 @@
   O OpenAPI atual ainda não define schemas de erro: documente-os junto da
   implementação, sem inventar formatos diferentes em cada controller.
 
-## Exemplos de revisão
-
-| Não fazer | Fazer |
-|---|---|
-| `findById(jobId)` no acesso do usuário | `findByIdAndUserId(jobId, authenticatedOwnerId)`. |
-| `request.userId()` define proprietário | Identidade do contexto de segurança. |
-| `ResponseEntity<JobEntity>` | DTO conforme o schema público de Job. |
-| Capturar toda exceção e retornar `200` | Mapear falhas específicas no handler global. |
-| Retornar stack trace ou SQL no erro | Detalhe público sanitizado. |
+Leia os [exemplos de revisão](references/exemplos-de-revisao.md) quando precisar comparar abordagens.
 
 Não remova campos públicos silenciosamente. `sourceKey` consta no contrato atual;
 uma representação mais restrita exige alinhamento com OpenAPI e compatibilidade
 com clientes. Não exponha chaves internas extras sem necessidade contratual.
 
-Teste autenticação, acesso entre usuários, validação e contrato conforme
-[testes e cobertura](testing-coverage.md).
+Teste autenticação, acesso entre usuários, validação e contrato conforme a [skill de testes e cobertura](../video-api-testing/SKILL.md).

@@ -1,4 +1,11 @@
+---
+name: video-api-job-lifecycle
+description: Aplicar regras de transição, histórico e idempotência ao alterar o ciclo de vida de jobs em services/video-api. Não use para mudanças sem estados de job ou consumo de eventos relacionado.
+---
+
 # Ciclo de vida dos jobs
+
+Use esta skill ao alterar estados de jobs, transições ou o consumo de eventos que atualiza seu ciclo de vida em `services/video-api`.
 
 - Defina explicitamente as transições permitidas entre estados do contrato.
   Rejeite transições inválidas e trate eventos antigos sem regredir o estado.
@@ -10,14 +17,7 @@
   Confirme consumo somente após sucesso da transação.
 - Não permita evento antigo sobrescrever resultado ou estado terminal.
 
-## Exemplos
-
-| Cenário | Comportamento exigido |
-|---|---|
-| Mesma conclusão entregue duas vezes | Uma mudança de estado e um histórico. |
-| Início chega após conclusão | Preservar estado terminal e resultado. |
-| Falha ao gravar histórico | Rollback da mudança de estado. |
-| Duas entregas concorrentes do mesmo evento | Garantia no banco impede dois efeitos. |
+Leia os [exemplos de comportamento](references/exemplos.md) quando precisar avaliar duplicação, ordenação ou concorrência.
 
 Não faça `job.setStatus(event.status())` diretamente no listener. Encaminhe ao
 caso de uso que valida transição e persiste efeitos atomicamente. Não compare
@@ -26,4 +26,4 @@ política de ordenação do contrato/especificação.
 
 Quando uma transição ainda não estiver especificada, registre a questão antes de
 inventar uma política. Teste transições permitidas, inválidas, duplicatas e ordem
-invertida; consulte [persistência e mensageria](persistence-messaging.md).
+invertida; consulte a [skill de persistência e mensageria](../video-api-persistence-messaging/SKILL.md).

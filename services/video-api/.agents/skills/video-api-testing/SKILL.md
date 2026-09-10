@@ -1,4 +1,11 @@
+---
+name: video-api-testing
+description: Aplicar regras de testes, cobertura e verificação ao implementar ou revisar comportamentos em services/video-api. Não use para alterações exclusivamente documentais sem mudança de comportamento.
+---
+
 # Testes e cobertura
+
+Use esta skill ao implementar ou revisar mudanças de comportamento em `services/video-api`. Leia o recurso de exemplo somente quando precisar de uma referência de teste unitário.
 
 ## Regra crítica e obrigatória
 
@@ -41,23 +48,9 @@ para suporte AMQP e Testcontainers para integrações reais. Declare dependênci
 de teste ausentes quando implementar os cenários que precisarem delas.
 
 Siga Given/When/Then ou AAA (Arrange/Act/Assert), separando etapas com linhas em
-branco, sem comentários redundantes. Exemplo unitário ilustrativo:
-
-```java
-@Test
-void rejectsJobOwnedByAnotherUser() {
-    var repository = mock(JobRepository.class);
-    var query = new FindJob(repository);
-    var jobId = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    var ownerId = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    when(repository.findByIdAndUserId(jobId, ownerId))
-        .thenReturn(Optional.empty());
-
-    var failure = catchThrowable(() -> query.execute(jobId, ownerId));
-
-    assertThat(failure).isInstanceOf(JobNotFoundException.class);
-}
-```
+branco, sem comentários redundantes. Leia o [exemplo unitário ilustrativo](references/exemplo-unitario.md).
+Escolha `@Mock` com extensão Mockito ou `mock(...)` local conforme o teste ficar
+mais claro e isolado; ambos são aceitáveis.
 
 Evite `testsAllJobOperations`, testes sem asserções, `Thread.sleep`, rede externa
 ou mocks que apenas repetem cada chamada interna da implementação.
