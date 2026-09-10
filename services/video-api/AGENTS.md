@@ -8,11 +8,12 @@ implementar ou revisar mudanças. Elas são obrigatórias, não apenas referênc
 
 - [Arquitetura e SOLID](.agents/rules/architecture.md): responsabilidades e dependências.
 - [Padrões de código](.agents/rules/code-standards.md): limites, comentários, condicionais e Clean Code.
-- [Boas práticas de Java 21](.agents/rules/java.md): linguagem, concorrência, configuração, logging e observabilidade.
-- [Testes e cobertura](.agents/rules/testing-coverage.md): TDD, FIRST, AAA e mínimo de 80%.
-- [HTTP e autorização](.agents/rules/http-api.md): JWT, propriedade, DTOs e contratos.
-- [Ciclo de vida](.agents/rules/job-lifecycle.md): transições, histórico e idempotência.
-- [Persistência e mensageria](.agents/rules/persistence-messaging.md): migrations, outbox e concorrência.
+- [Skill de boas práticas de Java 21](.agents/skills/video-api-java/SKILL.md): linguagem, concorrência, configuração, logging e observabilidade.
+- [Skill de testes e cobertura](.agents/skills/video-api-testing/SKILL.md): TDD, FIRST, AAA e mínimo de 80%.
+- [Skill de HTTP e autorização](.agents/skills/video-api-http/SKILL.md): JWT, propriedade, DTOs e contratos.
+- [Skill de OAuth2 Resource Server](.agents/skills/video-api-oauth2-resource-server/SKILL.md): validação de bearer token e mapeamento de identidade.
+- [Skill de ciclo de vida dos jobs](.agents/skills/video-api-job-lifecycle/SKILL.md): transições, histórico e idempotência.
+- [Skill de persistência e mensageria](.agents/skills/video-api-persistence-messaging/SKILL.md): migrations, outbox e concorrência.
 - [Segurança e observabilidade](.agents/rules/security-observability.md): configuração, logs e métricas.
 
 ## Aplicação e revisão

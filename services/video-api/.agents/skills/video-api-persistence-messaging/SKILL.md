@@ -1,4 +1,13 @@
+---
+name: video-api-persistence-messaging
+description: Aplicar regras de Flyway, JPA, outbox, publicação RabbitMQ e concorrência ao alterar persistência ou eventos em services/video-api. Não use para mudanças HTTP sem estado ou mensageria.
+---
+
 # Persistência e mensageria
+
+Use esta skill ao alterar banco, migrations, outbox, publicação ou consumo de
+eventos no Video API. Consulte `event-driven-messaging` para padrões de transporte
+e `video-api-job-lifecycle` para transições de estado.
 
 - Coloque fronteiras transacionais nos serviços de aplicação, não nos controllers.
 - Use novas migrations Flyway forward-only. Nunca edite migration aplicada.
@@ -15,17 +24,6 @@
   tratamento de mensagens inválidas conforme a política de DLQ, sem loop infinito.
 - Preserve compatibilidade e versão dos eventos no AsyncAPI. Inclua ID estável,
   timestamp de ocorrência, correlação, tipo e versão do schema.
-
-## Exemplos de revisão
-
-| Não fazer | Fazer |
-|---|---|
-| Salvar job e depois chamar `rabbitTemplate.convertAndSend` | Salvar job/outbox atomicamente; publicador envia depois. |
-| Marcar publicado antes de enviar | Aguardar confirmação do broker. |
-| Gerar novo eventId por retry | Reutilizar o ID persistido na outbox. |
-| Dois workers fazem `findAll` dos pendentes | Claim concorrente e lote limitado. |
-| Alterar `V1__api_schema.sql` aplicada | Nova migration com próxima versão disponível. |
-| Carregar todos os jobs para filtrar usuário em Java | Filtrar proprietário e limitar resultados no banco. |
 
 Teste rollback job/outbox e concorrência no PostgreSQL real; valide confirms,
 redelivery e falhas de roteamento no RabbitMQ real quando essas semânticas forem
