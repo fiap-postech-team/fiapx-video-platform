@@ -21,6 +21,7 @@
         <!-- This foundation PR intentionally contains no Java sources. Remove this
              property when the application classes are introduced. -->
         <spring-boot.repackage.skip>true</spring-boot.repackage.skip>
+        <lombok.version>1.18.48</lombok.version>
     </properties>
     <dependencyManagement>
         <dependencies>

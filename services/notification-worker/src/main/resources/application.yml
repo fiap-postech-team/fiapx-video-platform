@@ -5,19 +5,40 @@ spring:
     url: ${NOTIFICATION_DATABASE_URL:jdbc:postgresql://localhost:5432/fiapx_notifications}
     username: ${DATABASE_USER:fiapx}
     password: ${DATABASE_PASSWORD:fiapx}
-  jpa.hibernate.ddl-auto: validate
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     username: ${RABBITMQ_USER:fiapx}
     password: ${RABBITMQ_PASSWORD:fiapx}
-    listener.simple:
-      retry.enabled: true
-      retry.initial-interval: 2s
-      retry.multiplier: 2
-      retry.max-attempts: 4
-      default-requeue-rejected: false
+    listener:
+      simple:
+        concurrency: ${RABBITMQ_LISTENER_CONCURRENCY:1}
+        max-concurrency: ${RABBITMQ_LISTENER_MAX_CONCURRENCY:8}
+        prefetch: ${RABBITMQ_LISTENER_PREFETCH:10}
+        retry:
+          enabled: true
+          initial-interval: 2s
+          multiplier: 2
+          max-attempts: 4
+        default-requeue-rejected: false
   mail:
     host: ${SMTP_HOST:localhost}
     port: ${SMTP_PORT:1025}
-management.endpoints.web.exposure.include: health,info,prometheus
-management.endpoint.health.probes.enabled: true
+
+app:
+  notification:
+    default-recipient: ${NOTIFICATION_DEFAULT_RECIPIENT:dev@fiapx.local}
+    from-address: ${NOTIFICATION_FROM_ADDRESS:noreply@fiapx.local}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
