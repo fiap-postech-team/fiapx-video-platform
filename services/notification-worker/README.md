@@ -1,86 +1,194 @@
 # notification-worker
 
-## Summary
+## Objetivo
 
-Worker assíncrono que notifica o usuário quando um job termina em falha. Ele é separado do processor porque SMTP tem disponibilidade, latência e política de retry próprias. Não consulta tabelas da API; usa somente sua persistência para idempotência e auditoria.
+Worker assíncrono responsável por notificar o usuário quando um job de processamento de vídeo termina em falha.
+Este módulo foi organizado seguindo Clean Architecture para manter as regras de negócio independentes de RabbitMQ,
+SMTP, JPA e Spring.
+
+> Escopo: a reorganização arquitetural está restrita a `services/notification-worker`.
 
 ## Responsabilidades de negócio
 
 - consumir `video.job.failed.v1`;
 - ignorar eventos já entregues com base em `eventId`;
-- montar e enviar e-mail de falha;
+- montar a notificação de falha;
+- enviar o e-mail;
 - registrar a entrega no banco próprio;
-- enviar mensagens não processáveis para DLQ após retry limitado.
+- encaminhar mensagens não processáveis para DLQ após retry limitado.
+
+## Clean Architecture
+
+A dependência do código aponta para dentro:
+
+```text
+Infrastructure  --->  Application  --->  Domain
+     |                    |
+     +------ implements --+ (ports)
+```
+
+### Estrutura
+
+```text
+br.com.fiapx.notification
+├── NotificationWorkerApplication.java
+├── domain
+│   └── model
+│       ├── FailureNotification.java
+│       └── NotificationDelivery.java
+├── application
+│   ├── port
+│   │   ├── in
+│   │   │   ├── NotificationResult.java
+│   │   │   └── NotifyProcessingFailureUseCase.java
+│   │   └── out
+│   │       ├── NotificationDeliveryRepository.java
+│   │       ├── NotificationSender.java
+│   │       └── OutboundNotification.java
+│   └── service
+│       └── NotifyProcessingFailureService.java
+└── infrastructure
+    ├── config
+    │   ├── ApplicationConfiguration.java
+    │   └── NotificationProperties.java
+    ├── mail
+    │   └── SmtpNotificationSender.java
+    ├── messaging/rabbit
+    │   ├── FailureEventListener.java
+    │   ├── FailureEventMapper.java
+    │   ├── FailureEventMessage.java
+    │   └── RabbitMessagingConfiguration.java
+    └── persistence/jpa
+        ├── JpaNotificationDeliveryRepositoryAdapter.java
+        ├── NotificationDeliveryEntity.java
+        └── SpringDataNotificationDeliveryRepository.java
+```
+
+### Camadas
+
+**Domain** contém apenas os modelos e invariantes do worker. Não conhece Spring, RabbitMQ, SMTP ou JPA.
+
+**Application** contém o caso de uso e as portas de entrada/saída. O fluxo de negócio depende somente do domínio e de
+interfaces próprias.
+
+**Infrastructure** contém os detalhes tecnológicos. RabbitMQ é o adaptador de entrada; SMTP e PostgreSQL/JPA são
+adaptadores de saída. A configuração Spring conecta as implementações às portas da aplicação.
 
 ## Fluxo
 
 ```mermaid
 flowchart LR
-    EVENT[failed.v1] --> EXISTS{eventId já existe?}
-    EXISTS -->|sim| ACK[Confirmar sem reenviar]
-    EXISTS -->|não| MAIL[Enviar e-mail]
-    MAIL --> SAVE[Persistir entrega]
-    MAIL -. falha transitória .-> RETRY[Retry limitado]
-    RETRY -. esgotado .-> DLQ[notification failure DLQ]
+    EVENT[video.job.failed.v1] --> LISTENER[Rabbit adapter]
+    LISTENER --> USECASE[NotifyProcessingFailureUseCase]
+    USECASE --> EXISTS{eventId já entregue?}
+    EXISTS -->|sim| ACK[Ignorar duplicata]
+    EXISTS -->|não| MAIL[NotificationSender]
+    MAIL --> SMTP[SMTP adapter]
+    MAIL --> SAVE[NotificationDeliveryRepository]
+    SAVE --> DB[(PostgreSQL)]
+    LISTENER -. erro/retry esgotado .-> DLQ[notification failure DLQ]
 ```
 
-## Ferramentas
+## Boas práticas aplicadas
 
-- Spring AMQP para consumo e retry;
-- Spring Mail para SMTP;
-- Spring Data JPA e PostgreSQL para auditoria;
-- Flyway para migrations;
-- MailHog no desenvolvimento;
-- Actuator, Micrometer e Prometheus.
+- inversão de dependência por portas de entrada e saída;
+- domínio sem dependência de framework; a validação Jakarta fica nos objetos de entrada/saída onde é necessária;
+- DTO do RabbitMQ isolado do modelo de domínio;
+- entidade JPA separada do domínio;
+- configuração externa para remetente e destinatário de fallback;
+- `Clock` injetável para remover dependência implícita de `Instant.now()` e facilitar testes;
+- validação defensiva dos dados essenciais do evento;
+- limite de 500 caracteres para o motivo recebido no evento;
+- nomes de exchange, filas e routing keys centralizados;
+- logs com `eventId` e `jobId`, sem registrar o endereço completo do destinatário ou o conteúdo do erro;
+- `open-in-view` desabilitado;
+- testes unitários para o caso de uso e o mapeamento do evento;
+- uso criterioso de Lombok para reduzir boilerplate (`@RequiredArgsConstructor`, `@Slf4j`, `@Getter` e `@NoArgsConstructor`);
+- evitado `@Data` em entidades JPA e modelos de domínio para não gerar `equals/hashCode`, setters e outros comportamentos indesejados automaticamente.
+
+## Lombok
+
+O módulo utiliza Lombok apenas onde ele reduz código repetitivo sem esconder regra de negócio. Construtores de dependências
+são gerados com `@RequiredArgsConstructor`, logs com `@Slf4j`, o mapper estático com `@NoArgsConstructor(access = PRIVATE)` e a entidade JPA
+usa `@Getter` + `@NoArgsConstructor(access = PROTECTED)`. Os modelos e DTOs foram mantidos como classes Java convencionais,
+com Lombok para getters, setters e construtores quando apropriado; não são utilizados `record`s neste módulo.
 
 ## Eventos e persistência
 
 - Consome `video.job.failed.v1` pela fila `video.notifications.failure.v1`.
 - DLQ: `video.notifications.failure.dlq.v1`.
-- Tabela própria: `notification_deliveries`, com unique constraint em `event_id`.
+- Tabela própria: `notification_deliveries`, com unicidade em `event_id`.
 
-O evento deveria conter o destinatário já autorizado ou uma referência resolvível por uma API própria. O fallback `dev@fiapx.local` existe apenas para a fundação local.
+O contrato atual ainda não exige `recipient`. Enquanto o produtor não enviar esse campo, o worker usa
+`app.notification.default-recipient`, configurável por variável de ambiente.
 
 ## Configuração
 
-| Variável | Padrão local | Uso |
-|---|---|---|
-| `SERVER_PORT` | `8082` | management/Actuator |
-| `NOTIFICATION_DATABASE_URL` | banco local de notificações | JDBC URL |
-| `DATABASE_USER` | `fiapx` | usuário PostgreSQL |
-| `DATABASE_PASSWORD` | `fiapx` | senha PostgreSQL |
-| `RABBITMQ_HOST` | `localhost` | host do broker |
-| `RABBITMQ_USER` | `fiapx` | usuário do broker |
-| `RABBITMQ_PASSWORD` | `fiapx` | senha do broker |
-| `SMTP_HOST` | `localhost` | servidor SMTP |
-| `SMTP_PORT` | `1025` | porta SMTP |
+| Variável                         | Padrão local                | Uso |
+|----------------------------------|-----------------------------|-----|
+| `SERVER_PORT`                    | `8082`                      | management/Actuator |
+| `NOTIFICATION_DATABASE_URL`      | banco local de notificações | JDBC URL |
+| `DATABASE_USER`                  | `fiapx`                     | usuário PostgreSQL |
+| `DATABASE_PASSWORD`              | `fiapx`                     | senha PostgreSQL |
+| `RABBITMQ_HOST`                  | `localhost`                 | host do broker |
+| `RABBITMQ_USER`                  | `fiapx`                     | usuário do broker |
+| `RABBITMQ_PASSWORD`              | `fiapx`                     | senha do broker |
+| `RABBITMQ_LISTENER_CONCURRENCY`   | `1`                         | consumidores concorrentes iniciais |
+| `RABBITMQ_LISTENER_MAX_CONCURRENCY` | `8`                       | limite de consumidores concorrentes |
+| `RABBITMQ_LISTENER_PREFETCH`      | `10`                        | mensagens pré-buscadas por consumidor |
+| `SMTP_HOST`                      | `localhost`                 | servidor SMTP |
+| `SMTP_PORT`                      | `1025`                      | porta SMTP |
+| `NOTIFICATION_DEFAULT_RECIPIENT` | `dev@fiapx.local`           | fallback enquanto o evento não traz destinatário |
+| `NOTIFICATION_FROM_ADDRESS`      | `noreply@fiapx.local`       | remetente do e-mail |
 
 ## Executar e testar
 
 ```bash
-./mvnw -pl services/notification-worker -am clean verify
+./mvnw -pl services/notification-worker -am clean test
 ./mvnw -pl services/notification-worker -am spring-boot:run
 ```
 
-PostgreSQL, RabbitMQ e SMTP devem estar disponíveis. Use o Compose raiz para provisionar o ambiente completo e consulte mensagens em `http://localhost:8025`.
+PostgreSQL, RabbitMQ e SMTP devem estar disponíveis para execução da aplicação. Os testes unitários do caso de uso não
+dependem desses serviços externos.
 
 ## Idempotência e consistência
 
-A unique constraint evita duas linhas para o mesmo evento. Contudo, SMTP e PostgreSQL não compartilham transação: uma queda depois do envio e antes do `INSERT` pode duplicar o e-mail. Para reduzir o risco, adote uma tabela de intenção com estados, um provedor que aceite idempotency key ou uma caixa de saída dedicada de notificações.
+O worker consulta `eventId` antes do envio e mantém `event_id` como chave única na auditoria. Isso evita o reenvio em
+redeliveries normais já persistidas.
+
+SMTP e PostgreSQL, entretanto, não compartilham a mesma transação. Se o e-mail for aceito pelo servidor e o processo cair
+antes da persistência, uma nova entrega poderá reenviar o e-mail. Esse limite já faz parte da arquitetura do sistema e
+pode ser reduzido futuramente com uma tabela de intenção/state machine ou com um provedor de e-mail que aceite chave de
+idempotência.
 
 ## Observabilidade
 
-Monitore entregas, duplicatas ignoradas, latência SMTP, retries, falhas por categoria e profundidade da DLQ. Logs não devem conter conteúdo sensível ou endereço completo sem necessidade operacional.
+O worker expõe Actuator via HTTP na porta configurada em `SERVER_PORT`, incluindo `/actuator/health` e
+`/actuator/prometheus`. O `micrometer-registry-prometheus` disponibiliza as métricas para coleta por Prometheus.
 
-## CI/CD
+Monitorar entregas, duplicatas ignoradas, latência SMTP, retries, falhas por categoria e profundidade da DLQ. Logs não
+devem conter conteúdo sensível ou endereço de e-mail completo sem necessidade operacional.
 
-O CI raiz compila o módulo e valida o Compose. A entrega deve construir e escanear a imagem específica, aplicar a migration compatível e usar smoke test contra servidor SMTP de teste. Deploys devem preservar consumers antigos enquanto houver eventos compatíveis em trânsito.
+## Aderência ao Hackathon da pós - escopo do notification-worker
 
-## Próximos passos
+| Requisito relacionado ao worker | Situação | Implementação |
+|----------------------------------|----------|---------------|
+| Notificar o usuário em caso de erro | Parcial no fluxo ponta a ponta | O worker envia e-mail e aceita `recipient`; enquanto o produtor não preencher esse campo, utiliza um destinatário de fallback configurável. |
+| Mensageria | Atende | RabbitMQ, fila durável, retry limitado e DLQ. |
+| Persistência | Atende | PostgreSQL/JPA com migration Flyway e unicidade por `event_id`. |
+| Arquitetura escalável | Atende no worker | Serviço sem estado local, consumidores concorrentes configuráveis e possibilidade de múltiplas réplicas consumindo a mesma fila. |
+| Testes | Atende como base | Testes unitários cobrem domínio, mapeamento e principal caso de uso. Testes de integração podem ser adicionados como evolução. |
+| Containers | Atende | Dockerfile próprio; no projeto completo o serviço é executado via Docker Compose. |
+| Monitoramento | Atende no worker | Actuator + Micrometer + endpoint Prometheus. A coleta/visualização depende da infraestrutura do projeto. |
+| CI/CD | Atende no repositório | O pipeline do repositório executa `clean verify`, incluindo este módulo. |
+| Documentação da arquitetura | Atende | Este README documenta responsabilidades, camadas, fluxo, idempotência e observabilidade. |
+| Script de criação dos dados | Atende | `V1__notification_schema.sql` cria a tabela utilizada pelo worker. |
 
-- templates HTML/text versionados e localização;
-- destinatário obrigatório no contrato;
-- classificação de erros SMTP permanentes e transitórios;
-- estratégia de idempotência para o side effect externo;
-- testes Testcontainers e servidor SMTP fake;
-- política de retenção e privacidade da auditoria.
+Os requisitos de autenticação, listagem de status e processamento simultâneo de vídeos pertencem aos serviços responsáveis
+por entrada/consulta e processamento, portanto não devem ser implementados dentro deste worker apenas para reproduzir o
+enunciado.
+
+
+## Validation
+
+O módulo utiliza `spring-boot-starter-validation`/Jakarta Bean Validation nas bordas da aplicação. O evento recebido do RabbitMQ valida identificadores, formato do e-mail e tamanhos antes do mapeamento para o domínio. As propriedades de configuração são validadas no startup e `OutboundNotification` possui constraints de destinatário, assunto e corpo, aplicadas no adapter SMTP por method validation (`@Validated` + `@Valid`). As invariantes dos modelos de domínio permanecem protegidas no próprio domínio para não depender do Spring.

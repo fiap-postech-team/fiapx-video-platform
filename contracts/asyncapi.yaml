@@ -10,5 +10,5 @@ operations:
   consumeRequested: { action: receive, channel: { $ref: '#/channels/jobRequested' } }
 components:
   messages:
-    JobRequested: { payload: { type: object, required: [eventId, jobId, userId, sourceKey], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string } } } }
-    JobResult: { payload: { type: object, required: [eventId, jobId, type], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, type: { enum: [PROCESSING, COMPLETED, FAILED] }, resultKey: { type: string }, terminal: { type: boolean }, reason: { type: string }, recipient: { type: string, format: email } } } }
+    JobRequested: { payload: { type: object, required: [ eventId, jobId, userId, sourceKey ], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string } } } }
+    JobResult: { payload: { type: object, required: [ eventId, jobId, type ], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, type: { enum: [ PROCESSING, COMPLETED, FAILED ] }, resultKey: { type: string }, terminal: { type: boolean }, reason: { type: string }, recipient: { type: string, format: email } } } }

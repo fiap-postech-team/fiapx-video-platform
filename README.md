@@ -2,9 +2,13 @@
 
 ## Summary
 
-O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs assíncronos, extrai frames com FFmpeg, gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
+O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs assíncronos, extrai frames com FFmpeg,
+gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações
+Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
 
-> Estado da fundação: os serviços, contratos, migrations, imagens e ambiente local compilam e estão estruturados. Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e testes de integração são evoluções registradas, não funcionalidades concluídas.
+> Estado da fundação: os serviços, contratos, migrations, imagens e ambiente local compilam e estão estruturados.
+> Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e testes de integração são
+> evoluções registradas, não funcionalidades concluídas.
 
 ## Visão geral
 
@@ -22,17 +26,19 @@ flowchart LR
     NOTIF -->|e-mail| SMTP[MailHog / SMTP]
 ```
 
-Veja a [arquitetura detalhada](docs/architecture/architecture.md), o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arquiteturais](docs/adr/README.md).
+Veja a [arquitetura detalhada](docs/architecture/architecture.md),
+o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arquiteturais](docs/adr/README.md).
 
 ## Aplicações
 
-| Aplicação | Responsabilidade | Porta | Documentação |
-|---|---|---:|---|
-| `video-api` | Autorização JWT, jobs, outbox e aplicação dos resultados | 8080 | [README](services/video-api/README.md) |
-| `video-processor` | FFprobe, FFmpeg, ZIP e object storage | 8081 | [README](services/video-processor/README.md) |
-| `notification-worker` | Notificação de falhas terminais e auditoria | 8082 | [README](services/notification-worker/README.md) |
+| Aplicação             | Responsabilidade                                         | Porta | Documentação                                     |
+|-----------------------|----------------------------------------------------------|------:|--------------------------------------------------|
+| `video-api`           | Autorização JWT, jobs, outbox e aplicação dos resultados |  8080 | [README](services/video-api/README.md)           |
+| `video-processor`     | FFprobe, FFmpeg, ZIP e object storage                    |  8081 | [README](services/video-processor/README.md)     |
+| `notification-worker` | Notificação de falhas terminais e auditoria              |  8082 | [README](services/notification-worker/README.md) |
 
-Os módulos não dependem uns dos outros no Maven. Cada aplicação possui configuração, Dockerfile, health check e ciclo de execução próprios.
+Os módulos não dependem uns dos outros no Maven. Cada aplicação possui configuração, Dockerfile, health check e ciclo de
+execução próprios.
 
 ## Stack
 
@@ -92,13 +98,13 @@ docker compose up --build
 
 ### Endpoints locais
 
-| Recurso | URL |
-|---|---|
-| Video API | `http://localhost:8080` |
-| Health da API | `http://localhost:8080/actuator/health` |
-| RabbitMQ Management | `http://localhost:15672` |
-| MinIO Console | `http://localhost:9001` |
-| MailHog | `http://localhost:8025` |
+| Recurso             | URL                                     |
+|---------------------|-----------------------------------------|
+| Video API           | `http://localhost:8080`                 |
+| Health da API       | `http://localhost:8080/actuator/health` |
+| RabbitMQ Management | `http://localhost:15672`                |
+| MinIO Console       | `http://localhost:9001`                 |
+| MailHog             | `http://localhost:8025`                 |
 
 Credenciais locais vêm do `.env`; os valores de `.env.example` destinam-se somente a desenvolvimento.
 
@@ -121,21 +127,30 @@ docker compose config --quiet
 - [OpenAPI](contracts/openapi.yaml): endpoints HTTP atuais para criação e consulta de jobs.
 - [AsyncAPI](contracts/asyncapi.yaml): canais e schemas dos eventos versionados.
 
-O routing key inclui a versão (`.v1`). Mudanças incompatíveis exigem uma nova versão do contrato e uma estratégia de convivência entre produtores e consumidores.
+O routing key inclui a versão (`.v1`). Mudanças incompatíveis exigem uma nova versão do contrato e uma estratégia de
+convivência entre produtores e consumidores.
 
 ## Configuração e segurança
 
-Configuração é externalizada por variáveis de ambiente. Nunca use os segredos padrão fora do ambiente local. A API valida JWT HMAC, mas esta fundação não emite tokens. Em ambientes reais, prefira um provedor OIDC, chaves assimétricas, rotação de credenciais, TLS e secret manager.
+Configuração é externalizada por variáveis de ambiente. Nunca use os segredos padrão fora do ambiente local. A API
+valida JWT HMAC, mas esta fundação não emite tokens. Em ambientes reais, prefira um provedor OIDC, chaves assimétricas,
+rotação de credenciais, TLS e secret manager.
 
-Payloads binários não passam pelo RabbitMQ ou PostgreSQL. Vídeos e ZIPs ficam no object storage; mensagens carregam apenas IDs, object keys e metadados pequenos.
+Payloads binários não passam pelo RabbitMQ ou PostgreSQL. Vídeos e ZIPs ficam no object storage; mensagens carregam
+apenas IDs, object keys e metadados pequenos.
 
 ## Observabilidade
 
-Cada aplicação expõe liveness/readiness pelo Actuator e métricas em `/actuator/prometheus`. Logs estruturados, tracing distribuído, dashboards e alertas são próximos passos documentados em [atributos de qualidade](docs/architecture/quality-attributes.md).
+Cada aplicação expõe liveness/readiness pelo Actuator e métricas em `/actuator/prometheus`. Logs estruturados, tracing
+distribuído, dashboards e alertas são próximos passos documentados
+em [atributos de qualidade](docs/architecture/quality-attributes.md).
 
 ## CI/CD
 
-O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa em pushes e pull requests, prepara Java 21, usa cache Maven, roda `clean verify` e valida o Compose. O pipeline atual é de CI: publicação de imagens, análise de vulnerabilidades, assinatura de artefatos e deploy ainda devem ser adicionados conforme o registry e o ambiente alvo forem definidos.
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa em pushes e pull requests, prepara Java 21,
+usa cache Maven, roda `clean verify` e valida o Compose. O pipeline atual é de CI: publicação de imagens, análise de
+vulnerabilidades, assinatura de artefatos e deploy ainda devem ser adicionados conforme o registry e o ambiente alvo
+forem definidos.
 
 ## Decisões e limites
 
