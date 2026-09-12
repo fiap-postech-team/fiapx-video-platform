@@ -1,8 +1,33 @@
 target/
+**/target/
+build/
+out/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+coverage/
+**/coverage/
+
+# Logs
+*.log
+
+# IDEs
 .idea/
-.vscode/
+**/.idea/
 *.iml
-.DS_Store
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# Local environment and runtime data
 .env
 data/
 uploads/
+
+# OS
+.DS_Store
+Thumbs.db
