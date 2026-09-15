@@ -6,9 +6,9 @@ O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs
 gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações
 Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
 
-> Estado da fundação: os serviços, contratos, migrations, imagens e ambiente local compilam e estão estruturados.
-> Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e testes de integração são
-> evoluções registradas, não funcionalidades concluídas.
+> Estado da fundação: o `video-api` já é executável, sobe com PostgreSQL e expõe health e Swagger local no perfil
+> `local`. Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e os fluxos de
+> jobs/outbox/resultados continuam como evoluções registradas, não funcionalidades concluídas.
 
 ## Visão geral
 
@@ -33,7 +33,7 @@ o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arq
 
 | Aplicação             | Responsabilidade                                         | Porta | Documentação                                     |
 |-----------------------|----------------------------------------------------------|------:|--------------------------------------------------|
-| `video-api`           | Autorização JWT, jobs, outbox e aplicação dos resultados |  8080 | [README](services/video-api/README.md)           |
+| `video-api`           | Fundação executável; health hoje e Swagger local no perfil `local` |  8080 | [README](services/video-api/README.md)           |
 | `video-processor`     | FFprobe, FFmpeg, ZIP e object storage                    |  8081 | [README](services/video-processor/README.md)     |
 | `notification-worker` | Notificação de falhas terminais e auditoria              |  8082 | [README](services/notification-worker/README.md) |
 
@@ -110,9 +110,8 @@ Credenciais locais vêm do `.env`; os valores de `.env.example` destinam-se some
 
 ## Build e verificação
 
-Nesta entrega de fundação, o `spring-boot:repackage` está desabilitado porque os
-fontes Java serão adicionados em uma etapa posterior. Ao incluir as classes de
-aplicação, remova a propriedade `spring-boot.repackage.skip` do `pom.xml` raiz.
+O `services/video-api` já produz um JAR executável. Use os comandos abaixo para validar a fundação e os serviços
+conforme forem sendo implementados.
 
 ```bash
 ./mvnw clean verify
@@ -124,26 +123,25 @@ docker compose config --quiet
 
 ## Contratos
 
-- [OpenAPI](contracts/openapi.yaml): endpoints HTTP atuais para criação e consulta de jobs.
-- [AsyncAPI](contracts/asyncapi.yaml): canais e schemas dos eventos versionados.
+- [OpenAPI](contracts/openapi.yaml): contrato canônico da API HTTP; a UI local consome a cópia empacotada.
+- [AsyncAPI](contracts/asyncapi.yaml): contrato canônico dos eventos; permanece como fonte de verdade mesmo antes dos consumidores estarem completos.
 
 O routing key inclui a versão (`.v1`). Mudanças incompatíveis exigem uma nova versão do contrato e uma estratégia de
 convivência entre produtores e consumidores.
 
 ## Configuração e segurança
 
-Configuração é externalizada por variáveis de ambiente. Nunca use os segredos padrão fora do ambiente local. A API
-valida JWT HMAC, mas esta fundação não emite tokens. Em ambientes reais, prefira um provedor OIDC, chaves assimétricas,
-rotação de credenciais, TLS e secret manager.
+Configuração é externalizada por variáveis de ambiente. Nunca use os segredos padrão fora do ambiente local. O
+`video-api` desta fundação não emite tokens nem implementa autenticação; o ADR 0010 documenta HMAC apenas para
+desenvolvimento local futuro e OIDC/JWKS para ambientes não locais.
 
 Payloads binários não passam pelo RabbitMQ ou PostgreSQL. Vídeos e ZIPs ficam no object storage; mensagens carregam
 apenas IDs, object keys e metadados pequenos.
 
 ## Observabilidade
 
-Cada aplicação expõe liveness/readiness pelo Actuator e métricas em `/actuator/prometheus`. Logs estruturados, tracing
-distribuído, dashboards e alertas são próximos passos documentados
-em [atributos de qualidade](docs/architecture/quality-attributes.md).
+A fundação expõe health e Swagger local no `video-api`; métricas de negócio, tracing distribuído, dashboards e alertas
+permanecem nos próximos épicos e nos [atributos de qualidade](docs/architecture/quality-attributes.md).
 
 ## CI/CD
 

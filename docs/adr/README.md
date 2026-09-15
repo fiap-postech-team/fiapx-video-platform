@@ -27,6 +27,7 @@ exceto por correções editoriais e links.
 | [0007](0007-use-transactional-outbox.md)                            | Outbox transacional               | Aceito |
 | [0008](0008-use-at-least-once-delivery-and-idempotent-consumers.md) | Entrega pelo menos uma vez        | Aceito |
 | [0009](0009-defer-redis-until-needed.md)                            | Adiar Redis                       | Aceito |
+| [0010](0010-use-local-hmac-jwt-and-migrate-to-oidc-jwks.md)         | HMAC local e OIDC/JWKS        | Aceito |
 
 ## Template
 
