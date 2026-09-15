@@ -1,0 +1,58 @@
+package br.com.fiapx.videoapi.foundation.http;
+
+import java.net.URI;
+
+public enum ProblemType {
+    VALIDATION_ERROR(
+        "validation",
+        "Requisição inválida",
+        400,
+        "Um ou mais dados informados são inválidos."
+    ),
+    UNAUTHORIZED(
+        "unauthorized",
+        "Não autorizado",
+        401,
+        "Autenticação é necessária para acessar este recurso."
+    ),
+    ACCESS_DENIED(
+        "access-denied",
+        "Acesso negado",
+        403,
+        "Você não possui permissão para acessar este recurso."
+    ),
+    INTERNAL_ERROR(
+        "internal-error",
+        "Erro interno",
+        500,
+        "Não foi possível concluir a solicitação."
+    );
+
+    private final String type;
+    private final String title;
+    private final int status;
+    private final String detail;
+
+    ProblemType(String type, String title, int status, String detail) {
+        this.type = type;
+        this.title = title;
+        this.status = status;
+        this.detail = detail;
+    }
+
+    URI typeUri() {
+        return URI.create("urn:fiapx:problem:" + type);
+    }
+
+    String title() {
+        return title;
+    }
+
+    int status() {
+        return status;
+    }
+
+    String detail() {
+        return detail;
+    }
+}
