@@ -42,6 +42,7 @@ class HexagonalArchitectureTest {
             ArchitectureRules.coreIsIndependent(),
             ArchitectureRules.technicalBucketsAreForbidden(),
             ArchitectureRules.coreDoesNotDependOnAdapters(),
+            ArchitectureRules.domainDoesNotDependOnApplication(),
             ArchitectureRules.dependenciesAreImmutable(),
             ArchitectureRules.fieldInjectionIsForbidden(),
             ArchitectureRules.mediaAndNotificationDependenciesAreForbidden()

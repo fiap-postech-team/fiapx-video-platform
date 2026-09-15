@@ -3,8 +3,11 @@ package br.com.fiapx.videoapi.foundation.http;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +24,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.assertj.core.api.Assertions.assertThat;
 
-@WebMvcTest(ApiExceptionHandlerMvcTest.FixtureController.class)
+@WebMvcTest(
+    value = ApiExceptionHandlerMvcTest.FixtureController.class,
+    properties = {
+        "spring.datasource.url=jdbc:postgresql://database.invalid:5432/video",
+        "spring.datasource.username=application",
+        "spring.datasource.password=test-only"
+    }
+)
 @AutoConfigureMockMvc(addFilters = false)
+@ExtendWith(OutputCaptureExtension.class)
 @Import({
     ApiExceptionHandlerMvcTest.FixtureController.class,
     ApiExceptionHandler.class,
@@ -56,13 +68,16 @@ class ApiExceptionHandlerMvcTest {
     }
 
     @Test
-    void sanitizesUnexpectedFailure() throws Exception {
+    void sanitizesUnexpectedFailure(CapturedOutput output) throws Exception {
         mockMvc.perform(get("/fixture/failure"))
             .andExpect(status().isInternalServerError())
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
             .andExpect(jsonPath("$.detail").value("Não foi possível concluir a solicitação."))
             .andExpect(content().string(not(containsString("internal database failure"))));
+
+        assertThat(output).contains("method=GET path=/fixture/failure")
+            .doesNotContain("internal database failure");
     }
 
     @RestController
@@ -79,9 +94,7 @@ class ApiExceptionHandlerMvcTest {
         }
     }
 
-    record FixtureRequest(@NotBlank String sourceKey) {
-    }
+    record FixtureRequest(@NotBlank String sourceKey) {}
 
-    record FixtureResponse(String sourceKey) {
-    }
+    record FixtureResponse(String sourceKey) {}
 }

@@ -9,8 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EnvironmentSafetyValidatorTest {
 
-    private final EnvironmentSafetyValidator validator =
-        new EnvironmentSafetyValidator(new MockEnvironment(), new DataSourceProperties());
+    private final EnvironmentSafetyValidator validator = new EnvironmentSafetyValidator();
 
     @Test
     void rejectsMissingDatabaseConfigurationOutsideLocalProfile() {

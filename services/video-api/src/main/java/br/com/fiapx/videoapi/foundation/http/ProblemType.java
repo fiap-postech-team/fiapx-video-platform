@@ -2,25 +2,32 @@ package br.com.fiapx.videoapi.foundation.http;
 
 import java.net.URI;
 
+/**
+ * Catalog of stable, client-facing problem types exposed by the HTTP foundation.
+ */
 public enum ProblemType {
+    /** Validation failed at the HTTP boundary. */
     VALIDATION_ERROR(
         "validation",
         "Requisição inválida",
         400,
         "Um ou mais dados informados são inválidos."
     ),
+    /** The request does not carry an authenticated identity. */
     UNAUTHORIZED(
         "unauthorized",
         "Não autorizado",
         401,
         "Autenticação é necessária para acessar este recurso."
     ),
+    /** The authenticated identity is not authorized for the request. */
     ACCESS_DENIED(
         "access-denied",
         "Acesso negado",
         403,
         "Você não possui permissão para acessar este recurso."
     ),
+    /** An unexpected failure was replaced with a safe client response. */
     INTERNAL_ERROR(
         "internal-error",
         "Erro interno",

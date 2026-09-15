@@ -9,9 +9,18 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.core.env.Environment;
 
-@Configuration
+/**
+ * Defines the deny-by-default HTTP policy for the unauthenticated foundation stage.
+ */
+@Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-public class FoundationSecurityConfiguration {
+public final class FoundationSecurityConfiguration {
+
+    /**
+     * Creates the stateless security configuration.
+     */
+    public FoundationSecurityConfiguration() {
+    }
 
     @Bean
     SecurityFilterChain securityFilterChain(

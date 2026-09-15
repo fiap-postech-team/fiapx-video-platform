@@ -1,30 +1,38 @@
 package br.com.fiapx.videoapi.foundation.configuration;
 
-import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.env.EnvironmentPostProcessor;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-@Component
-public final class EnvironmentSafetyValidator implements InitializingBean {
+/**
+ * Rejects missing or development-only database settings before the context is created.
+ */
+public final class EnvironmentSafetyValidator implements EnvironmentPostProcessor {
 
-    private final Environment environment;
-    private final DataSourceProperties dataSourceProperties;
-
-    public EnvironmentSafetyValidator(
-        Environment environment,
-        DataSourceProperties dataSourceProperties
-    ) {
-        this.environment = environment;
-        this.dataSourceProperties = dataSourceProperties;
+    /**
+     * Creates the stateless environment validator loaded by Spring Boot.
+     */
+    public EnvironmentSafetyValidator() {
     }
 
     @Override
-    public void afterPropertiesSet() {
-        validate(environment, dataSourceProperties);
+    public void postProcessEnvironment(
+        ConfigurableEnvironment environment,
+        SpringApplication application
+    ) {
+        validate(environment, bindProperties(environment));
     }
 
+    /**
+     * Validates the effective datasource configuration without exposing its values.
+     *
+     * @param currentEnvironment active Spring environment
+     * @param properties effective datasource properties
+     */
     public void validate(Environment currentEnvironment, DataSourceProperties properties) {
         if (currentEnvironment.matchesProfiles("local")) {
             return;
@@ -35,10 +43,31 @@ public final class EnvironmentSafetyValidator implements InitializingBean {
         rejectLocalDefaults(properties);
     }
 
+    private DataSourceProperties bindProperties(ConfigurableEnvironment environment) {
+        requireResolvedValue(environment, "spring.datasource.url");
+        requireResolvedValue(environment, "spring.datasource.username");
+        requireResolvedValue(environment, "spring.datasource.password");
+        return Binder.get(environment)
+            .bind("spring.datasource", DataSourceProperties.class)
+            .orElseThrow(() -> missing("spring.datasource.url"));
+    }
+
+    private void requireResolvedValue(Environment environment, String propertyName) {
+        try {
+            requireValue(propertyName, environment.getProperty(propertyName));
+        } catch (IllegalArgumentException exception) {
+            throw missing(propertyName);
+        }
+    }
+
     private void requireValue(String propertyName, String value) {
         if (!StringUtils.hasText(value)) {
-            throw new IllegalStateException("Required configuration is missing: " + propertyName);
+            throw missing(propertyName);
         }
+    }
+
+    private IllegalStateException missing(String propertyName) {
+        return new IllegalStateException("Required configuration is missing: " + propertyName);
     }
 
     private void rejectLocalDefaults(DataSourceProperties properties) {

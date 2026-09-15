@@ -28,7 +28,7 @@ class BootJarIT {
         }
     }
 
-    private Path packagedJar() throws IOException {
+    static Path packagedJar() throws IOException {
         try (var files = Files.list(Path.of("target"))) {
             return files
                 .filter(path -> path.getFileName().toString().startsWith("video-api-"))

@@ -32,6 +32,11 @@ final class ArchitectureRules {
             .allowEmptyShould(true);
     }
 
+    static ArchRule domainDoesNotDependOnApplication() {
+        return noClasses().that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAPackage("..application..").allowEmptyShould(true);
+    }
+
     static ArchRule dependenciesAreImmutable() {
         return fields().that().areNotStatic().should().beFinal();
     }

@@ -14,7 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(FoundationSecurityConfigurationMvcTest.HealthFixtureController.class)
+@WebMvcTest(
+    value = FoundationSecurityConfigurationMvcTest.HealthFixtureController.class,
+    properties = {
+        "spring.datasource.url=jdbc:postgresql://database.invalid:5432/video",
+        "spring.datasource.username=application",
+        "spring.datasource.password=test-only"
+    }
+)
 @Import({
     FoundationSecurityConfigurationMvcTest.HealthFixtureController.class,
     FoundationSecurityConfiguration.class,
