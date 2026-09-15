@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import br.com.fiapx.videoapi.jobs.adapter.in.http.JobNotFoundException;
 
 /**
  * Converts failures reaching the MVC boundary into the shared sanitized error contract.
@@ -49,6 +50,11 @@ public final class ApiExceptionHandler {
             exception.getClass().getName()
         );
         return response(ProblemType.INTERNAL_ERROR, request);
+    }
+
+    @ExceptionHandler(JobNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleNotFound(JobNotFoundException exception, HttpServletRequest request) {
+        return response(ProblemType.NOT_FOUND, request);
     }
 
     private ResponseEntity<ProblemDetail> response(ProblemType type, HttpServletRequest request) {
