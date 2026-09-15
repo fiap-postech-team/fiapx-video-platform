@@ -1,5 +1,7 @@
 package br.com.fiapx.videoapi.foundation.configuration;
 
+import java.util.List;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -24,7 +26,20 @@ public final class EnvironmentSafetyValidator implements EnvironmentPostProcesso
         ConfigurableEnvironment environment,
         SpringApplication application
     ) {
+        if (isBootTestEnvironment(environment)) {
+            return;
+        }
         validate(environment, bindProperties(environment));
+    }
+
+    private boolean isBootTestEnvironment(Environment environment) {
+        var bootstrapperProperties = List.of(
+            "org.springframework.boot.test.context.SpringBootTestContextBootstrapper",
+            "org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTestContextBootstrapper"
+        );
+        return bootstrapperProperties.stream()
+            .map(property -> environment.getProperty(property, "false"))
+            .anyMatch(value -> Boolean.TRUE.toString().equalsIgnoreCase(value));
     }
 
     /**

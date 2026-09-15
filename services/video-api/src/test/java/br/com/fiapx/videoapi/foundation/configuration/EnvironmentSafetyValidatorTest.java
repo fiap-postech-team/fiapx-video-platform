@@ -19,6 +19,15 @@ class EnvironmentSafetyValidatorTest {
     }
 
     @Test
+    void skipsValidationDuringSpringBootTestBootstrap() {
+        var environment = new MockEnvironment();
+        environment.setProperty("org.springframework.boot.test.context.SpringBootTestContextBootstrapper", "true");
+
+        assertThatCode(() -> validator.postProcessEnvironment(environment, null))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
     void rejectsKnownLocalDefaultsOutsideLocalProfile() {
         assertThatThrownBy(() -> validator.validate(new MockEnvironment(), localProperties()))
             .isInstanceOf(IllegalStateException.class)
