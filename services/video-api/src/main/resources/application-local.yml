@@ -1,0 +1,11 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fiapx
+    username: fiapx
+    password: fiapx
+
+server:
+  port: 8080
