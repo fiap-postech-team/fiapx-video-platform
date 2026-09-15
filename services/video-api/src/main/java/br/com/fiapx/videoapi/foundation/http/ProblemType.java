@@ -27,6 +27,7 @@ public enum ProblemType {
         403,
         "Você não possui permissão para acessar este recurso."
     ),
+    NOT_FOUND("not-found", "Não encontrado", 404, "Recurso não encontrado."),
     /** An unexpected failure was replaced with a safe client response. */
     INTERNAL_ERROR(
         "internal-error",

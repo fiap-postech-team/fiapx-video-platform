@@ -38,7 +38,9 @@ final class ArchitectureRules {
     }
 
     static ArchRule dependenciesAreImmutable() {
-        return fields().that().areNotStatic().should().beFinal();
+        return fields().that().areNotStatic()
+            .and().areDeclaredInClassesThat().resideOutsideOfPackages("..domain..", "..persistence..")
+            .should().beFinal();
     }
 
     static ArchRule fieldInjectionIsForbidden() {

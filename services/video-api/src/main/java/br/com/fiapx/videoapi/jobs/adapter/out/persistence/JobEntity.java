@@ -1,0 +1,26 @@
+package br.com.fiapx.videoapi.jobs.adapter.out.persistence;
+
+import br.com.fiapx.videoapi.jobs.domain.Job;
+import br.com.fiapx.videoapi.jobs.domain.JobStatus;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "jobs")
+public class JobEntity {
+    @Id private UUID id;
+    private UUID userId;
+    private String sourceKey;
+    private String resultKey;
+    @Enumerated(EnumType.STRING) private JobStatus status;
+    private Instant createdAt;
+    private Instant updatedAt;
+    protected JobEntity() { }
+    JobEntity(Job job) { id = job.id(); userId = job.userId(); sourceKey = job.sourceKey(); resultKey = job.resultKey(); status = job.status(); createdAt = job.createdAt(); updatedAt = createdAt; }
+    Job toDomain() { return new Job(id, userId, sourceKey, resultKey, status, createdAt); }
+}
