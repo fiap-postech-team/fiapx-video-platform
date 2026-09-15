@@ -31,3 +31,10 @@ uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local agent tooling
+.agents/
+.codex/
+.impeccable/
+skills-lock.json
+tasks/

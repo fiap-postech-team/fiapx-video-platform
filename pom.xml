@@ -18,8 +18,7 @@
         <testcontainers.version>1.21.3</testcontainers.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- This foundation PR intentionally contains no Java sources. Remove this
-             property when the application classes are introduced. -->
+        <!-- Non-executable modules inherit this safeguard; executable services override it. -->
         <spring-boot.repackage.skip>true</spring-boot.repackage.skip>
         <lombok.version>1.18.48</lombok.version>
     </properties>

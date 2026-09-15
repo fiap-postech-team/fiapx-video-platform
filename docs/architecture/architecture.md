@@ -4,7 +4,8 @@
 
 Esta arquitetura separa a interação HTTP, o processamento pesado de mídia e a notificação de falhas. O objetivo é
 absorver picos, permitir escala independente e impedir que operações longas de FFmpeg consumam recursos da API. O
-desenho representa a fundação atual; lacunas conhecidas aparecem no final do documento.
+desenho abaixo é o alvo do produto; a fundação atual entrega apenas o bootstrap executável, health e Swagger local do
+`video-api`, enquanto as capacidades de negócio continuam como roadmap.
 
 ## Diagrama de contexto
 
@@ -34,7 +35,7 @@ flowchart LR
       STORAGE[(MinIO / S3<br/>vídeos + ZIPs)]
     end
     MAIL[SMTP / MailHog]
-    CLIENT -->|HTTPS + JWT| API
+    CLIENT -->|HTTPS + JWT futuro| API
     CLIENT -.->|upload/download futuro| STORAGE
     API -->|JPA + Flyway| API_DB
     API -->|publica outbox| RABBIT
@@ -51,7 +52,7 @@ flowchart LR
 
 | Componente            | Responsabilidades                                                       | Dados próprios                   | Não deve fazer                                             |
 |-----------------------|-------------------------------------------------------------------------|----------------------------------|------------------------------------------------------------|
-| `video-api`           | validar JWT, criar/consultar jobs, registrar outbox, aplicar resultados | jobs, histórico, outbox          | processar mídia ou acessar banco de notificações           |
+| `video-api`           | fundação executável hoje; validar JWT, criar/consultar jobs, registrar outbox e aplicar resultados no alvo | jobs, histórico, outbox          | processar mídia ou acessar banco de notificações           |
 | `video-processor`     | validar vídeo, extrair frames, gerar ZIP, publicar resultados           | arquivos temporários efêmeros    | atualizar tabelas da API ou transportar binários no broker |
 | `notification-worker` | consumir falhas terminais, enviar e-mail, auditar entrega               | entregas de notificação          | consultar jobs/usuários diretamente no banco da API        |
 | RabbitMQ              | filas de trabalho, fan-out lógico, retry e DLQ                          | mensagens pequenas e temporárias | armazenar vídeos ou ZIPs                                   |
@@ -183,21 +184,21 @@ serviços gerenciados ou operados com políticas próprias de backup, disponibil
 
 ## Segurança
 
-O limite HTTP exige bearer JWT, mas a emissão e a gestão de identidades não fazem parte desta fundação. Object keys não
-devem ser expostas como autorização de acesso; URLs pré-assinadas curtas e validação de propriedade devem mediar upload
-e download. Produção também requer TLS, chaves assimétricas, rotação de segredos, usuário de banco por serviço e
-políticas mínimas de bucket e RabbitMQ.
+O limite HTTP exigirá bearer JWT no alvo do produto, mas a emissão e a gestão de identidades não fazem parte desta
+fundação. Object keys não devem ser expostas como autorização de acesso; URLs pré-assinadas curtas e validação de
+propriedade devem mediar upload e download. Produção também requer TLS, chaves assimétricas, rotação de segredos,
+usuário de banco por serviço e políticas mínimas de bucket e RabbitMQ.
 
 ## Observabilidade e operação
 
-Actuator oferece health/probes e Micrometer expõe Prometheus. Para operação real ainda são necessários logs estruturados
-com `jobId`/`eventId`, tracing entre HTTP e AMQP, métricas de lag, idade da outbox, duração de FFmpeg, taxa de falha,
+Actuator oferece health/probes nesta fundação; o restante da observabilidade do produto ainda pede logs estruturados com
+`jobId`/`eventId`, tracing entre HTTP e AMQP, métricas de lag, idade da outbox, duração de FFmpeg, taxa de falha,
 profundidade das DLQs, dashboards e alertas. Consulte [quality-attributes.md](quality-attributes.md).
 
 ## Lacunas conhecidas
 
 1. Upload/download por URL pré-assinada ainda não foi implementado.
-2. O projeto valida, mas não emite JWT; autorização de propriedade do job precisa ser adicionada.
+2. O `video-api` desta fundação não emite JWT; a decisão de autenticação local e migração para OIDC/JWKS está no ADR 0010.
 3. Processor e API result listener ainda precisam de inbox/deduplicação persistente.
 4. O publisher da outbox precisa de claim concorrente, publisher confirms e recuperação explícita.
 5. Testes unitários, Testcontainers e end-to-end ainda precisam ser implementados.

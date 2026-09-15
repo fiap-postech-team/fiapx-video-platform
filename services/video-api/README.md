@@ -2,24 +2,29 @@
 
 ## Summary
 
-Aplicação de entrada e proprietária do ciclo de vida dos jobs. Valida bearer JWT, cria e consulta jobs, grava comandos
-em uma outbox transacional e consome eventos do processor para atualizar o estado. Não processa mídia e nenhum outro
-serviço deve escrever em suas tabelas.
+Fundação executável do serviço de entrada. Hoje ela sobe como Spring Boot, expõe health anonimamente e serve Swagger/OpenAPI local no perfil `local`. O restante da arquitetura de jobs, outbox, resultados e autenticação está documentado como roadmap dos próximos épicos.
 
-## Responsabilidades de negócio
+## Executável hoje
 
-- receber uma `sourceKey` e criar um job `PENDING`;
-- associar o job ao `sub` do JWT, tratado como UUID do usuário;
-- persistir job e `video.job.requested.v1` na mesma transação;
-- publicar registros pendentes da outbox no RabbitMQ;
-- consumir `started`, `completed` e `failed` para atualizar jobs;
-- expor consulta do estado atual.
+| Surface | State |
+|---|---|
+| `GET /actuator/health` | implementado e anônimo |
+| `GET /openapi.yaml` | implementado no perfil `local` |
+| `GET /swagger-ui.html` | implementado no perfil `local` |
+| `GET /v3/api-docs` | bloqueado pela segurança desta fundação |
+| `POST /v1/jobs`, `GET /v1/jobs/{id}` | não implementados nesta fundação |
 
-## Fluxo interno
+## Roadmap de responsabilidade
+
+- receber `sourceKey`, criar job e aplicar estados;
+- associar o job ao usuário autenticado;
+- registrar outbox transacional e publicar no RabbitMQ;
+- consumir eventos do processor e atualizar o estado;
+- expor consulta de jobs e autorização por proprietário.
 
 ```mermaid
 flowchart LR
-    HTTP[JobController] --> SERVICE[JobService]
+    HTTP[HTTP futuro] --> SERVICE[Casos de uso futuros]
     SERVICE -->|mesma transação| JOBS[(jobs)]
     SERVICE -->|mesma transação| OUTBOX[(outbox_events)]
     OUTBOX --> PUBLISHER[OutboxPublisher]
@@ -28,80 +33,48 @@ flowchart LR
     LISTENER --> JOBS
 ```
 
-## API atual
+## Configuração atual
 
-| Método | Endpoint               | Descrição                        |
-|--------|------------------------|----------------------------------|
-| `POST` | `/v1/jobs`             | cria job a partir de `sourceKey` |
-| `GET`  | `/v1/jobs/{id}`        | consulta job                     |
-| `GET`  | `/actuator/health`     | health check                     |
-| `GET`  | `/actuator/prometheus` | métricas                         |
+| Variável | Padrão local | Uso |
+|---|---|---|
+| `SERVER_PORT` | `8080` | porta HTTP |
+| `DATABASE_URL` | `jdbc:postgresql://localhost:5432/fiapx` | JDBC URL |
+| `DATABASE_USER` | `fiapx` | usuário PostgreSQL |
+| `DATABASE_PASSWORD` | `fiapx` | senha PostgreSQL |
 
-Todas as rotas de negócio exigem JWT. O contrato detalhado está em [
-`../../contracts/openapi.yaml`](../../contracts/openapi.yaml).
+RabbitMQ e JWT ainda não são dependências funcionais desta fundação. `JWT_SECRET` e qualquer integração de identidade ficam para o ADR 0010 e para os épicos de autenticação.
 
-## Persistência
-
-Flyway cria `jobs`, `job_status_history` e `outbox_events`. PostgreSQL é a fonte de verdade.
-`spring.jpa.hibernate.ddl-auto=validate` impede que Hibernate altere o schema silenciosamente.
-
-Limitação atual: a tabela de histórico existe, mas ainda não é populada; o result listener também precisa de uma inbox
-persistente e validação de transições fora de ordem.
-
-## Eventos
-
-- Produz: `video.job.requested.v1`.
-- Consome: `video.job.started.v1`, `video.job.completed.v1`, `video.job.failed.v1`.
-- Fila: `video.api.results.v1`.
-- DLQ: `video.api.results.dlq.v1`.
-
-## Configuração
-
-| Variável            | Padrão local                             | Uso                         |
-|---------------------|------------------------------------------|-----------------------------|
-| `SERVER_PORT`       | `8080`                                   | porta HTTP                  |
-| `DATABASE_URL`      | `jdbc:postgresql://localhost:5432/fiapx` | JDBC URL                    |
-| `DATABASE_USER`     | `fiapx`                                  | usuário PostgreSQL          |
-| `DATABASE_PASSWORD` | `fiapx`                                  | senha PostgreSQL            |
-| `RABBITMQ_HOST`     | `localhost`                              | host do broker              |
-| `RABBITMQ_USER`     | `fiapx`                                  | usuário do broker           |
-| `RABBITMQ_PASSWORD` | `fiapx`                                  | senha do broker             |
-| `JWT_SECRET`        | valor inseguro local                     | chave HMAC para validar JWT |
-
-## Executar e testar
+## Como executar
 
 Na raiz do monorepo:
 
 ```bash
 ./mvnw -pl services/video-api -am clean verify
+docker compose up postgres video-api
+```
+
+Para Swagger local, inicie o serviço com o perfil `local` e um PostgreSQL acessível:
+
+```bash
+SPRING_PROFILES_ACTIVE=local \
+DATABASE_URL=jdbc:postgresql://localhost:5432/fiapx \
+DATABASE_USER=fiapx \
+DATABASE_PASSWORD=fiapx \
 ./mvnw -pl services/video-api -am spring-boot:run
 ```
 
-Para execução funcional, PostgreSQL e RabbitMQ devem estar disponíveis. O Compose raiz provisiona ambos.
-
 ## Segurança
 
-A aplicação é resource server e não emite tokens. Produção deve migrar de HMAC compartilhado para OIDC/JWKS, validar
-issuer/audience e autorizar leitura por proprietário. O endpoint atual busca por ID sem filtrar `userId`; isso é uma
-lacuna conhecida e deve ser corrigida antes de exposição real.
+A fundação não emite tokens nem implementa autenticação. O ADR 0010 registra a evolução futura: HMAC apenas para desenvolvimento local e OIDC/JWKS para ambientes não locais. Fora de `local`, HMAC compartilhado é proibido.
 
 ## Observabilidade
 
-Health, readiness/liveness e Prometheus são expostos pelo Actuator. Métricas recomendadas: jobs por estado, duração por
-estado, idade e tamanho da outbox, falhas de publicação, duplicatas e mensagens na DLQ.
-
-## CI/CD
-
-O CI raiz compila o módulo em Java 21 durante `clean verify`. Uma esteira de entrega deverá construir
-`services/video-api/Dockerfile`, escanear dependências e imagem, publicar por digest e promover a mesma imagem entre
-ambientes. Migrations devem ser testadas antes do rollout; deploy deve aguardar readiness e manter compatibilidade com
-consumidores da versão anterior.
+O health é o único sinal operacional já exposto como contrato público desta fundação. Métricas de jobs, outbox, redelivery, DLQ e tracing entre HTTP e AMQP pertencem aos épicos que introduzirem comportamento de negócio.
 
 ## Próximos passos
 
-- endpoints de autenticação/integração OIDC;
-- URLs pré-assinadas para upload e download;
-- autorização por proprietário;
-- inbox idempotente e máquina de estados;
-- publisher confirms e claim concorrente da outbox;
-- testes Testcontainers de PostgreSQL e RabbitMQ.
+- autenticação e autorização por proprietário;
+- create/get job com estados e histórico;
+- outbox, publisher confirms e listeners idempotentes;
+- integrações reais de processor e worker;
+- métricas e alertas de negócio.
