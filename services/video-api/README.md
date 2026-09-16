@@ -2,7 +2,7 @@
 
 ## Summary
 
-Fundação executável do serviço de entrada. Hoje ela sobe como Spring Boot, expõe health anonimamente e serve Swagger/OpenAPI local no perfil `local`. O restante da arquitetura de jobs, outbox, resultados e autenticação está documentado como roadmap dos próximos épicos.
+Serviço de entrada Spring Boot que expõe health, documentação local, autenticação local e a futura superfície de jobs.
 
 ## Executável hoje
 
@@ -12,7 +12,9 @@ Fundação executável do serviço de entrada. Hoje ela sobe como Spring Boot, e
 | `GET /openapi.yaml` | implementado no perfil `local` |
 | `GET /swagger-ui.html` | implementado no perfil `local` |
 | `GET /v3/api-docs` | bloqueado pela segurança desta fundação |
-| `POST /v1/jobs`, `GET /v1/jobs/{id}` | não implementados nesta fundação |
+| `POST /v1/auth/register`, `POST /v1/auth/login` | cadastro e login local |
+| `POST /v1/auth/refresh`, `POST /v1/auth/logout` | sessão rotativa por cookie e CSRF |
+| `POST /v1/jobs`, `GET /v1/jobs/{id}` | bearer JWT obrigatório |
 
 ## Roadmap de responsabilidade
 
@@ -33,7 +35,7 @@ flowchart LR
     LISTENER --> JOBS
 ```
 
-## Configuração atual
+## Autenticação e configuração
 
 | Variável | Padrão local | Uso |
 |---|---|---|
@@ -41,8 +43,18 @@ flowchart LR
 | `DATABASE_URL` | `jdbc:postgresql://localhost:5432/fiapx` | JDBC URL |
 | `DATABASE_USER` | `fiapx` | usuário PostgreSQL |
 | `DATABASE_PASSWORD` | `fiapx` | senha PostgreSQL |
+| `APP_AUTH_ISSUER` | obrigatório fora de local | emissor JWT |
+| `APP_AUTH_AUDIENCE` | obrigatório fora de local | audiência JWT |
+| `APP_AUTH_KEY_ID` | obrigatório fora de local | identificador da chave RSA |
+| `APP_AUTH_PRIVATE_KEY_BASE64` | obrigatório fora de local | chave RSA PKCS#8 em Base64 |
+| `APP_AUTH_PUBLIC_KEY_BASE64` | obrigatório fora de local | chave RSA X.509 em Base64 |
+| `APP_AUTH_BOOTSTRAP_ENABLED` | `false` | habilita criação idempotente do primeiro ADMIN |
+| `APP_AUTH_BOOTSTRAP_EMAIL` / `APP_AUTH_BOOTSTRAP_PASSWORD` | — | segredo externo exigido quando bootstrap está ativo |
 
-RabbitMQ e JWT ainda não são dependências funcionais desta fundação. `JWT_SECRET` e qualquer integração de identidade ficam para o ADR 0010 e para os épicos de autenticação.
+O perfil `local` usa par RSA efêmero e permite cookies sem `Secure`. Fora dele, todas as chaves e identificadores
+acima são obrigatórios. O access token dura quinze minutos; o refresh token dura sete dias e é entregue apenas no
+cookie `FIAPX_REFRESH` (`HttpOnly`, `SameSite=Strict`). Após login, o cliente deve copiar `XSRF-TOKEN` para o header
+`X-XSRF-TOKEN` ao chamar refresh ou logout.
 
 ## Como executar
 
@@ -65,7 +77,10 @@ DATABASE_PASSWORD=fiapx \
 
 ## Segurança
 
-A fundação não emite tokens nem implementa autenticação. O ADR 0010 registra a evolução futura: HMAC apenas para desenvolvimento local e OIDC/JWKS para ambientes não locais. Fora de `local`, HMAC compartilhado é proibido.
+Senhas são armazenadas com `DelegatingPasswordEncoder`/BCrypt; nunca são registradas em logs. Após cinco falhas
+consecutivas, o login é bloqueado por quinze minutos. JWTs usam `RS256` e são validados por assinatura, issuer,
+audience, expiração e sessão. O [ADR 0011](../../docs/adr/0011-local-identity-with-rsa-jwt-and-oidc-boundary.md)
+documenta a transição futura para OIDC/JWKS.
 
 ## Observabilidade
 

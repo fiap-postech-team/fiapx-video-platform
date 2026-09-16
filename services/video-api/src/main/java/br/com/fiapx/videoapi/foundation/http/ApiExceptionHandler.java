@@ -11,6 +11,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import br.com.fiapx.videoapi.jobs.adapter.in.http.JobNotFoundException;
+import br.com.fiapx.videoapi.identity.application.AuthenticationFailedException;
+import br.com.fiapx.videoapi.identity.application.EmailAlreadyRegisteredException;
 
 /**
  * Converts failures reaching the MVC boundary into the shared sanitized error contract.
@@ -55,6 +57,16 @@ public final class ApiExceptionHandler {
     @ExceptionHandler(JobNotFoundException.class)
     ResponseEntity<ProblemDetail> handleNotFound(JobNotFoundException exception, HttpServletRequest request) {
         return response(ProblemType.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(AuthenticationFailedException.class)
+    ResponseEntity<ProblemDetail> handleAuthenticationFailure(AuthenticationFailedException exception, HttpServletRequest request) {
+        return response(ProblemType.AUTHENTICATION_FAILED, request);
+    }
+
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    ResponseEntity<ProblemDetail> handleConflict(EmailAlreadyRegisteredException exception, HttpServletRequest request) {
+        return response(ProblemType.CONFLICT, request);
     }
 
     private ResponseEntity<ProblemDetail> response(ProblemType type, HttpServletRequest request) {

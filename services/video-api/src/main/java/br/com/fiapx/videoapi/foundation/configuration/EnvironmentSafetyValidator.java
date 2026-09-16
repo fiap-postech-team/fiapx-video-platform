@@ -30,12 +30,16 @@ public final class EnvironmentSafetyValidator implements EnvironmentPostProcesso
             return;
         }
         validate(environment, bindProperties(environment));
+        if (!environment.matchesProfiles("local")) {
+            requireAuthConfiguration(environment);
+        }
     }
 
     private boolean isBootTestEnvironment(Environment environment) {
         var bootstrapperProperties = List.of(
             "org.springframework.boot.test.context.SpringBootTestContextBootstrapper",
-            "org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTestContextBootstrapper"
+            "org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTestContextBootstrapper",
+            "org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTestContextBootstrapper"
         );
         return bootstrapperProperties.stream()
             .map(property -> environment.getProperty(property, "false"))
@@ -93,6 +97,14 @@ public final class EnvironmentSafetyValidator implements EnvironmentPostProcesso
         );
         rejectLocalDefault("spring.datasource.username", properties.getUsername(), "fiapx");
         rejectLocalDefault("spring.datasource.password", properties.getPassword(), "fiapx");
+    }
+
+    private void requireAuthConfiguration(Environment environment) {
+        requireValue("app.auth.issuer", environment.getProperty("app.auth.issuer"));
+        requireValue("app.auth.audience", environment.getProperty("app.auth.audience"));
+        requireValue("app.auth.key-id", environment.getProperty("app.auth.key-id"));
+        requireValue("app.auth.private-key-base64", environment.getProperty("app.auth.private-key-base64"));
+        requireValue("app.auth.public-key-base64", environment.getProperty("app.auth.public-key-base64"));
     }
 
     private void rejectLocalDefault(String propertyName, String value, String localDefault) {

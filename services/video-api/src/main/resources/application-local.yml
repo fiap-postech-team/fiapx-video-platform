@@ -17,3 +17,9 @@ springdoc:
     enabled: true
     url: /openapi.yaml
     try-it-out-enabled: false
+
+app:
+  auth:
+    issuer: http://localhost:8080
+    audience: fiapx-video-api
+    key-id: local-development

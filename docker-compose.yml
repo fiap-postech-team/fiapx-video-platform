@@ -27,7 +27,7 @@ services:
     ports: [ "1025:1025", "8025:8025" ]
   video-api:
     build: { context: ., dockerfile: services/video-api/Dockerfile }
-    environment: { DATABASE_URL: "jdbc:postgresql://postgres:5432/fiapx", RABBITMQ_HOST: rabbitmq, JWT_SECRET: "${JWT_SECRET:-change-me-with-at-least-32-characters}" }
+    environment: { SPRING_PROFILES_ACTIVE: local, DATABASE_URL: "jdbc:postgresql://postgres:5432/fiapx", DATABASE_USER: fiapx, DATABASE_PASSWORD: fiapx, RABBITMQ_HOST: rabbitmq }
     ports: [ "8080:8080" ]
     depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
   video-processor:
