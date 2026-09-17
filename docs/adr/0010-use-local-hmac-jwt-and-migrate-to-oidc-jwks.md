@@ -1,6 +1,6 @@
 # ADR 0010 — Usar HMAC JWT apenas no desenvolvimento local e migrar para OIDC/JWKS fora dele
 
-- **Status:** Aceito
+- **Status:** Substituído pelo [ADR 0011](0011-local-identity-with-rsa-jwt-and-oidc-boundary.md)
 - **Data:** 2026-09-15
 
 ## Contexto

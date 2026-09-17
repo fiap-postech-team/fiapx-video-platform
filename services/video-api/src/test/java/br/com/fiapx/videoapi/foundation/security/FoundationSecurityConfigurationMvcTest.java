@@ -51,11 +51,9 @@ class FoundationSecurityConfigurationMvcTest {
 
     @Test
     @WithMockUser
-    void returnsForbiddenProblemForAuthenticatedDeniedRequest() throws Exception {
+    void permitsAuthenticatedBusinessRequests() throws Exception {
         mockMvc.perform(get("/v1/jobs"))
-            .andExpect(status().isForbidden())
-            .andExpect(content().contentType("application/problem+json"))
-            .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+            .andExpect(status().isOk());
     }
 
     @RestController
@@ -63,6 +61,11 @@ class FoundationSecurityConfigurationMvcTest {
 
         @GetMapping("/actuator/health")
         HealthStatus health() {
+            return new HealthStatus("UP");
+        }
+
+        @GetMapping("/v1/jobs")
+        HealthStatus jobs() {
             return new HealthStatus("UP");
         }
     }

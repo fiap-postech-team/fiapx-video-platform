@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.com.fiapx.videoapi.jobs.application.CreateJob;
 import br.com.fiapx.videoapi.jobs.application.port.out.JobStore;
 import br.com.fiapx.videoapi.jobs.domain.Job;
+import br.com.fiapx.videoapi.identity.domain.AuthenticatedIdentity;
+import br.com.fiapx.videoapi.identity.domain.UserRole;
 import br.com.fiapx.videoapi.outbox.application.port.out.OutboxStore;
 import java.time.Clock;
 import java.time.Instant;
@@ -13,7 +15,6 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.oauth2.jwt.Jwt;
 
 class JobControllerTest {
 
@@ -59,8 +60,8 @@ class JobControllerTest {
         );
     }
 
-    private Jwt jwt(UUID subject) {
-        return Jwt.withTokenValue("test-token").header("alg", "none").subject(subject.toString()).build();
+    private AuthenticatedIdentity jwt(UUID subject) {
+        return new AuthenticatedIdentity(subject, UUID.randomUUID(), java.util.Set.of(UserRole.USER));
     }
 
     private static final class InMemoryJobStore implements JobStore {

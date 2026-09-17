@@ -20,6 +20,12 @@ public enum ProblemType {
         401,
         "Autenticação é necessária para acessar este recurso."
     ),
+    AUTHENTICATION_FAILED(
+        "authentication-failed",
+        "Não autorizado",
+        401,
+        "Não foi possível autenticar as credenciais informadas."
+    ),
     /** The authenticated identity is not authorized for the request. */
     ACCESS_DENIED(
         "access-denied",
@@ -28,6 +34,7 @@ public enum ProblemType {
         "Você não possui permissão para acessar este recurso."
     ),
     NOT_FOUND("not-found", "Não encontrado", 404, "Recurso não encontrado."),
+    CONFLICT("conflict", "Conflito", 409, "O recurso informado já existe."),
     /** An unexpected failure was replaced with a safe client response. */
     INTERNAL_ERROR(
         "internal-error",
