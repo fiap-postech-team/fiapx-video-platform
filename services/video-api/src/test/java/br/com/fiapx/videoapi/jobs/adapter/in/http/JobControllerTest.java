@@ -15,6 +15,8 @@ import br.com.fiapx.videoapi.videos.domain.VideoStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,62 @@ class JobControllerTest {
             .isInstanceOf(JobNotFoundException.class);
     }
 
+    @Test
+    void listsJobsWithoutCursorWhenPageIsIncomplete() {
+        var jobs = new InMemoryJobStore();
+        var userId = UUID.randomUUID();
+        jobs.save(new Job(UUID.randomUUID(), userId, "uploads/one.mp4", Instant.EPOCH));
+
+        var page = controller(jobs).list(null, 20, jwt(userId));
+
+        assertThat(page.items()).singleElement().extracting(JobController.JobResponse::sourceKey).isEqualTo("uploads/one.mp4");
+        assertThat(page.nextCursor()).isNull();
+    }
+
+    @Test
+    void listsJobsWithNextCursorWhenPageLimitIsReached() {
+        var jobs = new InMemoryJobStore();
+        var userId = UUID.randomUUID();
+        var older = new Job(UUID.randomUUID(), userId, "uploads/older.mp4", Instant.EPOCH);
+        var newer = new Job(UUID.randomUUID(), userId, "uploads/newer.mp4", Instant.EPOCH.plusSeconds(60));
+        jobs.save(older);
+        jobs.save(newer);
+
+        var page = controller(jobs).list(null, 2, jwt(userId));
+
+        assertThat(page.items()).hasSize(2);
+        assertThat(JobCursor.decode(page.nextCursor())).isEqualTo(new JobCursor(older.createdAt(), older.id()));
+    }
+
+    @Test
+    void rejectsInvalidPageSize() {
+        assertThatThrownBy(() -> controller(new InMemoryJobStore()).list(null, 0, jwt(UUID.randomUUID())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Invalid page size");
+        assertThatThrownBy(() -> controller(new InMemoryJobStore()).list(null, 101, jwt(UUID.randomUUID())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Invalid page size");
+    }
+
+    @Test
+    void rejectsOverlongIdempotencyKey() {
+        assertThatThrownBy(() -> controller(new InMemoryJobStore())
+            .create(new JobController.CreateJobRequest("uploads/source.mp4"), "x".repeat(129), jwt(UUID.randomUUID())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Invalid idempotency key");
+    }
+
+    @Test
+    void treatsBlankIdempotencyKeyAsMissing() {
+        var jobs = new InMemoryJobStore();
+        var userId = UUID.randomUUID();
+
+        var response = controller(jobs).create(new JobController.CreateJobRequest("uploads/source.mp4"), "   ", jwt(userId));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(response.getBody().userId()).isEqualTo(userId);
+    }
+
     private JobController controller(InMemoryJobStore jobs) {
         return new JobController(
             new CreateJob(jobs, (eventId, jobId, userId, sourceKey) -> { }, videos(), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
@@ -78,10 +136,26 @@ class JobControllerTest {
     }
 
     private static final class InMemoryJobStore implements JobStore {
-        private Job job;
-        public Job save(Job candidate) { job = candidate; return candidate; }
+        private final List<Job> jobs = new ArrayList<>();
+        public Job save(Job candidate) {
+            jobs.removeIf(job -> job.id().equals(candidate.id()));
+            jobs.add(candidate);
+            jobs.sort(java.util.Comparator.comparing(Job::createdAt).reversed().thenComparing(Job::id));
+            return candidate;
+        }
         public Optional<Job> findOwned(UUID id, UUID userId) {
-            return job != null && job.id().equals(id) && job.userId().equals(userId) ? Optional.of(job) : Optional.empty();
+            return jobs.stream()
+                .filter(job -> job.id().equals(id) && job.userId().equals(userId))
+                .findFirst();
+        }
+        public List<Job> findOwnedPage(UUID userId, Instant createdBefore, UUID idBefore, int limit) {
+            return jobs.stream()
+                .filter(job -> job.userId().equals(userId))
+                .filter(job -> createdBefore == null
+                    || job.createdAt().isBefore(createdBefore)
+                    || (job.createdAt().equals(createdBefore) && job.id().compareTo(idBefore) < 0))
+                .limit(limit)
+                .toList();
         }
     }
 }
