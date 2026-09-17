@@ -12,6 +12,8 @@ out/
 !services/video-api/src/main/java/br/com/fiapx/videoapi/jobs/adapter/out/**
 !services/video-api/src/main/java/br/com/fiapx/videoapi/inbox/adapter/out/
 !services/video-api/src/main/java/br/com/fiapx/videoapi/inbox/adapter/out/**
+!services/video-api/src/main/java/br/com/fiapx/videoapi/outbox/adapter/out/
+!services/video-api/src/main/java/br/com/fiapx/videoapi/outbox/adapter/out/**
 !services/video-api/src/main/java/br/com/fiapx/videoapi/inbox/application/port/out/
 !services/video-api/src/main/java/br/com/fiapx/videoapi/inbox/application/port/out/**
 !services/video-api/src/main/java/br/com/fiapx/videoapi/jobs/application/port/out/
