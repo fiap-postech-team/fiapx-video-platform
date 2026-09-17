@@ -6,17 +6,28 @@ import java.util.UUID;
 public final class Job {
     private final UUID id;
     private final UUID userId;
+    private final UUID videoId;
+    private final JobSourceKind sourceKind;
     private final String sourceKey;
     private final Instant createdAt;
     private JobStatus status;
     private String resultKey;
 
     public Job(UUID id, UUID userId, String sourceKey, Instant createdAt) {
-        this(id, userId, sourceKey, null, JobStatus.PENDING, createdAt);
+        this(id, userId, null, JobSourceKind.LEGACY_KEY, sourceKey, null, JobStatus.PENDING, createdAt);
     }
 
     public Job(UUID id, UUID userId, String sourceKey, String resultKey, JobStatus status, Instant createdAt) {
-        this.id = id; this.userId = userId; this.sourceKey = sourceKey; this.resultKey = resultKey;
+        this(id, userId, null, JobSourceKind.LEGACY_KEY, sourceKey, resultKey, status, createdAt);
+    }
+
+    public Job(UUID id, UUID userId, UUID videoId, String sourceKey, Instant createdAt) {
+        this(id, userId, videoId, JobSourceKind.VIDEO, sourceKey, null, JobStatus.PENDING, createdAt);
+    }
+
+    public Job(UUID id, UUID userId, UUID videoId, JobSourceKind sourceKind, String sourceKey,
+               String resultKey, JobStatus status, Instant createdAt) {
+        this.id = id; this.userId = userId; this.videoId = videoId; this.sourceKind = sourceKind; this.sourceKey = sourceKey; this.resultKey = resultKey;
         this.status = status; this.createdAt = createdAt;
     }
 
@@ -33,6 +44,8 @@ public final class Job {
 
     public UUID id() { return id; }
     public UUID userId() { return userId; }
+    public UUID videoId() { return videoId; }
+    public JobSourceKind sourceKind() { return sourceKind; }
     public String sourceKey() { return sourceKey; }
     public String resultKey() { return resultKey; }
     public JobStatus status() { return status; }

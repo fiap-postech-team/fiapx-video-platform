@@ -9,6 +9,9 @@ import br.com.fiapx.videoapi.jobs.domain.Job;
 import br.com.fiapx.videoapi.identity.domain.AuthenticatedIdentity;
 import br.com.fiapx.videoapi.identity.domain.UserRole;
 import br.com.fiapx.videoapi.outbox.application.port.out.OutboxStore;
+import br.com.fiapx.videoapi.videos.application.port.out.VideoStore;
+import br.com.fiapx.videoapi.videos.domain.Video;
+import br.com.fiapx.videoapi.videos.domain.VideoStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -24,7 +27,7 @@ class JobControllerTest {
         var userId = UUID.randomUUID();
         var controller = controller(jobs);
 
-        var response = controller.create(new JobController.CreateJobRequest("uploads/source.mp4"), jwt(userId));
+        var response = controller.create(new JobController.CreateJobRequest("uploads/source.mp4"), null, jwt(userId));
 
         assertThat(response.getStatusCode().value()).isEqualTo(201);
         assertThat(response.getBody().userId()).isEqualTo(userId);
@@ -55,9 +58,19 @@ class JobControllerTest {
 
     private JobController controller(InMemoryJobStore jobs) {
         return new JobController(
-            new CreateJob(jobs, (eventId, jobId, userId, sourceKey) -> { }, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
+            new CreateJob(jobs, (eventId, jobId, userId, sourceKey) -> { }, videos(), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
             jobs
         );
+    }
+
+    private VideoStore videos() {
+        return new VideoStore() {
+            public Optional<Video> findConfirmed(UUID user, String key) {
+                return Optional.of(new Video(UUID.randomUUID(), user, key, "source.mp4", "video/mp4", 1,
+                    "a".repeat(64), VideoStatus.UPLOADED, Instant.EPOCH, Instant.EPOCH));
+            }
+            public Video save(Video video) { return video; }
+        };
     }
 
     private AuthenticatedIdentity jwt(UUID subject) {

@@ -17,10 +17,11 @@ class JpaJobStoreTest {
     @Test
     void mapsSavedDomainJobToJpaAndBack() {
         var repository = mock(SpringDataJobRepository.class);
+        var history = mock(JobStatusHistoryRepository.class);
         when(repository.save(any(JobEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         var job = job();
 
-        var saved = new JpaJobStore(repository).save(job);
+        var saved = new JpaJobStore(repository, history).save(job);
 
         assertThat(saved.id()).isEqualTo(job.id());
         assertThat(saved.userId()).isEqualTo(job.userId());
@@ -30,10 +31,11 @@ class JpaJobStoreTest {
     @Test
     void mapsOwnedJobWhenRepositoryFindsIt() {
         var repository = mock(SpringDataJobRepository.class);
+        var history = mock(JobStatusHistoryRepository.class);
         var job = job();
         when(repository.findByIdAndUserId(job.id(), job.userId())).thenReturn(Optional.of(new JobEntity(job)));
 
-        var found = new JpaJobStore(repository).findOwned(job.id(), job.userId());
+        var found = new JpaJobStore(repository, history).findOwned(job.id(), job.userId());
 
         assertThat(found).isPresent().get().extracting(Job::sourceKey).isEqualTo("uploads/source.mp4");
     }
@@ -41,9 +43,10 @@ class JpaJobStoreTest {
     @Test
     void returnsEmptyWhenNoOwnedJobExists() {
         var repository = mock(SpringDataJobRepository.class);
+        var history = mock(JobStatusHistoryRepository.class);
         when(repository.findByIdAndUserId(any(), any())).thenReturn(Optional.empty());
 
-        assertThat(new JpaJobStore(repository).findOwned(UUID.randomUUID(), UUID.randomUUID())).isEmpty();
+        assertThat(new JpaJobStore(repository, history).findOwned(UUID.randomUUID(), UUID.randomUUID())).isEmpty();
     }
 
     private Job job() {

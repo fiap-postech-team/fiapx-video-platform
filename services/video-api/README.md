@@ -14,15 +14,15 @@ Serviço de entrada Spring Boot que expõe health, documentação local, autenti
 | `GET /v3/api-docs` | bloqueado pela segurança desta fundação |
 | `POST /v1/auth/register`, `POST /v1/auth/login` | cadastro e login local |
 | `POST /v1/auth/refresh`, `POST /v1/auth/logout` | sessão rotativa por cookie e CSRF |
-| `POST /v1/jobs`, `GET /v1/jobs/{id}` | bearer JWT obrigatório |
+| `POST /v1/jobs`, `GET /v1/jobs/{id}` | bearer JWT obrigatório; criação exige vídeo confirmado e aceita `Idempotency-Key` |
 
 ## Roadmap de responsabilidade
 
-- receber `sourceKey`, criar job e aplicar estados;
-- associar o job ao usuário autenticado;
-- registrar outbox transacional e publicar no RabbitMQ;
-- consumir eventos do processor e atualizar o estado;
-- expor consulta de jobs e autorização por proprietário.
+- persistir metadados de vídeo e confirmar seu lifecycle antes do job;
+- associar o job ao usuário autenticado e deduplicar criações por `Idempotency-Key`;
+- registrar job, histórico inicial e outbox na mesma transação;
+- deduplicar resultados na inbox e atualizar o agregado com optimistic locking;
+- fazer claim durável da outbox com retry e autorização por proprietário.
 
 ```mermaid
 flowchart LR
@@ -85,6 +85,13 @@ documenta a transição futura para OIDC/JWKS.
 ## Observabilidade
 
 O health é o único sinal operacional já exposto como contrato público desta fundação. Métricas de jobs, outbox, redelivery, DLQ e tracing entre HTTP e AMQP pertencem aos épicos que introduzirem comportamento de negócio.
+
+## Persistência
+
+Flyway executa `V1`, `V2` e `V3` sem alterar migrations já publicadas. A `V3`
+normaliza usuários em `users`, `user_credentials` e `user_roles`, mantém dados
+legados durante a transição e adiciona vídeos, inbox, idempotência, histórico e
+metadados de claim/retry da outbox. Veja o [DER](../../docs/architecture/video-api-database.md).
 
 ## Próximos passos
 

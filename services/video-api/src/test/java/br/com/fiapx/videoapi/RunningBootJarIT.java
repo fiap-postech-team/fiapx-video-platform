@@ -16,7 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static br.com.fiapx.videoapi.BootJarIT.packagedJar;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class RunningBootJarIT {
 
     @Container

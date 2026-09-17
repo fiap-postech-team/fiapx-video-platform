@@ -6,9 +6,10 @@ O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs
 gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações
 Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
 
-> Estado da fundação: o `video-api` já é executável, sobe com PostgreSQL e expõe health e Swagger local no perfil
-> `local`. Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e os fluxos de
-> jobs/outbox/resultados continuam como evoluções registradas, não funcionalidades concluídas.
+> Estado atual: o `video-api` sobe com PostgreSQL, autenticação local RSA/JWT e
+> schema validado pelo Hibernate. O modelo persistente inclui identidade,
+> sessões rotativas, vídeos, jobs, histórico, inbox, outbox e idempotência;
+> integrações de S3, RabbitMQ e publisher confirms continuam evoluções externas.
 
 ## Visão geral
 
@@ -131,9 +132,9 @@ convivência entre produtores e consumidores.
 
 ## Configuração e segurança
 
-Configuração é externalizada por variáveis de ambiente. Nunca use os segredos padrão fora do ambiente local. O
-`video-api` desta fundação não emite tokens nem implementa autenticação; o ADR 0010 documenta HMAC apenas para
-desenvolvimento local futuro e OIDC/JWKS para ambientes não locais.
+Configuração é externalizada por variáveis de ambiente. Nunca use os segredos
+padrão fora do ambiente local. O `video-api` emite JWT RSA no MVP e preserva
+portas de identidade para a futura troca por OIDC/JWKS; veja o ADR 0011.
 
 Payloads binários não passam pelo RabbitMQ ou PostgreSQL. Vídeos e ZIPs ficam no object storage; mensagens carregam
 apenas IDs, object keys e metadados pequenos.

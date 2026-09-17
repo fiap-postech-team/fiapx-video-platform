@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Proves ownership filtering happens in the database, not in memory. */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class JobRepositoryOwnershipTest {
     @Container
     @ServiceConnection

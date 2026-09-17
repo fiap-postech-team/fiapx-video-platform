@@ -14,6 +14,11 @@ public interface IdentityStore {
     void createRefreshToken(UUID tokenId, UUID sessionId, String hash, Instant issuedAt, Instant expiresAt);
     Optional<RefreshTokenRecord> findRefreshTokenForUpdate(String hash);
     void consumeRefreshToken(UUID tokenId, Instant consumedAt);
+    default void rotateRefreshToken(UUID consumedTokenId, UUID replacementTokenId, UUID sessionId,
+                                    String hash, Instant issuedAt, Instant expiresAt) {
+        consumeRefreshToken(consumedTokenId, issuedAt);
+        createRefreshToken(replacementTokenId, sessionId, hash, issuedAt, expiresAt);
+    }
     void revokeSession(UUID sessionId, Instant revokedAt);
     boolean hasActiveSession(UUID sessionId, UUID userId, Instant now);
 

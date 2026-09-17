@@ -13,7 +13,7 @@ semântica, ownership e operação.
 
 | Routing key              | Produtor               | Consumidores                       | Quando ocorre              | Campos específicos                                      |
 |--------------------------|------------------------|------------------------------------|----------------------------|---------------------------------------------------------|
-| `video.job.requested.v1` | `video-api` via outbox | `video-processor`                  | job e outbox confirmados   | `userId`, `sourceKey`                                   |
+| `video.job.requested.v1` | `video-api` via outbox | `video-processor`                  | job, histórico e outbox confirmados | `userId`, `videoId` opcional, `sourceKey`              |
 | `video.job.started.v1`   | `video-processor`      | `video-api`                        | processor inicia trabalho  | `type=PROCESSING`                                       |
 | `video.job.completed.v1` | `video-processor`      | `video-api`                        | ZIP armazenado com sucesso | `type=COMPLETED`, `resultKey`                           |
 | `video.job.failed.v1`    | `video-processor`      | `video-api`, `notification-worker` | falha declarada terminal   | `type=FAILED`, `terminal`, `reason`, `recipient` futuro |
@@ -31,16 +31,17 @@ semântica, ownership e operação.
 }
 ```
 
-`occurredAt` e `correlationId` são recomendados para a próxima revisão do schema; não estão presentes em todos os
-eventos da implementação inicial.
+`occurredAt` e `correlationId` são persistidos no envelope da outbox. O payload
+legado em texto permanece temporariamente para compatibilidade; novas consultas
+operacionais usam o envelope JSONB versionado.
 
 ## Semântica por evento
 
 ### `video.job.requested.v1`
 
 Comando durável para iniciar processamento. O processor pode recebê-lo mais de uma vez. `sourceKey` identifica um objeto
-já existente; não deve conter URL com credencial. Retenção precisa cobrir a indisponibilidade máxima aceitável do
-processor.
+já existente e `videoId`, quando presente, identifica os metadados confirmados. Nenhum deles deve conter URL com
+credencial. Retenção precisa cobrir a indisponibilidade máxima aceitável do processor.
 
 ### `video.job.started.v1`
 

@@ -11,8 +11,6 @@ public interface IdentityUserRepository extends JpaRepository<IdentityUserEntity
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<IdentityUserEntity> findByEmail(String email);
 
-    boolean existsByRole(br.com.fiapx.videoapi.identity.domain.UserRole role);
-
     @Query("select count(s) > 0 from AuthSessionEntity s where s.id = :sessionId and s.userId = :userId "
         + "and s.revokedAt is null and s.expiresAt > :now")
     boolean hasActiveSession(UUID sessionId, UUID userId, java.time.Instant now);
