@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import br.com.fiapx.videoapi.outbox.domain.OutboxClaim;
 
 @Component
-public final class JpaOutboxStore implements OutboxStore {
+public class JpaOutboxStore implements OutboxStore {
     private final SpringDataOutboxRepository events;
     private final ObjectMapper json;
     public JpaOutboxStore(SpringDataOutboxRepository events, ObjectMapper json) { this.events = events; this.json = json; }
