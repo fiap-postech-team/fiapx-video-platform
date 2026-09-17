@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.List;
 import java.util.function.Supplier;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import br.com.fiapx.videoapi.identity.domain.AuthenticatedIdentity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +28,7 @@ public class JobController {
     private final JobStore jobs;
     private final JobTransactionExecutor transactions;
 
+    @Autowired
     public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions) {
         this.createJob = createJob;
         this.jobs = jobs;
