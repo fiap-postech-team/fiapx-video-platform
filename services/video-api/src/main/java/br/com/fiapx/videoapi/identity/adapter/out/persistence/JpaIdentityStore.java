@@ -80,8 +80,16 @@ public final class JpaIdentityStore implements IdentityStore {
     }
 
     private void saveCredential(IdentityUser user) {
-        var credential = new UserCredentialEntity(); credential.userId = user.id(); credential.passwordHash = user.passwordHash();
-        credential.passwordAlgorithm = algorithm(user.passwordHash()); credential.failedAttempts = user.failedAttempts(); credential.lockedUntil = user.lockedUntil();
+        var credential = credentials.findById(user.id()).orElseGet(() -> {
+            var created = new UserCredentialEntity();
+            created.userId = user.id();
+            created.passwordChangedAt = Instant.now();
+            return created;
+        });
+        credential.passwordHash = user.passwordHash();
+        credential.passwordAlgorithm = algorithm(user.passwordHash());
+        credential.failedAttempts = user.failedAttempts();
+        credential.lockedUntil = user.lockedUntil();
         credentials.save(credential);
     }
 

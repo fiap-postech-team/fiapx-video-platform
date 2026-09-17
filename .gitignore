@@ -4,6 +4,8 @@ build/
 out/
 !services/video-api/src/main/java/br/com/fiapx/videoapi/identity/adapter/out/
 !services/video-api/src/main/java/br/com/fiapx/videoapi/identity/adapter/out/**
+!services/video-api/src/test/java/br/com/fiapx/videoapi/identity/adapter/out/
+!services/video-api/src/test/java/br/com/fiapx/videoapi/identity/adapter/out/**
 !services/video-api/src/main/java/br/com/fiapx/videoapi/identity/application/port/out/
 !services/video-api/src/main/java/br/com/fiapx/videoapi/identity/application/port/out/**
 !services/video-api/src/main/java/br/com/fiapx/videoapi/videos/adapter/out/
