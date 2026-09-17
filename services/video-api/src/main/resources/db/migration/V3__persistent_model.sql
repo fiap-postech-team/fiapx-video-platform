@@ -71,7 +71,6 @@ ALTER TABLE jobs ADD COLUMN version bigint NOT NULL DEFAULT 0;
 ALTER TABLE jobs ADD COLUMN completed_at timestamptz;
 ALTER TABLE jobs ADD CONSTRAINT jobs_source_kind_check CHECK (source_kind IN ('LEGACY_KEY', 'VIDEO'));
 ALTER TABLE jobs ADD CONSTRAINT jobs_status_check CHECK (status IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'));
-ALTER TABLE jobs ADD CONSTRAINT jobs_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) NOT VALID;
 ALTER TABLE jobs ADD CONSTRAINT jobs_video_owner_fkey FOREIGN KEY (video_id, user_id)
     REFERENCES videos (id, user_id) NOT VALID;
 CREATE INDEX jobs_owner_cursor_idx ON jobs (user_id, created_at DESC, id DESC);
