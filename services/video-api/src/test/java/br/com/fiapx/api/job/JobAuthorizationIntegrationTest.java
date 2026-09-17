@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "app.outbox.enabled=false"})
 @AutoConfigureMockMvc
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class JobAuthorizationIntegrationTest {
     static final String SECRET = "test-secret-key-with-at-least-32-bytes!";
 

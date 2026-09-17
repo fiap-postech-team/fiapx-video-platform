@@ -50,6 +50,14 @@ class JobTest {
             .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    void identifiesTerminalStatuses() {
+        assertThat(JobStatus.PENDING.isTerminal()).isFalse();
+        assertThat(JobStatus.PROCESSING.isTerminal()).isFalse();
+        assertThat(JobStatus.COMPLETED.isTerminal()).isTrue();
+        assertThat(JobStatus.FAILED.isTerminal()).isTrue();
+    }
+
     private Job job(JobStatus status) {
         return new Job(UUID.randomUUID(), UUID.randomUUID(), "videos/source.mp4", null, status, Instant.EPOCH);
     }

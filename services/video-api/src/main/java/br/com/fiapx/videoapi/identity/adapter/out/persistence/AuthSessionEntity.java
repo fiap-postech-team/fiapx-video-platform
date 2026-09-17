@@ -13,6 +13,9 @@ class AuthSessionEntity {
     UUID userId;
     Instant expiresAt;
     Instant revokedAt;
+    Instant createdAt;
+    Instant lastUsedAt;
+    String revocationReason;
 
     protected AuthSessionEntity() {
     }

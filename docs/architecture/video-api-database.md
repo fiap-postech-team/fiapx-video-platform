@@ -16,12 +16,15 @@ metadados pequenos.
 ```mermaid
 erDiagram
     USERS ||--|| USER_CREDENTIALS : possui
+    USERS ||--o{ USER_ROLES : recebe
     USERS ||--o{ AUTH_SESSIONS : inicia
+    AUTH_SESSIONS ||--o{ REFRESH_TOKENS : rotaciona
     USERS ||--o{ VIDEOS : envia
-    VIDEOS ||--o{ PROCESSING_JOBS : origina
-    PROCESSING_JOBS ||--o{ JOB_STATUS_HISTORY : registra
-    PROCESSING_JOBS ||--o{ OUTBOX_EVENTS : produz
-    PROCESSING_JOBS ||--o{ INBOX_EVENTS : correlaciona
+    VIDEOS ||--o{ JOBS : origina
+    JOBS ||--o{ JOB_STATUS_HISTORY : registra
+    JOBS ||--o{ OUTBOX_EVENTS : produz
+    JOBS ||--o{ INBOX_EVENTS : correlaciona
+    JOBS ||--|| JOB_CREATION_IDEMPOTENCY : deduplica
 
     USERS {
         uuid id PK
@@ -41,6 +44,11 @@ erDiagram
         timestamptz locked_until
     }
 
+    USER_ROLES {
+        uuid user_id PK,FK
+        varchar role PK
+    }
+
     AUTH_SESSIONS {
         uuid id PK
         uuid user_id FK
@@ -49,6 +57,15 @@ erDiagram
         timestamptz revoked_at
         timestamptz created_at
         timestamptz last_used_at
+    }
+
+    REFRESH_TOKENS {
+        uuid id PK
+        uuid session_id FK
+        varchar token_hash UK
+        timestamptz expires_at
+        timestamptz consumed_at
+        uuid replaced_by_id FK
     }
 
     VIDEOS {
@@ -65,7 +82,7 @@ erDiagram
         timestamptz deleted_at
     }
 
-    PROCESSING_JOBS {
+    JOBS {
         uuid id PK
         uuid user_id FK
         uuid video_id FK
@@ -119,6 +136,14 @@ erDiagram
         varchar status
         text last_error
     }
+
+    JOB_CREATION_IDEMPOTENCY {
+        uuid user_id PK,FK
+        varchar idempotency_key PK
+        varchar request_fingerprint
+        uuid job_id UK,FK
+        timestamptz created_at
+    }
 ```
 
 ## Responsabilidade das tabelas
@@ -129,7 +154,7 @@ erDiagram
 | `user_credentials` | credencial local separada do perfil; guarda somente hash forte da senha |
 | `auth_sessions` | refresh tokens rotacionáveis e revogáveis; access token JWT continua stateless |
 | `videos` | metadados e ciclo de vida do objeto enviado ao S3 |
-| `processing_jobs` | agregado proprietário do processamento e seu estado atual |
+| `jobs` | agregado proprietário do processamento e seu estado atual |
 | `job_status_history` | trilha append-only de todas as transições aceitas |
 | `outbox_events` | intenção durável de publicar `video.job.requested.v1` |
 | `inbox_events` | deduplicação durável de `started`, `completed` e `failed` |
@@ -150,7 +175,7 @@ O fluxo recomendado é:
 1. a API cria `videos` com `upload_status = 'PENDING'` e devolve URL pré-assinada;
 2. o cliente envia o binário diretamente ao S3, sem passar pela API;
 3. a API confirma tamanho, tipo e checksum e muda para `UPLOADED`;
-4. na mesma transação, cria `processing_jobs` em `PENDING`, o primeiro histórico
+4. na mesma transação, cria `jobs` em `PENDING`, o primeiro histórico
    e `outbox_events` com `video.job.requested.v1`;
 5. o publisher envia a mensagem e somente depois do publisher confirm marca a
    outbox como `PUBLISHED`.
@@ -185,7 +210,7 @@ podem regredir `COMPLETED` ou `FAILED`.
   aprovada;
 - `videos`: `UNIQUE (user_id, object_key)` e checks para tamanho positivo e
   estados válidos;
-- `processing_jobs`: FK composta lógica de proprietário (`video_id`, `user_id`)
+- `jobs`: `video_id`, proprietário e `version` impedem inconsistência e atualização perdida
   para impedir processar vídeo de outro usuário; `version` para optimistic lock;
 - `job_status_history`: `UNIQUE (job_id, event_id)` quando `event_id` existir;
 - `outbox_events`: `payload jsonb NOT NULL`, `attempts >= 0` e estado limitado a
@@ -200,10 +225,10 @@ forward-only sem o acoplamento operacional de enums nativos do PostgreSQL.
 
 ```sql
 CREATE INDEX jobs_owner_created_idx
-    ON processing_jobs (user_id, created_at DESC, id);
+    ON jobs (user_id, created_at DESC, id);
 
 CREATE INDEX jobs_owner_status_idx
-    ON processing_jobs (user_id, status, created_at DESC);
+    ON jobs (user_id, status, created_at DESC);
 
 CREATE INDEX job_history_job_time_idx
     ON job_status_history (job_id, occurred_at, id);

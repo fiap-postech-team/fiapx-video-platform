@@ -15,6 +15,7 @@ class RefreshTokenEntity {
     Instant issuedAt;
     Instant expiresAt;
     Instant consumedAt;
+    UUID replacedById;
 
     protected RefreshTokenEntity() {
     }

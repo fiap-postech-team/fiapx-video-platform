@@ -29,6 +29,7 @@ exceto por correções editoriais e links.
 | [0009](0009-defer-redis-until-needed.md)                            | Adiar Redis                       | Aceito |
 | [0010](0010-use-local-hmac-jwt-and-migrate-to-oidc-jwks.md)         | HMAC local e OIDC/JWKS        | Substituído |
 | [0011](0011-local-identity-with-rsa-jwt-and-oidc-boundary.md)       | Identidade local RSA e OIDC   | Aceito |
+| [0012](0012-evolve-video-api-schema-with-forward-only-migrations.md) | Schema forward-only e modelo persistente | Aceito |
 
 ## Template
 

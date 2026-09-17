@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import br.com.fiapx.videoapi.jobs.adapter.in.http.JobNotFoundException;
 import br.com.fiapx.videoapi.identity.application.AuthenticationFailedException;
 import br.com.fiapx.videoapi.identity.application.EmailAlreadyRegisteredException;
+import br.com.fiapx.videoapi.jobs.application.IdempotencyConflictException;
+import br.com.fiapx.videoapi.jobs.application.VideoNotConfirmedException;
+import br.com.fiapx.videoapi.jobs.application.VideoNotFoundException;
 
 /**
  * Converts failures reaching the MVC boundary into the shared sanitized error contract.
@@ -67,6 +70,21 @@ public final class ApiExceptionHandler {
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     ResponseEntity<ProblemDetail> handleConflict(EmailAlreadyRegisteredException exception, HttpServletRequest request) {
         return response(ProblemType.CONFLICT, request);
+    }
+
+    @ExceptionHandler({IdempotencyConflictException.class, VideoNotConfirmedException.class})
+    ResponseEntity<ProblemDetail> handleStateConflict(RuntimeException exception, HttpServletRequest request) {
+        return response(ProblemType.CONFLICT, request);
+    }
+
+    @ExceptionHandler(VideoNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleVideoNotFound(VideoNotFoundException exception, HttpServletRequest request) {
+        return response(ProblemType.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ProblemDetail> handleInvalidArgument(IllegalArgumentException exception, HttpServletRequest request) {
+        return response(ProblemType.VALIDATION_ERROR, request);
     }
 
     private ResponseEntity<ProblemDetail> response(ProblemType type, HttpServletRequest request) {

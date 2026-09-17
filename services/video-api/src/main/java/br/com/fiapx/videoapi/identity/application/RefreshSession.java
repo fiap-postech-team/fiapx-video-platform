@@ -32,8 +32,7 @@ public class RefreshSession {
         var user = store.findUser(token.userId()).orElseThrow(AuthenticationFailedException::new);
         var replacement = tokens.generate();
         var expiresAt = now.plus(duration);
-        store.consumeRefreshToken(token.id(), now);
-        store.createRefreshToken(UUID.randomUUID(), token.sessionId(), tokens.hash(replacement), now, expiresAt);
+        store.rotateRefreshToken(token.id(), UUID.randomUUID(), token.sessionId(), tokens.hash(replacement), now, expiresAt);
         return new RefreshResult(issuer.issue(user, token.sessionId()), replacement, expiresAt);
     }
 

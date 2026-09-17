@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -110,7 +111,8 @@ class IdentityApplicationsTest {
         var refresh = new RefreshSession(store, tokens, issuer, CLOCK, Duration.ofDays(7));
 
         assertThat(refresh.execute("valid").refreshToken()).isEqualTo("replacement");
-        verify(store).consumeRefreshToken(valid.id(), NOW);
+        verify(store).rotateRefreshToken(eq(valid.id()), any(), eq(session), eq("replacement-hash"),
+                eq(NOW), eq(NOW.plus(Duration.ofDays(7))));
 
         var reused = new IdentityStore.RefreshTokenRecord(UUID.randomUUID(), session, user.id(), NOW.plusSeconds(1), NOW, null);
         when(tokens.hash("reused")).thenReturn("reused-hash");
