@@ -2,10 +2,11 @@
 
 ## Objetivo
 
-Este modelo cobre cadastro e autenticação local de usuários, upload direto para
-object storage compatível com S3, submissão assíncrona de processamento, histórico
-de estado, publicação confiável pelo padrão transactional outbox e consumo
-idempotente dos resultados do processor.
+Este modelo cobre o cadastro e a autenticação local de usuários, a persistência
+de vídeos e jobs, histórico de estado, outbox e inbox. Cadastro, login, jobs e
+as operações de persistência estão implementados. Upload direto para object
+storage, confirmação do vídeo e integração da outbox/inbox com RabbitMQ são o
+fluxo-alvo, ainda não uma superfície HTTP disponível.
 
 O PostgreSQL é a fonte de verdade dos metadados. Os binários permanecem no S3 e
 as mensagens no RabbitMQ carregam somente identificadores, object keys e
@@ -52,17 +53,18 @@ erDiagram
     AUTH_SESSIONS {
         uuid id PK
         uuid user_id FK
-        varchar refresh_token_hash UK
         timestamptz expires_at
         timestamptz revoked_at
         timestamptz created_at
         timestamptz last_used_at
+        varchar revocation_reason
     }
 
     REFRESH_TOKENS {
         uuid id PK
         uuid session_id FK
         varchar token_hash UK
+        timestamptz issued_at
         timestamptz expires_at
         timestamptz consumed_at
         uuid replaced_by_id FK
@@ -73,24 +75,24 @@ erDiagram
         uuid user_id FK
         varchar object_key UK
         varchar original_filename
-        varchar content_type
+        varchar declared_content_type
         bigint size_bytes
         varchar checksum_sha256
         varchar upload_status
-        timestamptz uploaded_at
         timestamptz created_at
-        timestamptz deleted_at
+        timestamptz updated_at
     }
 
     JOBS {
         uuid id PK
         uuid user_id FK
         uuid video_id FK
+        varchar source_kind
         varchar source_key
         varchar result_key
         varchar status
         varchar failure_code
-        integer version
+        bigint version
         timestamptz created_at
         timestamptz updated_at
         timestamptz completed_at
@@ -114,15 +116,18 @@ erDiagram
         integer schema_version
         varchar routing_key
         uuid correlation_id
-        jsonb payload
+        text payload
+        jsonb payload_json
         varchar status
         integer attempts
         timestamptz next_attempt_at
         timestamptz claimed_at
         varchar claimed_by
+        uuid claim_token
+        timestamptz claim_expires_at
         timestamptz created_at
         timestamptz published_at
-        text last_error
+        varchar last_error_code
     }
 
     INBOX_EVENTS {
@@ -130,11 +135,12 @@ erDiagram
         uuid job_id FK
         varchar event_type
         integer schema_version
+        uuid correlation_id
+        varchar payload_fingerprint
         timestamptz occurred_at
         timestamptz received_at
         timestamptz processed_at
         varchar status
-        text last_error
     }
 
     JOB_CREATION_IDEMPOTENCY {
@@ -153,11 +159,11 @@ erDiagram
 | `users` | perfil e estado da conta; e-mail normalizado e único |
 | `user_credentials` | credencial local separada do perfil; guarda somente hash forte da senha |
 | `auth_sessions` | refresh tokens rotacionáveis e revogáveis; access token JWT continua stateless |
-| `videos` | metadados e ciclo de vida do objeto enviado ao S3 |
+| `videos` | metadados e ciclo de vida previsto para o objeto; ainda não há endpoint de upload/confirmação |
 | `jobs` | agregado proprietário do processamento e seu estado atual |
 | `job_status_history` | trilha append-only de todas as transições aceitas |
-| `outbox_events` | intenção durável de publicar `video.job.requested.v1` |
-| `inbox_events` | deduplicação durável de `started`, `completed` e `failed` |
+| `outbox_events` | intenção durável de publicar `video.job.requested.v1`; publisher RabbitMQ ainda não está conectado |
+| `inbox_events` | base de deduplicação durável para resultados; listener RabbitMQ ainda não está conectado |
 
 ## Decisões importantes
 
@@ -170,7 +176,7 @@ curta no momento do upload ou download. Se houver URL pública permanente, ela
 pode ser derivada da configuração do bucket/CDN sem duplicá-la em todas as
 linhas.
 
-O fluxo recomendado é:
+O fluxo recomendado, ainda pendente de endpoints e integração S3, é:
 
 1. a API cria `videos` com `upload_status = 'PENDING'` e devolve URL pré-assinada;
 2. o cliente envia o binário diretamente ao S3, sem passar pela API;
@@ -189,31 +195,32 @@ armazenar o token em claro.
 
 Se a decisão final for OIDC/JWKS, `user_credentials` e `auth_sessions` saem deste
 bounded context. `users.id` permanece como identidade local, associada ao
-`issuer + subject` do provedor. Isso resolve a divergência atual entre o requisito
-de login e a implementação documentada, que hoje apenas valida JWT.
+`issuer + subject` do provedor. Hoje a API já emite e valida JWT RSA locais; a
+fronteira de migração está no ADR 0011.
 
 ### Outbox e inbox
 
-Job, histórico inicial e outbox são gravados em uma única transação. O publisher
-faz claim concorrente em pequenos lotes com `FOR UPDATE SKIP LOCKED`, usa
-publisher confirms e aplica retry com `next_attempt_at`. Como envio e atualização
-da outbox não são atômicos, consumidores continuam idempotentes por `eventId`.
+Job, histórico inicial e outbox são gravados em uma única transação. A
+persistência possui operações de claim/retry com `next_attempt_at`; o publisher
+RabbitMQ com confirms ainda deve ser conectado. Como envio e atualização da
+outbox não serão atômicos, consumidores continuam obrigatoriamente idempotentes
+por `eventId`.
 
-O listener de resultados insere primeiro em `inbox_events`. A unique key de
-`event_id` elimina redelivery; a inserção na inbox, a validação da transição, a
-atualização do job e o histórico ocorrem na mesma transação. Eventos antigos não
-podem regredir `COMPLETED` ou `FAILED`.
+O caso de uso de resultados registra `eventId` na inbox antes de aplicar a
+transição. A chave única elimina redelivery, mas o listener RabbitMQ e a
+validação completa do fluxo de resultados ainda devem ser conectados e validados
+em integração.
 
 ## Constraints recomendadas
 
 - `users.email`: `UNIQUE (lower(email))`, ou tipo `citext` se a extensão estiver
   aprovada;
-- `videos`: `UNIQUE (user_id, object_key)` e checks para tamanho positivo e
-  estados válidos;
+- `videos`: `UNIQUE (object_key)` e checks para tamanho positivo e estados válidos;
 - `jobs`: `video_id`, proprietário e `version` impedem inconsistência e atualização perdida
   para impedir processar vídeo de outro usuário; `version` para optimistic lock;
 - `job_status_history`: `UNIQUE (job_id, event_id)` quando `event_id` existir;
-- `outbox_events`: `payload jsonb NOT NULL`, `attempts >= 0` e estado limitado a
+- `outbox_events`: `payload` textual legado e `payload_json` de transição,
+  `attempts >= 0` e estado limitado a
   `PENDING`, `PROCESSING`, `PUBLISHED`, `FAILED`;
 - `inbox_events.event_id`: chave primária e, portanto, chave de idempotência;
 - timestamps em UTC (`timestamptz`) e UUIDs para agregados e eventos.
@@ -258,12 +265,12 @@ O schema existente já contém `jobs`, `job_status_history` e `outbox_events`. A
 evolução deve ocorrer em novas migrations Flyway, sem alterar
 `V1__api_schema.sql`:
 
-1. criar `users`, `user_credentials`, `auth_sessions`, `videos` e
-   `inbox_events`;
-2. adicionar metadados operacionais à outbox e converter `payload` para `jsonb`;
-3. adicionar `video_id`, `version`, códigos de falha e timestamps ao job;
-4. popular/validar relações antes de tornar novas FKs e colunas obrigatórias;
-5. manter `source_key` e `result_key` durante a compatibilidade com os contratos
+1. criou `users`, `user_credentials`, `user_roles`, `videos` e `inbox_events`;
+2. adicionou metadados operacionais e `payload_json` à outbox, preservando
+   temporariamente o `payload` textual;
+3. adicionou `video_id`, `source_kind`, `version`, códigos de falha e timestamps ao job;
+4. preservou campos e FKs legados para permitir rollout expand/contract;
+5. manteve `source_key` e `result_key` durante a compatibilidade com os contratos
    OpenAPI/AsyncAPI atuais.
 
 Essa sequência permite rollout expand/contract e instâncias antigas e novas

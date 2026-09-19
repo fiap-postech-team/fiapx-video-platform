@@ -6,12 +6,18 @@ O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs
 gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações
 Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
 
-> Estado atual: o `video-api` sobe com PostgreSQL, autenticação local RSA/JWT e
-> schema validado pelo Hibernate. O modelo persistente inclui identidade,
-> sessões rotativas, vídeos, jobs, histórico, inbox, outbox e idempotência;
-> integrações de S3, RabbitMQ e publisher confirms continuam evoluções externas.
+> Estado atual: o `video-api` cadastra usuários, mantém sessões locais RSA/JWT,
+> aplica autorização de proprietário aos jobs e valida o schema PostgreSQL pelo
+> Hibernate. O modelo persistente inclui identidade, sessões rotativas, vídeos,
+> jobs, histórico, inbox, outbox e idempotência. Upload/confirmação de vídeo e
+> a integração efetiva entre outbox, RabbitMQ e processor ainda não estão
+> expostos pelo backend.
 
 ## Visão geral
+
+O diagrama representa a arquitetura-alvo; os limites entre API, broker,
+processor e notificações já estão definidos, mas a publicação e o consumo
+efetivos de eventos ainda não foram integrados ao `video-api`.
 
 ```mermaid
 flowchart LR
@@ -34,7 +40,7 @@ o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arq
 
 | Aplicação             | Responsabilidade                                         | Porta | Documentação                                     |
 |-----------------------|----------------------------------------------------------|------:|--------------------------------------------------|
-| `video-api`           | Fundação executável; health hoje e Swagger local no perfil `local` |  8080 | [README](services/video-api/README.md)           |
+| `video-api`           | Cadastro/login local, JWT, jobs persistentes, health e Swagger no perfil `local` |  8080 | [README](services/video-api/README.md)           |
 | `video-processor`     | FFprobe, FFmpeg, ZIP e object storage                    |  8081 | [README](services/video-processor/README.md)     |
 | `notification-worker` | Notificação de falhas terminais e auditoria              |  8082 | [README](services/notification-worker/README.md) |
 
@@ -71,7 +77,11 @@ execução próprios.
 └── pom.xml
 ```
 
-## Fluxo de negócio
+## Fluxo-alvo de negócio
+
+O fluxo a seguir descreve a arquitetura pretendida. Hoje o `video-api` já
+persiste jobs e a intenção na outbox, mas não publica no RabbitMQ nem oferece o
+ciclo HTTP de upload/confirmação de vídeo.
 
 1. O cliente envia à API a `sourceKey` de um vídeo previamente armazenado.
 2. A API persiste o job `PENDING` e o evento de outbox na mesma transação.
@@ -161,11 +171,11 @@ forem definidos.
 
 ## Roadmap
 
-- Upload/download por URLs pré-assinadas e bucket policies;
-- autenticação completa e autorização de propriedade do job;
-- deduplicação persistente no processor e no consumidor de resultados;
-- claim concorrente e confirmação robusta da outbox;
-- testes unitários, de integração com Testcontainers e end-to-end;
+- upload, confirmação de vídeo e URLs pré-assinadas;
+- publisher RabbitMQ com confirms e listener de resultados;
+- deduplicação persistente no processor e integração da inbox de resultados;
+- recuperação de outbox, métricas e alertas de negócio;
+- execução dos testes de integração com Testcontainers e cobertura mínima estável;
 - logs JSON, tracing, dashboards, alertas e runbooks;
 - build/push de imagens, SBOM, scan e promoção entre ambientes.
 

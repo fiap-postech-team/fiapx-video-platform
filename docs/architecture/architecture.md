@@ -4,8 +4,10 @@
 
 Esta arquitetura separa a interação HTTP, o processamento pesado de mídia e a notificação de falhas. O objetivo é
 absorver picos, permitir escala independente e impedir que operações longas de FFmpeg consumam recursos da API. O
-desenho abaixo é o alvo do produto; a fundação atual entrega apenas o bootstrap executável, health e Swagger local do
-`video-api`, enquanto as capacidades de negócio continuam como roadmap.
+desenho abaixo é o alvo do produto. O `video-api` já cadastra usuários, emite e
+valida JWTs locais, persiste jobs de seus proprietários e registra a intenção na
+outbox. Upload/confirmação de vídeo e a integração da outbox/inbox com RabbitMQ
+continuam no roadmap.
 
 ## Diagrama de contexto
 
@@ -13,10 +15,10 @@ desenho abaixo é o alvo do produto; a fundação atual entrega apenas o bootstr
 flowchart TB
     USER[Usuário / cliente HTTP]
     SYSTEM[FIAP X Video Processing Platform]
-    IDP[Provedor de identidade<br/>futuro]
+    IDP[OIDC/JWKS<br/>evolução futura]
     SMTP[Servidor SMTP]
     USER -->|cria e consulta jobs<br/>baixa resultados| SYSTEM
-    IDP -.->|emite JWT<br/>não implementado nesta fundação| USER
+    IDP -.->|substituirá emissor<br/>local RSA/JWT| USER
     SYSTEM -->|notifica falha terminal| SMTP
 ```
 
@@ -35,7 +37,7 @@ flowchart LR
       STORAGE[(MinIO / S3<br/>vídeos + ZIPs)]
     end
     MAIL[SMTP / MailHog]
-    CLIENT -->|HTTPS + JWT futuro| API
+    CLIENT -->|HTTPS + JWT RSA local| API
     CLIENT -.->|upload/download futuro| STORAGE
     API -->|JPA + Flyway| API_DB
     API -->|publica outbox| RABBIT
@@ -52,13 +54,17 @@ flowchart LR
 
 | Componente            | Responsabilidades                                                       | Dados próprios                   | Não deve fazer                                             |
 |-----------------------|-------------------------------------------------------------------------|----------------------------------|------------------------------------------------------------|
-| `video-api`           | fundação executável hoje; validar JWT, criar/consultar jobs, registrar outbox e aplicar resultados no alvo | jobs, histórico, outbox          | processar mídia ou acessar banco de notificações           |
+| `video-api`           | cadastro/login/sessão, validar JWT, criar/consultar jobs do proprietário e registrar outbox; resultado por listener ainda é futuro | usuários, sessões, vídeos, jobs, histórico, inbox, outbox | processar mídia ou acessar banco de notificações           |
 | `video-processor`     | validar vídeo, extrair frames, gerar ZIP, publicar resultados           | arquivos temporários efêmeros    | atualizar tabelas da API ou transportar binários no broker |
 | `notification-worker` | consumir falhas terminais, enviar e-mail, auditar entrega               | entregas de notificação          | consultar jobs/usuários diretamente no banco da API        |
 | RabbitMQ              | filas de trabalho, fan-out lógico, retry e DLQ                          | mensagens pequenas e temporárias | armazenar vídeos ou ZIPs                                   |
 | MinIO/S3              | objetos de entrada e saída                                              | vídeo e ZIP                      | atuar como fonte de verdade do estado do job               |
 
-## Fluxo principal
+## Fluxo principal (alvo)
+
+O passo de persistência da API já existe, mas o fluxo não pode ser concluído
+pela API atual: não há endpoint para confirmar vídeo nem publisher/listener AMQP
+conectado ao broker.
 
 ```mermaid
 sequenceDiagram
@@ -175,19 +181,25 @@ serviços gerenciados ou operados com políticas próprias de backup, disponibil
 ## Consistência e garantias
 
 - Criar o job e registrar a intenção de publicação é atômico dentro do banco da API.
-- Publicar no RabbitMQ e marcar a outbox não formam uma única transação distribuída; duplicatas são possíveis.
-- Consumers recebem mensagens pelo menos uma vez e devem deduplicar por `eventId`.
-- A tabela do notification worker já possui `event_id` único. A deduplicação persistente do processor e do result
-  listener permanece no roadmap.
+- A API possui operações de claim/retry na outbox e persistência para inbox, mas
+  ainda não há publisher RabbitMQ nem listener de resultados configurados.
+- Quando os consumidores forem conectados, entrega pelo menos uma vez e
+  deduplicação por `eventId` continuam requisitos obrigatórios.
+- A tabela do notification worker já possui `event_id` único. A integração de
+  deduplicação do processor e do listener da API permanece no roadmap.
 - Object storage e banco têm consistência eventual: o job só deve virar `COMPLETED` depois que o upload do ZIP
   finalizar.
 
 ## Segurança
 
-O limite HTTP exigirá bearer JWT no alvo do produto, mas a emissão e a gestão de identidades não fazem parte desta
-fundação. Object keys não devem ser expostas como autorização de acesso; URLs pré-assinadas curtas e validação de
-propriedade devem mediar upload e download. Produção também requer TLS, chaves assimétricas, rotação de segredos,
-usuário de banco por serviço e políticas mínimas de bucket e RabbitMQ.
+A API exige bearer JWT para jobs e usa o `sub` validado para limitar consultas e
+criações ao proprietário. Cadastro, login, refresh rotativo e logout pertencem
+ao serviço; o emissor usa RSA/JWT local e tem fronteira documentada para futura
+migração a OIDC/JWKS. Object keys não devem ser expostas como autorização de
+acesso; URLs pré-assinadas curtas e validação de propriedade devem mediar upload
+e download quando esse fluxo for implementado. Produção também requer TLS,
+chaves assimétricas externas, rotação de segredos, usuário de banco por serviço
+e políticas mínimas de bucket e RabbitMQ.
 
 ## Observabilidade e operação
 
@@ -197,10 +209,10 @@ profundidade das DLQs, dashboards e alertas. Consulte [quality-attributes.md](qu
 
 ## Lacunas conhecidas
 
-1. Upload/download por URL pré-assinada ainda não foi implementado.
-2. O `video-api` desta fundação não emite JWT; a decisão de autenticação local e migração para OIDC/JWKS está no ADR 0010.
-3. Processor e API result listener ainda precisam de inbox/deduplicação persistente.
-4. O publisher da outbox precisa de claim concorrente, publisher confirms e recuperação explícita.
-5. Testes unitários, Testcontainers e end-to-end ainda precisam ser implementados.
+1. Upload/download por URL pré-assinada e confirmação de vídeo ainda não foram implementados.
+2. A API emite JWT RSA local; a migração para OIDC/JWKS está documentada no ADR 0011.
+3. Processor e API result listener ainda precisam ser conectados à inbox e à deduplicação persistente já modelada.
+4. O publisher da outbox precisa ser integrado ao RabbitMQ com confirms e recuperação explícita.
+5. Há testes unitários e de integração; os de Testcontainers exigem Docker e a cobertura atual não alcança o gate de 70%.
 6. Eventos de falha devem carregar o destinatário ou uma referência resolvível sem acesso ao banco da API.
 7. A política de retenção e limpeza de objetos temporários ainda deve ser definida.
