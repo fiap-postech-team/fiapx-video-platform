@@ -10,11 +10,11 @@ As colunas de evidência distinguem a fundação já executável das táticas qu
 
 | Atributo         | Cenário                                         | Resposta esperada                                  | Táticas                                             | Evidência atual                           |
 |------------------|-------------------------------------------------|----------------------------------------------------|-----------------------------------------------------|-------------------------------------------|
-| Disponibilidade  | RabbitMQ fica indisponível após criação do job  | job permanece recuperável e é publicado depois     | outbox transacional, polling                        | schema disponível; publisher no roadmap   |
-| Confiabilidade   | consumer cai após executar efeito, antes do ack | redelivery não duplica efeito final                | `eventId`, unique constraints, keys determinísticas | parcial; inbox pendente em dois consumers |
+| Disponibilidade  | RabbitMQ fica indisponível após criação do job  | job permanece recuperável e é publicado depois     | outbox transacional, polling                        | job/outbox persistidos; publisher no roadmap |
+| Confiabilidade   | consumer cai após executar efeito, antes do ack | redelivery não duplica efeito final                | `eventId`, unique constraints, keys determinísticas | inbox modelada; consumidores ainda não integrados |
 | Escalabilidade   | fila cresce durante pico                        | adicionar processors aumenta vazão sem escalar API | serviços stateless, work queue, S3                  | desenho e containers separados            |
 | Performance      | cliente cria job durante processamento pesado   | API mantém latência independente do FFmpeg         | processamento fora da API                           | separação implementada                    |
-| Segurança        | usuário tenta consultar job de terceiro         | resposta não revela existência nem dados           | JWT + ownership check                               | JWT e ownership ainda não implementados    |
+| Segurança        | usuário tenta consultar job de terceiro         | resposta não revela existência nem dados           | JWT + ownership check                               | JWT RSA local e consulta por proprietário implementados |
 | Observabilidade  | job fica parado                                 | operador identifica etapa e correlação             | métricas, logs com `jobId`, alertas                 | Actuator/health na fundação; tracing pendente |
 | Recuperabilidade | mensagem vai para DLQ                           | operador corrige e reprocessa com segurança        | DLQ, runbook, idempotência                          | filas existentes; runbook pendente        |
 | Manutenibilidade | contrato muda de forma incompatível             | v1 e v2 convivem durante migração                  | AsyncAPI, versionamento no routing key              | contrato v1 existente                     |
@@ -70,5 +70,7 @@ credencial S3 ou payload sensível.
 
 ## Validação contínua
 
-CI deve cobrir unitários, integração com Testcontainers, contratos, migrations e Compose. Antes de produção: teste de
-carga, fault injection básica, restore de backup, scan de imagem, smoke test e exercício documentado de DLQ.
+CI deve cobrir unitários, integração com Testcontainers, contratos, migrations e Compose. O módulo `video-api` já tem
+testes unitários e de integração, mas os últimos dependem de Docker e a cobertura atual não alcança o gate JaCoCo de
+70%. Antes de produção: teste de carga, fault injection básica, restore de backup, scan de imagem, smoke test e
+exercício documentado de DLQ.

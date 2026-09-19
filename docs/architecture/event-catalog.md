@@ -9,11 +9,18 @@ passado; a versão major muda somente quando houver incompatibilidade. Todo even
 O contrato executável está em [`../../contracts/asyncapi.yaml`](../../contracts/asyncapi.yaml). Este documento explica
 semântica, ownership e operação.
 
+## Estado da implementação
+
+O `video-api` registra a intenção de `video.job.requested.v1` na outbox quando
+cria um job. O publisher RabbitMQ e o listener de resultados ainda não estão
+conectados; portanto, as linhas abaixo definem o contrato e o fluxo-alvo, não
+uma integração ponta a ponta já executável.
+
 ## Catálogo
 
 | Routing key              | Produtor               | Consumidores                       | Quando ocorre              | Campos específicos                                      |
 |--------------------------|------------------------|------------------------------------|----------------------------|---------------------------------------------------------|
-| `video.job.requested.v1` | `video-api` via outbox | `video-processor`                  | job, histórico e outbox confirmados | `userId`, `videoId` opcional, `sourceKey`              |
+| `video.job.requested.v1` | `video-api` via outbox (publisher pendente) | `video-processor` | job, histórico e outbox persistidos | `userId`, `videoId` opcional, `sourceKey`              |
 | `video.job.started.v1`   | `video-processor`      | `video-api`                        | processor inicia trabalho  | `type=PROCESSING`                                       |
 | `video.job.completed.v1` | `video-processor`      | `video-api`                        | ZIP armazenado com sucesso | `type=COMPLETED`, `resultKey`                           |
 | `video.job.failed.v1`    | `video-processor`      | `video-api`, `notification-worker` | falha declarada terminal   | `type=FAILED`, `terminal`, `reason`, `recipient` futuro |
@@ -31,9 +38,10 @@ semântica, ownership e operação.
 }
 ```
 
-`occurredAt` e `correlationId` são persistidos no envelope da outbox. O payload
-legado em texto permanece temporariamente para compatibilidade; novas consultas
-operacionais usam o envelope JSONB versionado.
+`correlationId` é persistido nos metadados da outbox e o payload textual legado
+continua sendo usado pela implementação atual. A coluna `payload_json` já existe
+para a transição, mas o envelope JSONB versionado deve ser preenchido junto com o
+publisher RabbitMQ.
 
 ## Semântica por evento
 
