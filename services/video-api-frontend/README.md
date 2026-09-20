@@ -1,8 +1,8 @@
 # Video API Frontend
 
-Protótipo React da FIAP X para uma pessoa que envia vídeos e acompanha a extração de imagens. Há seis telas navegáveis: Entrar, Cadastrar, Meus vídeos, Detalhe do vídeo, Enviar vídeo e Meu perfil. Autenticação, lista, envio e download são simulados em memória. Não há chamadas HTTP.
+Interface React da FIAP X para uma pessoa que envia vídeos e acompanha a extração de imagens. Há seis telas navegáveis: Entrar, Cadastrar, Meus vídeos, Detalhe do vídeo, Enviar vídeo e Meu perfil. Cadastro, entrada, renovação de sessão e saída usam o `video-api`. Lista, envio e download de vídeos ainda são simulados em memória.
 
-A linguagem visível está em português do Brasil e documentada em [docs/prototype-copy.md](docs/prototype-copy.md). Estados internos, identificadores e contratos da API não aparecem na interface.
+A linguagem visível está em português do Brasil e documentada em [docs/prototype-copy.md](docs/prototype-copy.md). Estados internos, identificadores e contratos da API não aparecem na interface. O token de acesso fica só na memória do navegador.
 
 ## Telas
 
@@ -26,30 +26,29 @@ A lista mostra só o status do vídeo (`pendente`, `enviado`, `rejeitado`, `expi
 
 ## Arquitetura
 
-- `auth`: validação e mock de cadastro/entrada
+- `auth`: validação, adaptador HTTP de conta/sessão e store do token em memória
 - `videos`: modelo de vídeo, estados visíveis, mock e telas de lista, detalhe e envio
 - `shell` e `profile`: estrutura autenticada e consulta da conta
-- `prototype`: controles de cenário
 - `product-copy.ts`: catálogo dos textos visíveis
 
-A porta `VideoService` existe para uma futura troca do mock por HTTP. Este épico não consome a API.
+A porta `VideoService` permanece mockada. Chamadas autenticadas futuras devem usar `authorizedFetch`.
 
 ## Executar
 
+O `video-api` precisa estar no ar (perfil `local`, porta 8080), com `GET /v1/me` e origens da SPA em `APP_WEB_ALLOWED_ORIGINS` / `app.web.allowed-origins`. Use **localhost** nos dois lados: cookies `SameSite=Strict` não cruzam `localhost` e `127.0.0.1`.
+
 ```bash
 cd services/video-api-frontend
+cp .env.example .env
 npm install
-npm run dev
+npm run dev -- --host localhost --port 5173
 ```
 
 URL local: [http://localhost:5173](http://localhost:5173).
 
-| Campo | Valor |
-| --- | --- |
-| E-mail | `demo@fiapx.local` |
-| Senha | `MockPassword123!` |
+Crie uma conta em Cadastrar e entre com o mesmo e-mail e senha. A senha da API tem no mínimo 12 caracteres; a interface continua validando 8 a 128 e mostra uma falha genérica se o serviço recusar o cadastro.
 
-Formatos aceitos no envio simulado: MP4, MOV, WebM e MKV, até 500 MB (500.000.000 bytes). Nenhum byte é enviado nem gravado no serviço.
+Formatos aceitos no envio simulado: MP4, MOV, WebM e MKV, até 500 MB (500.000.000 bytes). Nenhum byte de vídeo é enviado nem gravado no serviço.
 
 ## Verificação
 

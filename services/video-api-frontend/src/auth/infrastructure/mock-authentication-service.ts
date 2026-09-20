@@ -4,6 +4,7 @@ import type {
   AuthenticationService,
   LoginCredentials,
   RegistrationResult,
+  SessionBootstrapResult,
 } from '../domain/authentication'
 
 export const DEMO_CREDENTIALS = {
@@ -70,7 +71,15 @@ export class MockAuthenticationService implements AuthenticationService {
     return { user }
   }
 
+  async bootstrap(): Promise<SessionBootstrapResult> {
+    return { user: null }
+  }
+
   async logout(): Promise<void> {
     return undefined
+  }
+
+  async authorizedFetch(): Promise<Response> {
+    return new Response(null, { status: 401 })
   }
 }
