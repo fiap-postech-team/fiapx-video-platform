@@ -12,7 +12,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
-import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -95,10 +94,6 @@ public class AuthController {
     }
 
     record CredentialsRequest(@NotBlank @Email String email, @NotBlank @Size(min = 12, max = 128) String password) {
-    }
-
-    record UserResponse(java.util.UUID id, String email, List<String> roles) {
-        static UserResponse from(IdentityUser user) { return new UserResponse(user.id(), user.email(), List.of(user.role().name())); }
     }
 
     record LoginResponse(UserResponse user, String accessToken, String tokenType, long expiresIn) {

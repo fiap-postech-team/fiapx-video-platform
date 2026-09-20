@@ -64,11 +64,17 @@ class IdentityAuthenticationIT {
         assertThat(refresh).isNotBlank();
         assertThat(csrf).isNotBlank();
 
+        var currentUser = currentUser(firstAccess);
+        assertThat(currentUser.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(body(currentUser)).containsKey("id").containsEntry("email", email).containsEntry("roles", List.of("USER"));
+        assertThat(body(currentUser)).doesNotContainKeys("password", "accessToken", "refreshToken");
+
         var rotated = refresh(refresh, csrf);
         assertThat(rotated.getStatusCode()).isEqualTo(HttpStatus.OK);
         var secondAccess = (String) body(rotated).get("accessToken");
         var rotatedRefresh = cookie(rotated, "FIAPX_REFRESH");
         assertThat(rotatedRefresh).isNotEqualTo(refresh);
+        assertThat(currentUser(secondAccess).getStatusCode()).isEqualTo(HttpStatus.OK);
 
         var logout = authPost("/v1/auth/logout", rotatedRefresh, csrf);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
@@ -76,6 +82,13 @@ class IdentityAuthenticationIT {
         assertThat(protectedRequest(firstAccess).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(protectedRequest(secondAccess).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(refresh(rotatedRefresh, csrf).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(currentUser(secondAccess).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void currentUserRequiresAnActiveBearer() {
+        assertThat(currentUser(null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(currentUser("not-a-jwt").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
@@ -134,6 +147,14 @@ class IdentityAuthenticationIT {
         var headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         return client.exchange(url("/v1/jobs/" + UUID.randomUUID()), HttpMethod.GET, new HttpEntity<>(headers), String.class);
+    }
+
+    private ResponseEntity<String> currentUser(String accessToken) {
+        var headers = new HttpHeaders();
+        if (accessToken != null) {
+            headers.setBearerAuth(accessToken);
+        }
+        return client.exchange(url("/v1/me"), HttpMethod.GET, new HttpEntity<>(headers), String.class);
     }
 
     private String url(String path) {

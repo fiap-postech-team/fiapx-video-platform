@@ -138,6 +138,18 @@ class IdentityApplicationsTest {
         verify(store).revokeSession(session, NOW);
     }
 
+    @Test
+    void getsOnlyTheCurrentUserAndRejectsAnUnknownIdentity() {
+        var store = mock(IdentityStore.class);
+        var user = user(0, null);
+        var currentUser = new GetCurrentUser(store);
+        when(store.findUser(user.id())).thenReturn(Optional.of(user));
+
+        assertThat(currentUser.execute(user.id())).isEqualTo(user);
+        assertThatThrownBy(() -> currentUser.execute(UUID.randomUUID()))
+            .isInstanceOf(AuthenticationFailedException.class);
+    }
+
     private IdentityUser user(int failures, Instant lockedUntil) {
         return new IdentityUser(UUID.randomUUID(), "person@example.test", "hash", UserRole.USER, UserStatus.ACTIVE,
             failures, lockedUntil);

@@ -37,6 +37,13 @@ paths:
       responses:
         '204': { description: Sessão encerrada, headers: { Set-Cookie: { $ref: '#/components/headers/RefreshCookie' } } }
         '403': { $ref: '#/components/responses/AccessDenied' }
+  /v1/me:
+    get:
+      summary: Recupera a conta autenticada pelo bearer token
+      security: [ { bearerAuth: [ ] } ]
+      responses:
+        '200': { description: Conta autenticada, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /v1/videos/uploads:
     post:
       summary: Reserva uma chave opaca e autoriza upload direto ao object storage
