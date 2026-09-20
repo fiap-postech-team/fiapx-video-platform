@@ -2,6 +2,7 @@ package br.com.fiapx.videoapi.videos.domain;
 
 import java.time.Instant;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 public record Video(UUID id, UUID userId, String objectKey, String originalFilename,
@@ -30,8 +31,9 @@ public record Video(UUID id, UUID userId, String objectKey, String originalFilen
         if (!now.isBefore(expiresAt)) {
             throw new IllegalStateException("Video upload expired");
         }
+        var confirmedAt = now.truncatedTo(ChronoUnit.MICROS);
         return new Video(id, userId, objectKey, originalFilename, contentType, sizeBytes,
-            checksumSha256, VideoStatus.UPLOADED, createdAt, now, expiresAt, now, null);
+            checksumSha256, VideoStatus.UPLOADED, createdAt, confirmedAt, expiresAt, confirmedAt, null);
     }
 
     public Video expire(Instant now) {

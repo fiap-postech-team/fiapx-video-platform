@@ -21,6 +21,15 @@ class VideoLifecycleTest {
     }
 
     @Test
+    void normalizesConfirmationTimestampToPostgresPrecision() {
+        var instant = CREATED.plusSeconds(60).plusNanos(123456789);
+
+        var uploaded = video(CREATED.plusSeconds(86400)).confirm(instant);
+
+        assertThat(uploaded.uploadedAt()).isEqualTo(CREATED.plusSeconds(60).plusNanos(123456000));
+    }
+
+    @Test
     void expiresPendingVideoAndRejectsLateConfirmation() {
         var pending = video(CREATED.plusSeconds(86400));
 
