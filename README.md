@@ -41,7 +41,7 @@ o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arq
 | Aplicação             | Responsabilidade                                         | Porta | Documentação                                     |
 |-----------------------|----------------------------------------------------------|------:|--------------------------------------------------|
 | `video-api`           | Cadastro/login local, JWT, jobs persistentes, health e Swagger no perfil `local` |  8080 | [README](services/video-api/README.md)           |
-| `video-api-frontend`  | Protótipo HTML de cadastro, sessão e jobs do proprietário |  5173 | [README](services/video-api-frontend/README.md) |
+| `video-api-frontend`  | Protótipo de cadastro, vídeos e extração de imagens |  5173 | [README](services/video-api-frontend/README.md) |
 | `video-processor`     | FFprobe, FFmpeg, ZIP e object storage                    |  8081 | [README](services/video-processor/README.md)     |
 | `notification-worker` | Notificação de falhas terminais e auditoria              |  8082 | [README](services/notification-worker/README.md) |
 

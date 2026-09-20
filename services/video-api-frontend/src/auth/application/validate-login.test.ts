@@ -16,13 +16,13 @@ describe('validateLogin', () => {
 
   it('rejects a password outside the API length bounds', () => {
     expect(validateLogin({ email: 'demo@fiapx.local', password: 'curta' })).toEqual({
-      errors: { password: 'A senha deve ter entre 12 e 128 caracteres.' },
+      errors: { password: 'A senha deve ter entre 8 e 128 caracteres.' },
     })
   })
 
   it('trims and lowercases email without changing the password', () => {
-    expect(validateLogin({ email: '  Demo@FiapX.local ', password: ' password12 ' })).toEqual({
-      credentials: { email: 'demo@fiapx.local', password: ' password12 ' },
+    expect(validateLogin({ email: '  Demo@FiapX.local ', password: ' password ' })).toEqual({
+      credentials: { email: 'demo@fiapx.local', password: ' password ' },
       errors: {},
     })
   })

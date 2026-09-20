@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
-import { validateLogin, type LoginValidationErrors } from '../application/validate-login'
+import { copy } from '../../product-copy'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../application/credentials'
+import { validateLogin, type LoginValidationErrors } from '../application/validate-login'
 import type {
   AuthenticatedUser,
   AuthenticationService,
@@ -11,8 +12,6 @@ interface LoginFormProps {
   onAuthenticated: (user: AuthenticatedUser) => void
   initialEmail?: string
 }
-
-const UNAVAILABLE_MESSAGE = 'Não foi possível concluir o login. Tente novamente.'
 
 export function LoginForm({
   authenticationService,
@@ -48,11 +47,11 @@ export function LoginForm({
 
       setGlobalError(
         result.error.code === 'INVALID_CREDENTIALS'
-          ? result.error.message
-          : UNAVAILABLE_MESSAGE,
+          ? copy.access.invalidCredentials
+          : copy.access.loginUnavailable,
       )
     } catch {
-      setGlobalError(UNAVAILABLE_MESSAGE)
+      setGlobalError(copy.access.loginUnavailable)
     } finally {
       setIsSubmitting(false)
     }
@@ -60,10 +59,10 @@ export function LoginForm({
 
   return (
     <form className="access-form" noValidate onSubmit={handleSubmit} aria-describedby="login-instructions">
-      <p id="login-instructions" className="visually-hidden">Preencha e envie suas credenciais de acesso.</p>
+      <p id="login-instructions" className="visually-hidden">{copy.access.loginInstructions}</p>
       {globalError && <p className="alert" role="alert">{globalError}</p>}
       <div className="field">
-        <label htmlFor="email">E-mail</label>
+        <label htmlFor="email">{copy.access.emailLabel}</label>
         <input
           id="email"
           name="email"
@@ -78,7 +77,7 @@ export function LoginForm({
         {errors.email && <p id="email-error" className="field-error" role="alert">{errors.email}</p>}
       </div>
       <div className="field">
-        <label htmlFor="password">Senha</label>
+        <label htmlFor="password">{copy.access.passwordLabel}</label>
         <input
           id="password"
           name="password"
@@ -95,7 +94,7 @@ export function LoginForm({
         {errors.password && <p id="password-error" className="field-error" role="alert">{errors.password}</p>}
       </div>
       <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Entrando…' : 'Entrar'}
+        {isSubmitting ? copy.access.loginPending : copy.access.loginSubmit}
       </button>
     </form>
   )

@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react'
+import { copy } from '../../product-copy'
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../application/credentials'
 import { validateRegister, type RegisterValidationErrors } from '../application/validate-register'
 import type { AuthenticationService } from '../domain/authentication'
@@ -8,7 +9,7 @@ interface RegisterFormProps {
   onRegistered: (email: string) => void
 }
 
-const UNAVAILABLE_MESSAGE = 'Não foi possível concluir o cadastro. Tente novamente.'
+
 
 export function RegisterForm({ authenticationService, onRegistered }: RegisterFormProps) {
   const [email, setEmail] = useState('')
@@ -37,11 +38,11 @@ export function RegisterForm({ authenticationService, onRegistered }: RegisterFo
 
       setGlobalError(
         result.error.code === 'EMAIL_ALREADY_REGISTERED'
-          ? result.error.message
-          : UNAVAILABLE_MESSAGE,
+          ? copy.access.registerDuplicate
+          : copy.access.registerUnavailable,
       )
     } catch {
-      setGlobalError(UNAVAILABLE_MESSAGE)
+      setGlobalError(copy.access.registerUnavailable)
     } finally {
       setIsSubmitting(false)
     }
@@ -50,11 +51,11 @@ export function RegisterForm({ authenticationService, onRegistered }: RegisterFo
   return (
     <form className="access-form" noValidate onSubmit={handleSubmit} aria-describedby="register-instructions">
       <p id="register-instructions" className="visually-hidden">
-        Cadastre uma conta USER. A senha deve ter entre {PASSWORD_MIN_LENGTH} e {PASSWORD_MAX_LENGTH} caracteres.
+        {copy.access.registerInstructions}
       </p>
       {globalError && <p className="alert" role="alert">{globalError}</p>}
       <div className="field">
-        <label htmlFor="register-email">E-mail</label>
+        <label htmlFor="register-email">{copy.access.emailLabel}</label>
         <input
           id="register-email"
           name="email"
@@ -69,7 +70,7 @@ export function RegisterForm({ authenticationService, onRegistered }: RegisterFo
         {errors.email && <p id="register-email-error" className="field-error" role="alert">{errors.email}</p>}
       </div>
       <div className="field">
-        <label htmlFor="register-password">Senha</label>
+        <label htmlFor="register-password">{copy.access.passwordLabel}</label>
         <input
           id="register-password"
           name="password"
@@ -86,7 +87,7 @@ export function RegisterForm({ authenticationService, onRegistered }: RegisterFo
         {errors.password && <p id="register-password-error" className="field-error" role="alert">{errors.password}</p>}
       </div>
       <div className="field">
-        <label htmlFor="register-confirm-password">Confirmar senha</label>
+        <label htmlFor="register-confirm-password">{copy.access.confirmPasswordLabel}</label>
         <input
           id="register-confirm-password"
           name="confirmPassword"
@@ -105,7 +106,7 @@ export function RegisterForm({ authenticationService, onRegistered }: RegisterFo
         )}
       </div>
       <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Cadastrando…' : 'Criar conta'}
+        {isSubmitting ? copy.access.registerPending : copy.access.registerSubmit}
       </button>
     </form>
   )

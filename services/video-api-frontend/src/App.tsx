@@ -3,78 +3,120 @@ import type { AuthenticatedUser, AuthenticationService } from './auth/domain/aut
 import { MockAuthenticationService } from './auth/infrastructure/mock-authentication-service'
 import { LoginForm } from './auth/presentation/LoginForm'
 import { RegisterForm } from './auth/presentation/RegisterForm'
-import type { JobService } from './jobs/domain/job'
-import { MockJobService } from './jobs/infrastructure/mock-job-service'
-import { Workspace } from './jobs/presentation/Workspace'
+import { copy } from './product-copy'
+import { Profile } from './profile/Profile'
+import { AuthenticatedShell } from './shell/AuthenticatedShell'
+import { isDetailView, type ProductView } from './shell/navigation'
+import type { ScenarioKind, VideoService } from './videos/domain/video'
+import { MockVideoService } from './videos/infrastructure/mock-video-service'
+import { UploadVideo } from './videos/presentation/UploadVideo'
+import { VideoDetail } from './videos/presentation/VideoDetail'
+import { VideoList } from './videos/presentation/VideoList'
 import './App.css'
 
 interface AppProps {
   authenticationService?: AuthenticationService
-  jobService?: JobService
+  videoService?: VideoService
 }
 
 type AccessMode = 'login' | 'register'
 
 const defaultAuthenticationService = new MockAuthenticationService()
-const defaultJobService = new MockJobService()
+const defaultVideoService = new MockVideoService()
 
 export default function App({
   authenticationService = defaultAuthenticationService,
-  jobService = defaultJobService,
+  videoService = defaultVideoService,
 }: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null)
   const [accessMode, setAccessMode] = useState<AccessMode>('login')
   const [registeredEmail, setRegisteredEmail] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
+  const [view, setView] = useState<ProductView>('videos')
+  const [scenario, setScenario] = useState<ScenarioKind>('default')
+
+  function navigate(next: ProductView) {
+    setView(next)
+  }
 
   async function handleLogout() {
     await authenticationService.logout()
     setUser(null)
     setAccessMode('login')
     setNotice(null)
+    setView('videos')
+    setScenario('default')
   }
 
   function handleRegistered(email: string) {
     setRegisteredEmail(email)
-    setNotice('Conta criada. Entre com o e-mail e a senha cadastrados.')
+    setNotice(copy.access.registerSuccess)
     setAccessMode('login')
   }
 
   if (user) {
-    return <Workspace user={user} jobService={jobService} onLogout={() => { void handleLogout() }} />
+    const scenarioValue = { kind: scenario }
+    return (
+      <AuthenticatedShell
+        email={user.email}
+        view={view}
+        onNavigate={navigate}
+        onLogout={() => { void handleLogout() }}
+      >
+        {view === 'videos' && (
+          <VideoList
+            userId={user.id}
+            videoService={videoService}
+            scenario={scenarioValue}
+            onOpen={(videoId) => navigate({ kind: 'video-detail', videoId })}
+            onUpload={() => navigate('upload')}
+          />
+        )}
+        {isDetailView(view) && (
+          <VideoDetail
+            userId={user.id}
+            videoId={view.videoId}
+            videoService={videoService}
+            onBack={() => navigate('videos')}
+          />
+        )}
+        {view === 'upload' && (
+          <UploadVideo
+            userId={user.id}
+            videoService={videoService}
+            scenario={scenarioValue}
+            onFinished={() => navigate('videos')}
+          />
+        )}
+        {view === 'profile' && <Profile user={user} />}
+      </AuthenticatedShell>
+    )
   }
 
   return (
     <main className="page-shell">
       <section className="proof-sheet" aria-labelledby="product-title">
-        <div className="wordmark" aria-label="FIAP X">FIAP <span>X</span></div>
-        <p className="sheet-index">PROTOCOLO DE EXTRAÇÃO / PROTÓTIPO</p>
-        <h1 id="product-title">O próximo frame do seu investimento começa aqui.</h1>
-        <p className="product-summary">
-          Cadastre-se, autentique a sessão e acompanhe jobs assíncronos que transformam um vídeo
-          confirmado em um ZIP de frames.
-        </p>
-        <div className="contact-sheet" aria-label="Visão ilustrativa do fluxo de processamento de vídeo">
-          <div className="source-tile"><span>SOURCE KEY</span><strong>vídeo.mp4</strong><i /></div>
+        <div className="wordmark" aria-label={copy.shell.brand}>FIAP <span>X</span></div>
+        <p className="sheet-index">{copy.access.kicker}</p>
+        <h1 id="product-title">{copy.access.heroTitle}</h1>
+        <p className="product-summary">{copy.access.heroLead}</p>
+        <div className="contact-sheet" aria-label={copy.access.heroLead}>
+          <div className="source-tile"><span>{copy.access.stepSend}</span><strong>vídeo</strong><i /></div>
           <div className="frame-strip" aria-hidden="true">
             <span /><span /><span /><span /><span /><span />
           </div>
-          <div className="output-tile"><span>ENTREGA</span><strong>imagens.zip</strong><i /></div>
+          <div className="output-tile"><span>{copy.access.stepDownload}</span><strong>imagens</strong><i /></div>
         </div>
-        <div className="flow-notes" aria-label="Etapas da visão do produto">
-          <p><b>01</b> Conta USER</p>
-          <p><b>02</b> Job PENDING</p>
-          <p><b>03</b> ZIP no storage</p>
+        <div className="flow-notes">
+          <p><b>01</b> {copy.access.stepSend}</p>
+          <p><b>02</b> {copy.access.stepProcess}</p>
+          <p><b>03</b> {copy.access.stepDownload}</p>
         </div>
-        <p className="illustrative-note">
-          Protótipo alinhado à Video API atual: cadastro, login, listagem, criação e consulta de jobs.
-          Upload HTTP e download do ZIP ainda estão no roadmap.
-        </p>
       </section>
       <section className="access-panel" aria-labelledby="page-title">
         <div className="access-heading">
-          <p>ACESSO À PLATAFORMA</p>
-          <div className="access-tabs" role="tablist" aria-label="Acesso">
+          <p>{copy.access.kicker}</p>
+          <div className="access-tabs" role="tablist" aria-label={copy.access.kicker}>
             <button
               type="button"
               role="tab"
@@ -82,7 +124,7 @@ export default function App({
               className={accessMode === 'login' ? 'is-active' : undefined}
               onClick={() => setAccessMode('login')}
             >
-              Entrar
+              {copy.access.enterTab}
             </button>
             <button
               type="button"
@@ -91,35 +133,28 @@ export default function App({
               className={accessMode === 'register' ? 'is-active' : undefined}
               onClick={() => { setAccessMode('register'); setNotice(null) }}
             >
-              Cadastrar
+              {copy.access.createTab}
             </button>
           </div>
           {accessMode === 'login' ? (
             <>
-              <h2 id="page-title">Entre para acompanhar a extração.</h2>
-              <p>Use a conta USER local. A sessão do protótipo espelha o contrato de login da API.</p>
+              <h2 id="page-title">{copy.access.loginTitle}</h2>
+              <p>{copy.access.loginLead}</p>
             </>
           ) : (
-            <>
-              <h2 id="page-title">Crie uma conta USER.</h2>
-              <p>O cadastro público não concede ADMIN. E-mail único, senha de 12 a 128 caracteres.</p>
-            </>
+            <h2 id="page-title">{copy.access.registerTitle}</h2>
           )}
         </div>
         {notice && accessMode === 'login' && <p className="notice" role="status">{notice}</p>}
         {accessMode === 'login' ? (
           <LoginForm
             authenticationService={authenticationService}
-            onAuthenticated={setUser}
+            onAuthenticated={(next) => { setUser(next); setView('videos') }}
             initialEmail={registeredEmail}
           />
         ) : (
           <RegisterForm authenticationService={authenticationService} onRegistered={handleRegistered} />
         )}
-        <p className="access-footnote">
-          Protótipo local. Não envia JWT, cookies nem chamadas à API; os contratos HTTP estão
-          representados nas telas e nos mocks.
-        </p>
       </section>
     </main>
   )

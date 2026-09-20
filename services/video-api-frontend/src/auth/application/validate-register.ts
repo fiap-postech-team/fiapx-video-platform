@@ -1,3 +1,4 @@
+import { copy } from '../../product-copy'
 import type { LoginCredentials, RegisterCredentials } from '../domain/authentication'
 import { emailError, normalizeEmail, passwordError } from './credentials'
 
@@ -24,9 +25,9 @@ export function validateRegister(
     errors.password = nextPasswordError
   }
   if (!credentials.confirmPassword) {
-    errors.confirmPassword = 'Confirme sua senha.'
+    errors.confirmPassword = copy.access.confirmRequired
   } else if (credentials.confirmPassword !== credentials.password) {
-    errors.confirmPassword = 'As senhas não coincidem.'
+    errors.confirmPassword = copy.access.passwordMismatch
   }
 
   return Object.keys(errors).length > 0
