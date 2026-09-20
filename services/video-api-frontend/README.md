@@ -1,39 +1,40 @@
 # Video API Frontend
 
-Aplicação web independente da plataforma FIAP X para demonstrar um fluxo de login. Ela existe como uma interface de referência para a Video API, mas não se conecta a ela: a autenticação é local e mockada.
+Protótipo React da FIAP X para uma pessoa que envia vídeos e acompanha a extração de imagens. Há seis telas navegáveis: Entrar, Cadastrar, Meus vídeos, Detalhe do vídeo, Enviar vídeo e Meu perfil. Autenticação, lista, envio e download são simulados em memória. Não há chamadas HTTP.
 
-Após um login válido, a própria tela confirma a sessão autenticada. Não existem rotas protegidas, dashboard, cadastro ou recuperação de senha neste escopo.
+A linguagem visível está em português do Brasil e documentada em [docs/prototype-copy.md](docs/prototype-copy.md). Estados internos, identificadores e contratos da API não aparecem na interface.
+
+## Telas
+
+| Tela | O que a pessoa faz |
+| --- | --- |
+| Entrar | Acessa a conta com e-mail e senha |
+| Cadastrar | Cria uma conta e volta para Entrar |
+| Meus vídeos | Vê um item por arquivo, com status do vídeo e do processamento |
+| Detalhe do vídeo | Consulta andamento, histórico e a ação de baixar imagens (simulada) |
+| Enviar vídeo | Seleciona um arquivo e inspeciona progresso, sucesso e falha |
+| Meu perfil | Consulta o e-mail da sessão, sem edição |
+
+Depois de entrar, o menu leva a Meus vídeos, Enviar vídeo, Meu perfil e Sair. No celular o menu é recolhível.
+
+A lista mostra só o status do vídeo (`pendente`, `enviado`, `rejeitado`, `expirado`). O detalhe mostra o status do processamento (`pendente`, `processando`, `completado`, `error`).
 
 ## Tecnologias
 
 - React 19 e TypeScript
-- Vite, para desenvolvimento e build de produção
-- Vitest e React Testing Library, para testes de unidade e interface
-- ESLint, para análise estática
+- Vite, Vitest, React Testing Library e ESLint
 
 ## Arquitetura
 
-O código de autenticação é separado por responsabilidade em `src/auth`:
+- `auth`: validação e mock de cadastro/entrada
+- `videos`: modelo de vídeo, estados visíveis, mock e telas de lista, detalhe e envio
+- `shell` e `profile`: estrutura autenticada e consulta da conta
+- `prototype`: controles de cenário
+- `product-copy.ts`: catálogo dos textos visíveis
 
-- `domain`: tipos e porta `AuthenticationService` consumidos pela interface.
-- `application`: validação e normalização do login.
-- `infrastructure`: implementação local `MockAuthenticationService`.
-- `presentation`: formulário e seus estados visuais.
+A porta `VideoService` existe para uma futura troca do mock por HTTP. Este épico não consome a API.
 
-Essa separação permite substituir o mock por um cliente HTTP no futuro sem acoplar a tela à infraestrutura.
-
-## Pré-requisitos
-
-É necessário Node.js 22 ou posterior e npm. Confira as versões instaladas com:
-
-```bash
-node --version
-npm --version
-```
-
-## Executar o servidor de desenvolvimento
-
-No diretório deste serviço, instale as dependências e inicie o Vite:
+## Executar
 
 ```bash
 cd services/video-api-frontend
@@ -41,41 +42,21 @@ npm install
 npm run dev
 ```
 
-O terminal exibirá a URL local; normalmente é [http://localhost:5173](http://localhost:5173). Para encerrar o servidor, pressione `Ctrl+C` no mesmo terminal.
-
-## Credenciais de demonstração
+URL local: [http://localhost:5173](http://localhost:5173).
 
 | Campo | Valor |
 | --- | --- |
 | E-mail | `demo@fiapx.local` |
 | Senha | `MockPassword123!` |
 
-Qualquer outra combinação apresenta a mensagem segura `E-mail ou senha inválidos.`
-
-## Comandos disponíveis
-
-| Comando | Finalidade |
-| --- | --- |
-| `npm run dev` | Inicia o servidor local com recarregamento automático. |
-| `npm run lint` | Analisa o código com ESLint. |
-| `npm run test` | Executa os testes uma vez, sem modo interativo. |
-| `npm run build` | Faz a checagem TypeScript e gera os arquivos de produção em `dist/`. |
-
-## Comportamento e segurança
-
-- O e-mail tem os espaços das extremidades removidos antes da validação e autenticação.
-- A senha é mantida exatamente como digitada.
-- Dados inválidos impedem a chamada de autenticação e mostram erros associados a cada campo.
-- Durante uma autenticação pendente, o botão fica desabilitado para evitar envios duplicados.
-- Não há chamadas de rede, JWT, `localStorage`, cookies, tokens ou persistência de sessão.
-- As credenciais acima são públicas, exclusivas para demonstração e não podem ser usadas em produção.
+Formatos aceitos no envio simulado: MP4, MOV, WebM e MKV, até 500 MB (500.000.000 bytes). Nenhum byte é enviado nem gravado no serviço.
 
 ## Verificação
-
-Antes de enviar mudanças, execute:
 
 ```bash
 npm run lint
 npm run test
 npm run build
 ```
+
+Revisão visual da solicitante: desktop 1440 × 900 e celular 390 × 844, sem rolagem horizontal, com o inventário de textos em mãos. O aceite é dessa revisão, não de telemetria.

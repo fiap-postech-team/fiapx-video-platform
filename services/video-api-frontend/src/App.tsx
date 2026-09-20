@@ -2,57 +2,159 @@ import { useState } from 'react'
 import type { AuthenticatedUser, AuthenticationService } from './auth/domain/authentication'
 import { MockAuthenticationService } from './auth/infrastructure/mock-authentication-service'
 import { LoginForm } from './auth/presentation/LoginForm'
+import { RegisterForm } from './auth/presentation/RegisterForm'
+import { copy } from './product-copy'
+import { Profile } from './profile/Profile'
+import { AuthenticatedShell } from './shell/AuthenticatedShell'
+import { isDetailView, type ProductView } from './shell/navigation'
+import type { ScenarioKind, VideoService } from './videos/domain/video'
+import { MockVideoService } from './videos/infrastructure/mock-video-service'
+import { UploadVideo } from './videos/presentation/UploadVideo'
+import { VideoDetail } from './videos/presentation/VideoDetail'
+import { VideoList } from './videos/presentation/VideoList'
 import './App.css'
 
 interface AppProps {
   authenticationService?: AuthenticationService
+  videoService?: VideoService
 }
 
-const defaultAuthenticationService = new MockAuthenticationService()
+type AccessMode = 'login' | 'register'
 
-export default function App({ authenticationService = defaultAuthenticationService }: AppProps) {
+const defaultAuthenticationService = new MockAuthenticationService()
+const defaultVideoService = new MockVideoService()
+
+export default function App({
+  authenticationService = defaultAuthenticationService,
+  videoService = defaultVideoService,
+}: AppProps) {
   const [user, setUser] = useState<AuthenticatedUser | null>(null)
+  const [accessMode, setAccessMode] = useState<AccessMode>('login')
+  const [registeredEmail, setRegisteredEmail] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [view, setView] = useState<ProductView>('videos')
+  const [scenario, setScenario] = useState<ScenarioKind>('default')
+
+  function navigate(next: ProductView) {
+    setView(next)
+  }
+
+  async function handleLogout() {
+    await authenticationService.logout()
+    setUser(null)
+    setAccessMode('login')
+    setNotice(null)
+    setView('videos')
+    setScenario('default')
+  }
+
+  function handleRegistered(email: string) {
+    setRegisteredEmail(email)
+    setNotice(copy.access.registerSuccess)
+    setAccessMode('login')
+  }
+
+  if (user) {
+    const scenarioValue = { kind: scenario }
+    return (
+      <AuthenticatedShell
+        email={user.email}
+        view={view}
+        onNavigate={navigate}
+        onLogout={() => { void handleLogout() }}
+      >
+        {view === 'videos' && (
+          <VideoList
+            userId={user.id}
+            videoService={videoService}
+            scenario={scenarioValue}
+            onOpen={(videoId) => navigate({ kind: 'video-detail', videoId })}
+            onUpload={() => navigate('upload')}
+          />
+        )}
+        {isDetailView(view) && (
+          <VideoDetail
+            userId={user.id}
+            videoId={view.videoId}
+            videoService={videoService}
+            onBack={() => navigate('videos')}
+          />
+        )}
+        {view === 'upload' && (
+          <UploadVideo
+            userId={user.id}
+            videoService={videoService}
+            scenario={scenarioValue}
+            onFinished={() => navigate('videos')}
+          />
+        )}
+        {view === 'profile' && <Profile user={user} />}
+      </AuthenticatedShell>
+    )
+  }
 
   return (
     <main className="page-shell">
       <section className="proof-sheet" aria-labelledby="product-title">
-        <div className="wordmark" aria-label="FIAP X">FIAP <span>X</span></div>
-        <p className="sheet-index">PROTOCOLO DE EXTRAÇÃO / DEMONSTRAÇÃO</p>
-        <h1 id="product-title">O próximo frame do seu investimento começa aqui.</h1>
-        <p className="product-summary">
-          FIAP X está evoluindo a forma de transformar um vídeo em um pacote ZIP de imagens, pronto para download.
-        </p>
-        <div className="contact-sheet" aria-label="Visão ilustrativa do fluxo de processamento de vídeo">
-          <div className="source-tile"><span>UPLOAD</span><strong>vídeo.mp4</strong><i /></div>
+        <div className="wordmark" aria-label={copy.shell.brand}>FIAP <span>X</span></div>
+        <p className="sheet-index">{copy.access.kicker}</p>
+        <h1 id="product-title">{copy.access.heroTitle}</h1>
+        <p className="product-summary">{copy.access.heroLead}</p>
+        <div className="contact-sheet" aria-label={copy.access.heroLead}>
+          <div className="source-tile"><span>{copy.access.stepSend}</span><strong>vídeo</strong><i /></div>
           <div className="frame-strip" aria-hidden="true">
             <span /><span /><span /><span /><span /><span />
           </div>
-          <div className="output-tile"><span>ENTREGA</span><strong>imagens.zip</strong><i /></div>
+          <div className="output-tile"><span>{copy.access.stepDownload}</span><strong>imagens</strong><i /></div>
         </div>
-        <div className="flow-notes" aria-label="Etapas da visão do produto">
-          <p><b>01</b> Envie o vídeo</p>
-          <p><b>02</b> Extraia os frames</p>
-          <p><b>03</b> Baixe o ZIP</p>
+        <div className="flow-notes">
+          <p><b>01</b> {copy.access.stepSend}</p>
+          <p><b>02</b> {copy.access.stepProcess}</p>
+          <p><b>03</b> {copy.access.stepDownload}</p>
         </div>
-        <p className="illustrative-note">Fluxo ilustrativo da evolução do produto.</p>
       </section>
       <section className="access-panel" aria-labelledby="page-title">
         <div className="access-heading">
-          <p>ACESSO À DEMONSTRAÇÃO</p>
-          {user ? (
-            <div className="authenticated" role="status">
-              <h2 id="page-title">Sessão confirmada.</h2>
-              <p>Você está autenticado como <strong>{user.name}</strong>.</p>
-            </div>
-          ) : (
+          <p>{copy.access.kicker}</p>
+          <div className="access-tabs" role="tablist" aria-label={copy.access.kicker}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={accessMode === 'login'}
+              className={accessMode === 'login' ? 'is-active' : undefined}
+              onClick={() => setAccessMode('login')}
+            >
+              {copy.access.enterTab}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={accessMode === 'register'}
+              className={accessMode === 'register' ? 'is-active' : undefined}
+              onClick={() => { setAccessMode('register'); setNotice(null) }}
+            >
+              {copy.access.createTab}
+            </button>
+          </div>
+          {accessMode === 'login' ? (
             <>
-              <h2 id="page-title">Entre para acompanhar a evolução.</h2>
-              <p>Use suas credenciais para acessar a demonstração FIAP X.</p>
+              <h2 id="page-title">{copy.access.loginTitle}</h2>
+              <p>{copy.access.loginLead}</p>
             </>
+          ) : (
+            <h2 id="page-title">{copy.access.registerTitle}</h2>
           )}
         </div>
-        {!user && <LoginForm authenticationService={authenticationService} onAuthenticated={setUser} />}
-        <p className="access-footnote">Ambiente local de demonstração. Nenhuma sessão é armazenada.</p>
+        {notice && accessMode === 'login' && <p className="notice" role="status">{notice}</p>}
+        {accessMode === 'login' ? (
+          <LoginForm
+            authenticationService={authenticationService}
+            onAuthenticated={(next) => { setUser(next); setView('videos') }}
+            initialEmail={registeredEmail}
+          />
+        ) : (
+          <RegisterForm authenticationService={authenticationService} onRegistered={handleRegistered} />
+        )}
       </section>
     </main>
   )

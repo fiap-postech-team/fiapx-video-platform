@@ -1,108 +1,217 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { AuthenticationService } from './auth/domain/authentication'
+import { DEMO_CREDENTIALS, DEMO_USER, MockAuthenticationService } from './auth/infrastructure/mock-authentication-service'
+import { copy, findForbiddenTerms } from './product-copy'
+import { MockVideoService } from './videos/infrastructure/mock-video-service'
 
-function serviceReturning(result: Awaited<ReturnType<AuthenticationService['authenticate']>>): AuthenticationService {
-  return { authenticate: vi.fn().mockResolvedValue(result) }
+function serviceReturning(
+  result: Awaited<ReturnType<AuthenticationService['authenticate']>>,
+): AuthenticationService {
+  return {
+    authenticate: vi.fn().mockResolvedValue(result),
+    register: vi.fn(),
+    logout: vi.fn().mockResolvedValue(undefined),
+  }
 }
 
-async function fillValidCredentials(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('E-mail'), 'demo@fiapx.local')
-  await user.type(screen.getByLabelText('Senha'), 'MockPassword123!')
+async function signIn(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(copy.access.emailLabel), DEMO_CREDENTIALS.email)
+  await user.type(screen.getByLabelText(copy.access.passwordLabel), DEMO_CREDENTIALS.password)
+  await user.click(screen.getByRole('button', { name: copy.access.loginSubmit }))
+  await screen.findByRole('heading', { name: copy.videos.title })
 }
 
-describe('App', () => {
-  it('renders the accessible login form', () => {
-    render(<App />)
+function assertProductLanguage() {
+  expect(findForbiddenTerms(document.body.textContent ?? '')).toEqual([])
+}
 
-    expect(screen.getByRole('heading', { name: 'Entre para acompanhar a evolução.' })).toBeInTheDocument()
-    expect(screen.getByLabelText('E-mail')).toBeRequired()
-    expect(screen.getByLabelText('Senha')).toBeRequired()
-    expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument()
-  })
-
-  it('shows field errors and does not call the service when data is invalid', async () => {
+describe('access', () => {
+  it('renders Entrar and Criar conta and keeps field validation local', async () => {
     const user = userEvent.setup()
-    const authenticationService = serviceReturning({ error: { code: 'INVALID_CREDENTIALS', message: 'unexpected' } })
+    const authenticationService = serviceReturning({ error: { code: 'INVALID_CREDENTIALS', message: 'internal' } })
     render(<App authenticationService={authenticationService} />)
 
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
-
-    expect(screen.getByText('Informe seu e-mail.')).toHaveAttribute('role', 'alert')
-    expect(screen.getByText('Informe sua senha.')).toHaveAttribute('role', 'alert')
+    expect(screen.getByRole('heading', { name: copy.access.loginTitle })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: copy.access.createTab })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: copy.access.loginSubmit }))
+    expect(screen.getByText(copy.access.emailRequired)).toHaveAttribute('role', 'alert')
     expect(authenticationService.authenticate).not.toHaveBeenCalled()
+    assertProductLanguage()
   })
 
-  it('shows an authenticated session after successful login', async () => {
+  it('returns to login after a valid registration', async () => {
     const user = userEvent.setup()
-    render(<App authenticationService={serviceReturning({ user: { id: 'id', email: 'demo@fiapx.local', name: 'Demo' } })} />)
+    render(<App authenticationService={new MockAuthenticationService()} videoService={new MockVideoService()} />)
 
-    await fillValidCredentials(user)
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    await user.click(screen.getByRole('tab', { name: copy.access.createTab }))
+    await user.type(screen.getByLabelText(copy.access.emailLabel), 'nova@fiapx.local')
+    await user.type(screen.getByLabelText(copy.access.passwordLabel), 'SenhaSegura123')
+    await user.type(screen.getByLabelText(copy.access.confirmPasswordLabel), 'SenhaSegura123')
+    await user.click(screen.getByRole('button', { name: copy.access.registerSubmit }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Você está autenticado como Demo.')
+    expect(await screen.findByRole('status')).toHaveTextContent(copy.access.registerSuccess)
+    expect(screen.getByRole('heading', { name: copy.access.loginTitle })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: copy.videos.title })).not.toBeInTheDocument()
   })
 
-  it('shows a safe message for rejected credentials', async () => {
+  it('shows a safe message for rejected credentials and a generic one when auth is unavailable', async () => {
     const user = userEvent.setup()
-    render(<App authenticationService={serviceReturning({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou senha inválidos.' } })} />)
+    const { rerender } = render(
+      <App authenticationService={serviceReturning({ error: { code: 'INVALID_CREDENTIALS', message: 'internal' } })} />,
+    )
+    await user.type(screen.getByLabelText(copy.access.emailLabel), DEMO_CREDENTIALS.email)
+    await user.type(screen.getByLabelText(copy.access.passwordLabel), DEMO_CREDENTIALS.password)
+    await user.click(screen.getByRole('button', { name: copy.access.loginSubmit }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(copy.access.invalidCredentials)
 
-    await fillValidCredentials(user)
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    rerender(
+      <App authenticationService={serviceReturning({ error: { code: 'AUTHENTICATION_UNAVAILABLE', message: 'internal' } })} />,
+    )
+  })
+})
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('E-mail ou senha inválidos.')
+describe('authenticated product', () => {
+  it('opens Meus vídeos with one row per file and navigates the shell', async () => {
+    const user = userEvent.setup()
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService()}
+      />,
+    )
+    await signIn(user)
+
+    expect(screen.getByRole('columnheader', { name: copy.videos.colFile })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: copy.videos.colDate })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: copy.videos.colStatus })).toBeInTheDocument()
+    expect(screen.getByText('campanha.mp4')).toBeInTheDocument()
+    expect(screen.getAllByText(copy.lifecycleStatus.processing).length).toBeGreaterThan(1)
+    expect(screen.getAllByText(copy.lifecycleStatus.available).length).toBeGreaterThan(1)
+    expect(screen.queryByText(copy.videoStatus.uploaded)).not.toBeInTheDocument()
+    expect(screen.queryByText(copy.processingStatus.completed)).not.toBeInTheDocument()
+    expect(screen.getAllByText('campanha.mp4')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: copy.shell.navUpload }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: copy.shell.navProfile })).toBeInTheDocument()
+    assertProductLanguage()
+
+    await user.click(screen.getByRole('button', { name: copy.shell.navProfile }))
+    expect(screen.getByRole('heading', { name: copy.profile.title })).toBeInTheDocument()
+    expect(screen.getAllByText(DEMO_USER.email).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    assertProductLanguage()
   })
 
-  it('uses a generic message when authentication is unavailable', async () => {
+  it('opens a dedicated detail with history and a simulated download', async () => {
     const user = userEvent.setup()
-    render(<App authenticationService={serviceReturning({ error: { code: 'AUTHENTICATION_UNAVAILABLE', message: 'internal details' } })} />)
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService()}
+      />,
+    )
+    await signIn(user)
 
-    await fillValidCredentials(user)
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    const row = screen.getByText('campanha.mp4').closest('[role="row"]')
+    await user.click(within(row as HTMLElement).getByRole('button', { name: copy.videos.openDetail }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível concluir o login. Tente novamente.')
+    expect(await screen.findByRole('heading', { name: 'campanha.mp4' })).toBeInTheDocument()
+    expect(screen.getByText(copy.detail.sent)).toBeInTheDocument()
+    expect(screen.getByText(copy.detail.history)).toBeInTheDocument()
+    expect(screen.getByText(copy.lifecycleStatus.available)).toBeInTheDocument()
+    expect(screen.getByText(copy.processingStatus.error)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: copy.detail.download }))
+    expect(screen.getByRole('status')).toHaveTextContent(copy.detail.downloadSimulated)
+    assertProductLanguage()
   })
 
-  it('prevents duplicate submissions while authentication is pending', async () => {
-    let complete: ((value: Awaited<ReturnType<AuthenticationService['authenticate']>>) => void) | undefined
-    const authenticationService: AuthenticationService = {
-      authenticate: vi.fn().mockImplementation(() => new Promise((resolve) => { complete = resolve })),
-    }
+  it('shows an empty list without scenario controls', async () => {
     const user = userEvent.setup()
-    render(<App authenticationService={authenticationService} />)
-
-    await fillValidCredentials(user)
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
-
-    expect(screen.getByRole('button', { name: 'Entrando…' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Entrando…' }))
-    expect(authenticationService.authenticate).toHaveBeenCalledTimes(1)
-
-    complete?.({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou senha inválidos.' } })
-    expect(await screen.findByText('E-mail ou senha inválidos.')).toBeInTheDocument()
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService([])}
+      />,
+    )
+    await signIn(user)
+    expect(await screen.findByText(copy.videos.emptyBody)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: copy.videos.emptyAction })).toBeInTheDocument()
+    expect(screen.queryByText(copy.prototype.title)).not.toBeInTheDocument()
   })
 
-  it('clears an old global error when a new attempt starts', async () => {
-    let complete: ((value: Awaited<ReturnType<AuthenticationService['authenticate']>>) => void) | undefined
-    const authenticationService: AuthenticationService = {
-      authenticate: vi
-        .fn()
-        .mockResolvedValueOnce({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou senha inválidos.' } })
-        .mockImplementationOnce(() => new Promise((resolve) => { complete = resolve })),
-    }
+  it('explains when search or status filters hide every row', async () => {
     const user = userEvent.setup()
-    render(<App authenticationService={authenticationService} />)
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService()}
+      />,
+    )
+    await signIn(user)
 
-    await fillValidCredentials(user)
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
-    expect(await screen.findByText('E-mail ou senha inválidos.')).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText(copy.videos.searchPlaceholder), 'arquivo-inexistente')
+    expect(screen.getByText(copy.videos.filterEmpty)).toBeInTheDocument()
+    expect(screen.getByText(copy.videos.filterEmptyHint)).toBeInTheDocument()
+    expect(screen.queryByText(copy.videos.emptyBody)).not.toBeInTheDocument()
+  })
 
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
-    expect(screen.queryByText('E-mail ou senha inválidos.')).not.toBeInTheDocument()
+  it('shows a recoverable load error', async () => {
+    const user = userEvent.setup()
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={{
+          list: vi.fn().mockRejectedValue({ code: 'LIST_UNAVAILABLE', message: 'mock' }),
+          get: vi.fn(),
+          simulateUpload: vi.fn(),
+        }}
+      />,
+    )
+    await signIn(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent(copy.videos.error)
+  })
 
-    complete?.({ error: { code: 'INVALID_CREDENTIALS', message: 'E-mail ou senha inválidos.' } })
-    expect(await screen.findByText('E-mail ou senha inválidos.')).toBeInTheDocument()
+  it('simulates upload from metadata and never calls the network', async () => {
+    const user = userEvent.setup()
+    const videoService = new MockVideoService()
+    const simulate = vi.spyOn(videoService, 'simulateUpload')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    render(<App authenticationService={serviceReturning({ user: DEMO_USER })} videoService={videoService} />)
+    await signIn(user)
+
+    await user.click(screen.getAllByRole('button', { name: copy.shell.navUpload })[0]!)
+    const submitButton = () => screen.getAllByRole('button', { name: copy.upload.submit })
+      .find((button) => button.getAttribute('type') === 'submit')
+    expect(submitButton()).toBeDisabled()
+    const file = new File(['abc'], 'gravacao.webm', { type: 'video/webm' })
+    await user.upload(screen.getByLabelText(copy.upload.fileLabel), file)
+    expect(screen.getByText(/gravacao\.webm/)).toBeInTheDocument()
+    expect(submitButton()).toBeEnabled()
+    await user.click(submitButton()!)
+
+    expect(await screen.findByRole('heading', { name: copy.upload.successTitle }, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.getByText(copy.upload.successStatus)).toBeInTheDocument()
+    expect(simulate).toHaveBeenCalledWith(
+      DEMO_USER.id,
+      { name: 'gravacao.webm', sizeBytes: file.size, contentType: 'video/webm' },
+      expect.objectContaining({ scenario: { kind: 'default' } }),
+    )
+    expect(simulate.mock.calls[0]?.[1]).not.toHaveProperty('stream')
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
+
+  it('logs out, clears the session and restores the default scenario', async () => {
+    const user = userEvent.setup()
+    const authenticationService = serviceReturning({ user: DEMO_USER })
+    render(<App authenticationService={authenticationService} videoService={new MockVideoService()} />)
+    await signIn(user)
+    await user.click(screen.getByRole('button', { name: copy.shell.logout }))
+
+    expect(await screen.findByRole('heading', { name: copy.access.loginTitle })).toBeInTheDocument()
+    expect(authenticationService.logout).toHaveBeenCalledTimes(1)
   })
 })

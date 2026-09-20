@@ -1,4 +1,5 @@
 import type { LoginCredentials } from '../domain/authentication'
+import { emailError, normalizeEmail, passwordError } from './credentials'
 
 export type LoginField = 'email' | 'password'
 export type LoginValidationErrors = Partial<Record<LoginField, string>>
@@ -8,22 +9,19 @@ export interface LoginValidationResult {
   errors: LoginValidationErrors
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 export function validateLogin(
   credentials: LoginCredentials,
 ): LoginValidationResult {
-  const email = credentials.email.trim()
+  const email = normalizeEmail(credentials.email)
   const errors: LoginValidationErrors = {}
+  const nextEmailError = emailError(email)
+  const nextPasswordError = passwordError(credentials.password)
 
-  if (!email) {
-    errors.email = 'Informe seu e-mail.'
-  } else if (!EMAIL_PATTERN.test(email)) {
-    errors.email = 'Informe um e-mail válido.'
+  if (nextEmailError) {
+    errors.email = nextEmailError
   }
-
-  if (!credentials.password) {
-    errors.password = 'Informe sua senha.'
+  if (nextPasswordError) {
+    errors.password = nextPasswordError
   }
 
   return Object.keys(errors).length > 0
