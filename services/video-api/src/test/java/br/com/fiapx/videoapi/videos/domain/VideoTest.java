@@ -26,12 +26,10 @@ class VideoTest {
     }
 
     @Test
-    void rejectsConfirmationWhenVideoIsNotPending() {
+    void repeatedConfirmationKeepsTheOriginalResult() {
         var video = new Video(UUID.randomUUID(), UUID.randomUUID(), "uploads/source.mp4", "source.mp4",
             "video/mp4", 1, "a".repeat(64), VideoStatus.UPLOADED, Instant.EPOCH, Instant.EPOCH);
 
-        assertThatThrownBy(() -> video.confirm(Instant.EPOCH.plusSeconds(5)))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Video cannot be confirmed");
+        assertThat(video.confirm(Instant.EPOCH.plusSeconds(5))).isSameAs(video);
     }
 }
