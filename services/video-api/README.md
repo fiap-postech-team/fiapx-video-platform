@@ -13,18 +13,19 @@ PostgreSQL. O contrato HTTP canônico é o
 | Login, refresh e logout | Implementados; refresh token rotativo fica em cookie HttpOnly e refresh/logout exigem CSRF |
 | JWT | Emitido com `RS256`; no perfil `local`, usa par RSA efêmero e validade padrão de 15 minutos |
 | Jobs | Criação, consulta do proprietário, paginação por cursor e idempotência implementadas |
-| Persistência | Flyway executa as migrations `V1`, `V2` e `V3`; Hibernate apenas valida o schema |
+| Persistência | Flyway executa as migrations `V1` a `V4`; Hibernate apenas valida o schema |
 | Swagger | Disponível somente com o perfil `local` |
-| Upload/download de vídeo | Ainda não há endpoint HTTP; um job exige um vídeo já confirmado no banco |
+| Upload de vídeo | URL temporária para PUT direto no MinIO/S3, confirmação por HEAD e expiração de pendências |
+| Download de vídeo | Ainda não há endpoint HTTP |
 | Publicação/consumo RabbitMQ | Schema, outbox, inbox e operações de claim existem; publisher e listener integrados ao broker ainda não estão disponíveis |
 
 ## Pré-requisitos
 
 - JDK 21;
-- Docker Desktop ou Docker Engine em execução, para o PostgreSQL local;
+- Docker Desktop ou Docker Engine em execução, para PostgreSQL e MinIO locais;
 - Maven Wrapper do repositório (não é necessário instalar Maven).
 
-As portas `5432` (PostgreSQL) e `8080` (API) devem estar livres.
+As portas `5432` (PostgreSQL), `8080` (API) e `9000` (MinIO) devem estar livres.
 
 ## Início rápido: testar cadastro de usuário
 
@@ -34,8 +35,8 @@ na raiz do monorepo.
 ### 1. Inicie o PostgreSQL
 
 ```bash
-docker compose up -d postgres
-docker compose ps postgres
+docker compose up -d postgres minio minio-init
+docker compose ps postgres minio
 ```
 
 Espere o estado `healthy`. O Compose usa, no ambiente local, banco `fiapx`,
@@ -118,7 +119,7 @@ curl --include \
 Interrompa a API com `Ctrl+C` e execute:
 
 ```bash
-docker compose stop postgres
+docker compose stop postgres minio
 ```
 
 O comando preserva o volume do banco. Para reiniciar os testes de dados do
@@ -139,6 +140,38 @@ valores podem ser alterados por `APP_AUTH_LOCK_DURATION` e
 `APP_AUTH_MAX_FAILURES`. O primeiro `ADMIN` não é criado pelo cadastro público:
 ele depende do bootstrap explicitamente habilitado e de segredo externo.
 
+## Upload direto de vídeo
+
+Com um bearer token válido, chame `POST /v1/videos/uploads`:
+
+```json
+{"originalFilename":"clip.mp4","contentType":"video/mp4","sizeBytes":12345,"checksumSha256":null}
+```
+
+A resposta `201` contém `videoId`, `sourceKey`, `uploadUrl`, `expiresAt`,
+`method: "PUT"` e `headers`. Envie os bytes diretamente à `uploadUrl` usando
+exatamente o método e os headers retornados; o arquivo nunca passa pela API.
+Se informar SHA-256, use 64 caracteres hexadecimais; a resposta exigirá também
+o header de checksum codificado em Base64. Não persista, registre nem compartilhe
+a URL pré-assinada. Ela vence em 15 minutos e o header condicional impede
+sobrescrever um objeto já enviado.
+
+Depois do PUT, chame `POST /v1/videos/{videoId}/confirm` com o mesmo bearer.
+A API confere o objeto por HEAD e devolve `videoId`, `sourceKey`, `status:
+"UPLOADED"` e `uploadedAt`. Repetir a confirmação devolve o mesmo resultado.
+O job usa a `sourceKey` confirmada em `POST /v1/jobs`. Objeto ausente, metadados
+divergentes ou upload expirado não originam job; solicite um novo upload para
+corrigir um objeto incompatível.
+
+Por padrão, a allowlist aceita `video/mp4`, `video/quicktime`, `video/webm` e
+`video/x-matroska`; o tamanho declarado e o observado não podem ultrapassar
+500.000.000 bytes. Pendências vencem em 24 horas; a limpeza agendada marca
+`EXPIRED` e remove o objeto, repetindo falhas de storage. Formato real e duração
+máxima de 30 minutos são responsabilidade do `video-processor` em entrega
+separada. Para clientes de navegador, configure o CORS do bucket para permitir
+PUT com `Content-Type`, `If-None-Match` e `x-amz-checksum-sha256` a partir da
+origem autorizada.
+
 ## Configuração
 
 | Variável | Perfil `local` | Fora de `local` |
@@ -149,9 +182,22 @@ ele depende do bootstrap explicitamente habilitado e de segredo externo.
 | `APP_AUTH_ACCESS_TOKEN_TTL` | `15m` | Opcional |
 | `APP_AUTH_REFRESH_TOKEN_TTL` | `7d` | Opcional |
 | `APP_AUTH_BOOTSTRAP_ENABLED` | `false` | Opcional; exige e-mail e senha quando `true` |
+| `S3_BUCKET`, `S3_REGION` | `videos`, `us-east-1` | Bucket e região do storage |
+| `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT` | `http://localhost:9000` | Endpoint interno para HEAD/DELETE e endpoint alcançável pelo cliente para a URL assinada; sem override usa S3 padrão |
+| `S3_ACCESS_KEY`, `S3_SECRET_KEY` | Usuário local `fiapx-video-api` com política restrita | Omitir ambos para usar a cadeia de credenciais do ambiente; fornecer ambos quando usar chaves explícitas |
+| `APP_VIDEO_MAX_SIZE_BYTES`, `APP_VIDEO_ALLOWED_CONTENT_TYPES` | `500000000`, quatro tipos acima | Política de mídia declarada |
+| `APP_VIDEO_UPLOAD_URL_TTL`, `APP_VIDEO_PENDING_TTL` | `PT15M`, `PT24H` | Duração da URL e da pendência; a pendência deve durar mais |
+| `APP_VIDEO_CLEANUP_INTERVAL`, `APP_VIDEO_CLEANUP_BATCH_SIZE` | `PT5M`, `100` | Agendamento e tamanho máximo de cada rodada |
 
 Fora do perfil `local`, inicialização sem banco ou configuração de autenticação
 completa falha antes de expor a aplicação.
+Em produção, use credenciais exclusivas da API com `PutObject`, `GetObject`
+(HEAD) e `DeleteObject` restritos ao prefixo `users/*/videos/*/source`, mais
+`ListBucket` restrito ao prefixo de entrada para distinguir objeto ausente.
+O Compose cria essa política e um usuário local dedicado; o processor mantém
+outra identidade.
+No Compose, `S3_ENDPOINT` aponta para `minio:9000` e `S3_PUBLIC_ENDPOINT` para
+`localhost:9000`, preservando o host que participa da assinatura.
 
 ## Rotas locais e documentação
 
@@ -168,15 +214,14 @@ acima, Postman ou outro cliente HTTP para executar o cadastro.
 
 ## Persistência e limites atuais
 
-As migrations `V2` e `V3` mantêm usuários, credenciais com hash BCrypt,
+As migrations `V2` a `V4` mantêm usuários, credenciais com hash BCrypt,
 papéis, sessões, refresh tokens, vídeos, jobs, histórico, inbox, outbox e
 idempotência. Detalhes de tabelas e compatibilidade estão no
 [DER](../../docs/architecture/video-api-database.md) e a decisão de identidade
 local está no [ADR 0011](../../docs/adr/0011-local-identity-with-rsa-jwt-and-oidc-boundary.md).
 
-O endpoint de criação de job aceita `sourceKey`, mas só funciona quando existe
-um vídeo confirmado daquele proprietário. Como a API ainda não expõe o ciclo de
-upload/confirmação, o fluxo manual suportado hoje começa pelo cadastro e login.
+O endpoint de criação de job aceita `sourceKey` somente quando existe vídeo
+confirmado daquele proprietário. A API não fornece URL de download neste MVP.
 
 ## Verificação
 

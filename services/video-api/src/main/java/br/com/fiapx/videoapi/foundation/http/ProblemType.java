@@ -35,6 +35,8 @@ public enum ProblemType {
     ),
     NOT_FOUND("not-found", "Não encontrado", 404, "Recurso não encontrado."),
     CONFLICT("conflict", "Conflito", 409, "O recurso informado já existe."),
+    STORAGE_UNAVAILABLE("storage-unavailable", "Storage indisponível", 503,
+        "Não foi possível acessar o armazenamento de vídeos agora."),
     /** An unexpected failure was replaced with a safe client response. */
     INTERNAL_ERROR(
         "internal-error",

@@ -16,6 +16,9 @@ import br.com.fiapx.videoapi.identity.application.EmailAlreadyRegisteredExceptio
 import br.com.fiapx.videoapi.jobs.application.IdempotencyConflictException;
 import br.com.fiapx.videoapi.jobs.application.VideoNotConfirmedException;
 import br.com.fiapx.videoapi.jobs.application.VideoNotFoundException;
+import br.com.fiapx.videoapi.videos.application.VideoUploadNotFoundException;
+import br.com.fiapx.videoapi.videos.application.VideoUploadConflictException;
+import br.com.fiapx.videoapi.videos.application.StorageUnavailableException;
 
 /**
  * Converts failures reaching the MVC boundary into the shared sanitized error contract.
@@ -57,8 +60,8 @@ public final class ApiExceptionHandler {
         return response(ProblemType.INTERNAL_ERROR, request);
     }
 
-    @ExceptionHandler(JobNotFoundException.class)
-    ResponseEntity<ProblemDetail> handleNotFound(JobNotFoundException exception, HttpServletRequest request) {
+    @ExceptionHandler({JobNotFoundException.class, VideoNotFoundException.class, VideoUploadNotFoundException.class})
+    ResponseEntity<ProblemDetail> handleNotFound(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.NOT_FOUND, request);
     }
 
@@ -67,19 +70,16 @@ public final class ApiExceptionHandler {
         return response(ProblemType.AUTHENTICATION_FAILED, request);
     }
 
-    @ExceptionHandler(EmailAlreadyRegisteredException.class)
-    ResponseEntity<ProblemDetail> handleConflict(EmailAlreadyRegisteredException exception, HttpServletRequest request) {
-        return response(ProblemType.CONFLICT, request);
-    }
-
-    @ExceptionHandler({IdempotencyConflictException.class, VideoNotConfirmedException.class})
+    @ExceptionHandler({EmailAlreadyRegisteredException.class, IdempotencyConflictException.class,
+        VideoNotConfirmedException.class, VideoUploadConflictException.class})
     ResponseEntity<ProblemDetail> handleStateConflict(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.CONFLICT, request);
     }
 
-    @ExceptionHandler(VideoNotFoundException.class)
-    ResponseEntity<ProblemDetail> handleVideoNotFound(VideoNotFoundException exception, HttpServletRequest request) {
-        return response(ProblemType.NOT_FOUND, request);
+    @ExceptionHandler(StorageUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleStorageUnavailable(StorageUnavailableException exception,
+                                                            HttpServletRequest request) {
+        return response(ProblemType.STORAGE_UNAVAILABLE, request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
