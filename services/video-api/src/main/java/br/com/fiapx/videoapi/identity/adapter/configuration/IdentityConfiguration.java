@@ -4,6 +4,7 @@ import br.com.fiapx.videoapi.identity.adapter.in.security.LocalJwtAuthentication
 import br.com.fiapx.videoapi.identity.adapter.out.security.RsaKeyPairFactory;
 import br.com.fiapx.videoapi.identity.adapter.out.security.SessionJwtValidator;
 import br.com.fiapx.videoapi.identity.application.AuthenticationPolicy;
+import br.com.fiapx.videoapi.identity.application.GetCurrentUser;
 import br.com.fiapx.videoapi.identity.application.Login;
 import br.com.fiapx.videoapi.identity.application.LogoutSession;
 import br.com.fiapx.videoapi.identity.application.RefreshSession;
@@ -51,4 +52,5 @@ public class IdentityConfiguration {
     }
     @Bean RefreshSession refreshSession(IdentityStore store, RefreshTokenGenerator tokens, AccessTokenIssuer issuer, java.time.Clock clock, AuthProperties p) { return new RefreshSession(store, tokens, issuer, clock, p.refreshTokenTtl()); }
     @Bean LogoutSession logoutSession(IdentityStore store, RefreshTokenGenerator tokens, java.time.Clock clock) { return new LogoutSession(store, tokens, clock); }
+    @Bean GetCurrentUser getCurrentUser(IdentityStore store) { return new GetCurrentUser(store); }
 }

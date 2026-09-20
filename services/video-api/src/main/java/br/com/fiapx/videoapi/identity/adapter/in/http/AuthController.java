@@ -4,7 +4,6 @@ import br.com.fiapx.videoapi.identity.application.Login;
 import br.com.fiapx.videoapi.identity.application.LogoutSession;
 import br.com.fiapx.videoapi.identity.application.RefreshSession;
 import br.com.fiapx.videoapi.identity.application.RegisterUser;
-import br.com.fiapx.videoapi.identity.domain.IdentityUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -16,8 +15,6 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -91,10 +88,6 @@ public class AuthController {
     }
 
     record CredentialsRequest(@NotBlank @Email String email, @NotBlank @Size(min = 8, max = 128) String password) {
-    }
-
-    record UserResponse(java.util.UUID id, String email, List<String> roles) {
-        static UserResponse from(IdentityUser user) { return new UserResponse(user.id(), user.email(), List.of(user.role().name())); }
     }
 
     record LoginResponse(UserResponse user, String accessToken, String tokenType, long expiresIn) {
