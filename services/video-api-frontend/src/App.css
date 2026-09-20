@@ -6,6 +6,45 @@
   min-height: 100vh;
 }
 
+.session-check {
+  align-items: center;
+  background: var(--paper);
+  color: var(--muted);
+  display: grid;
+  min-height: 100vh;
+  padding: 2rem 2.25rem;
+  place-items: center;
+}
+
+.session-check p {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.session-banner {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding: .9rem 1.15rem;
+}
+
+.session-banner p {
+  color: var(--ink);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.session-banner button {
+  width: auto;
+}
+
 .proof-sheet {
   background: var(--rail);
   color: #eef0f3;

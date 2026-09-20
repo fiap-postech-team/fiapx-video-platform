@@ -134,11 +134,16 @@ nenhum dado local precisa ser preservado.
 | `POST /v1/auth/login` | Público | Retorna access token e envia `FIAPX_REFRESH` e `XSRF-TOKEN` em cookies |
 | `POST /v1/auth/refresh` | Cookie + header `X-XSRF-TOKEN` | Rotaciona o refresh token e retorna novo access token |
 | `POST /v1/auth/logout` | Cookie + header `X-XSRF-TOKEN` | Revoga a sessão e expira os cookies |
+| `GET /v1/me` | Bearer | Devolve id, e-mail e papéis da conta autenticada |
 
 O login bloqueia a conta por 15 minutos após cinco falhas consecutivas. Os
 valores podem ser alterados por `APP_AUTH_LOCK_DURATION` e
 `APP_AUTH_MAX_FAILURES`. O primeiro `ADMIN` não é criado pelo cadastro público:
 ele depende do bootstrap explicitamente habilitado e de segredo externo.
+
+A SPA lê o cookie `XSRF-TOKEN` em `Path=/`. Origens permitidas com credenciais
+ficam em `APP_WEB_ALLOWED_ORIGINS` (no perfil `local`, `http://localhost:5173`
+e `http://127.0.0.1:5173`). Não use `Access-Control-Allow-Origin: *` com cookies.
 
 ## Upload direto de vídeo
 

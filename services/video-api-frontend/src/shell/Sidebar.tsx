@@ -4,11 +4,12 @@ import { isDetailView, sectionOf, type ProductView } from './navigation'
 interface SidebarProps {
   email: string
   view: ProductView
+  logoutPending?: boolean
   onNavigate: (view: ProductView) => void
   onLogout: () => void
 }
 
-export function Sidebar({ email, view, onNavigate, onLogout }: SidebarProps) {
+export function Sidebar({ email, view, logoutPending = false, onNavigate, onLogout }: SidebarProps) {
   const section = sectionOf(view)
   const videosCurrent = section === 'videos' || isDetailView(view)
 
@@ -45,8 +46,8 @@ export function Sidebar({ email, view, onNavigate, onLogout }: SidebarProps) {
       </nav>
       <div className="sidebar-session">
         <p className="session-email">{email}</p>
-        <button type="button" className="ghost" onClick={onLogout}>
-          {copy.shell.logout}
+        <button type="button" className="ghost" onClick={onLogout} disabled={logoutPending}>
+          {logoutPending ? copy.shell.logoutPending : copy.shell.logout}
         </button>
       </div>
     </>

@@ -63,6 +63,9 @@ class IdentityAuthenticationIT {
         var csrf = cookie(login, "XSRF-TOKEN");
         assertThat(refresh).isNotBlank();
         assertThat(csrf).isNotBlank();
+        assertThat(login.getHeaders().getOrEmpty(HttpHeaders.SET_COOKIE))
+            .anyMatch(header -> header.startsWith("XSRF-TOKEN=") && header.contains("Path=/") && !header.contains("Path=/v1/auth"))
+            .anyMatch(header -> header.startsWith("FIAPX_REFRESH=") && header.contains("Path=/v1/auth"));
 
         var currentUser = currentUser(firstAccess);
         assertThat(currentUser.getStatusCode()).isEqualTo(HttpStatus.OK);

@@ -19,10 +19,23 @@ export type AuthenticationErrorCode =
   | 'INVALID_CREDENTIALS'
   | 'EMAIL_ALREADY_REGISTERED'
   | 'AUTHENTICATION_UNAVAILABLE'
+  | 'SESSION_EXPIRED'
+  | 'CSRF_DENIED'
+  | 'LOGOUT_FAILED'
 
 export interface AuthenticationError {
   code: AuthenticationErrorCode
   message: string
+}
+
+export class AuthenticationFailure extends Error {
+  readonly error: AuthenticationError
+
+  constructor(error: AuthenticationError) {
+    super(error.message)
+    this.name = 'AuthenticationFailure'
+    this.error = error
+  }
 }
 
 export type AuthenticationResult =
@@ -30,11 +43,17 @@ export type AuthenticationResult =
   | { error: AuthenticationError }
 
 export type RegistrationResult =
-  | { user: Omit<AuthenticatedUser, 'roles'> & { roles: UserRole[] } }
+  | { user: AuthenticatedUser }
   | { error: AuthenticationError }
+
+export type SessionBootstrapResult =
+  | { user: AuthenticatedUser }
+  | { user: null; error?: AuthenticationError }
 
 export interface AuthenticationService {
   authenticate(credentials: LoginCredentials): Promise<AuthenticationResult>
   register(credentials: LoginCredentials): Promise<RegistrationResult>
+  bootstrap(): Promise<SessionBootstrapResult>
   logout(): Promise<void>
+  authorizedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }

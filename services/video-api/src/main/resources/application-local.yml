@@ -19,6 +19,8 @@ springdoc:
     try-it-out-enabled: false
 
 app:
+  web:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
   video:
     internal-endpoint: ${S3_ENDPOINT:http://localhost:9000}
     public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}

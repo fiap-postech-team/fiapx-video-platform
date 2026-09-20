@@ -51,6 +51,8 @@ app:
     region: ${S3_REGION:us-east-1}
     access-key: ${S3_ACCESS_KEY:}
     secret-key: ${S3_SECRET_KEY:}
+  web:
+    allowed-origins: ${APP_WEB_ALLOWED_ORIGINS:}
   auth:
     issuer: ${APP_AUTH_ISSUER:}
     audience: ${APP_AUTH_AUDIENCE:}
