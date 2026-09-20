@@ -4,12 +4,12 @@ import type { Video } from '../domain/video'
 import { demoVideos } from '../infrastructure/fixtures'
 import {
   latestAttempt,
+  lifecycleStatus,
+  lifecycleStatusLabel,
   previousAttempts,
   processingStatus,
   processingStatusLabel,
   videoMilestones,
-  videoStatus,
-  videoStatusLabel,
 } from './product-status'
 
 function videoById(id: string): Video {
@@ -21,16 +21,16 @@ function videoById(id: string): Video {
 }
 
 describe('video and processing status', () => {
-  it('exposes only the allowed video and processing labels', () => {
-    expect(videoStatusLabel(videoStatus(videoById('video-pending')))).toBe(copy.videoStatus.pending)
-    expect(videoStatusLabel(videoStatus(videoById('video-uploaded')))).toBe(copy.videoStatus.uploaded)
-    expect(videoStatusLabel(videoStatus(videoById('video-rejected')))).toBe(copy.videoStatus.rejected)
-    expect(videoStatusLabel(videoStatus(videoById('video-expired')))).toBe(copy.videoStatus.expired)
-    expect(processingStatusLabel(processingStatus(videoById('video-queued')))).toBe(copy.processingStatus.pending)
-    expect(processingStatusLabel(processingStatus(videoById('video-processing')))).toBe(copy.processingStatus.processing)
+  it('derives one owner-facing lifecycle status from upload and latest attempt', () => {
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-pending')))).toBe(copy.lifecycleStatus.pending)
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-uploaded')))).toBe(copy.lifecycleStatus.processing)
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-queued')))).toBe(copy.lifecycleStatus.processing)
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-processing')))).toBe(copy.lifecycleStatus.processing)
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-available')))).toBe(copy.lifecycleStatus.available)
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-failed')))).toBe(copy.lifecycleStatus.failed)
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-rejected')))).toBe(copy.lifecycleStatus.rejected)
+    expect(lifecycleStatusLabel(lifecycleStatus(videoById('video-expired')))).toBe(copy.lifecycleStatus.expired)
     expect(processingStatusLabel(processingStatus(videoById('video-available')))).toBe(copy.processingStatus.completed)
-    expect(processingStatusLabel(processingStatus(videoById('video-failed')))).toBe(copy.processingStatus.error)
-    expect(processingStatusLabel(processingStatus(videoById('video-uploaded')))).toBe(copy.processingStatus.pending)
   })
 
   it('keeps a single latest attempt for a video with history', () => {

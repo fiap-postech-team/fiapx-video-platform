@@ -13,18 +13,16 @@ Este documento cobre somente as seis telas do épico de linguagem: Entrar, Cadas
 
 ## Correspondência de estados técnicos → produto
 
-Duas categorias aparecem juntas na lista e no detalhe.
+A lista e o detalhe mostram um único status de ciclo de vida, derivado no frontend a partir de `uploadStatus` e da última tentativa. Nenhum estado novo é inventado no backend.
 
-| Origem interna (não visível) | Texto visível | Categoria |
-| --- | --- | --- |
-| `Video.PENDING` | pendente | Vídeo (lista) |
-| `Video.UPLOADED` | enviado | Vídeo (lista) |
-| `Video.REJECTED` | rejeitado | Vídeo (lista) |
-| `Video.EXPIRED` | expirado | Vídeo (lista) |
-| tentativa `PENDING` ou ausente | pendente | Processamento (detalhe) |
-| tentativa `PROCESSING` | processando | Processamento (detalhe) |
-| tentativa `COMPLETED` | completado | Processamento (detalhe) |
-| tentativa `FAILED` | error | Processamento (detalhe) |
+| Origem interna (não visível) | Texto visível |
+| --- | --- |
+| `uploadStatus` `PENDING` | Pendente |
+| `uploadStatus` `REJECTED` | Rejeitado |
+| `uploadStatus` `EXPIRED` | Expirado |
+| `UPLOADED` + tentativa `PENDING`, `PROCESSING` ou ausente | Processando |
+| `UPLOADED` + última tentativa `COMPLETED` | Processado |
+| `UPLOADED` + última tentativa `FAILED` | Falha no processamento |
 
 Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisponível`.
 

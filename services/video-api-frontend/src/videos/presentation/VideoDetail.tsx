@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { copy } from '../../product-copy'
 import { formatDateTime } from '../application/format-datetime'
 import {
+  lifecycleStatus,
+  lifecycleStatusLabel,
   previousAttempts,
-  processingStatus,
   processingStatusLabel,
-  videoStatus,
 } from '../application/product-status'
 import type { Video, VideoService } from '../domain/video'
 import { VideoTimeline } from './VideoTimeline'
@@ -45,28 +45,26 @@ export function VideoDetail({ userId, videoId, videoService, onBack }: VideoDeta
     return (
       <section className="page-block">
         <p role="alert">{copy.detail.notFound}</p>
-        <button type="button" className="ghost" onClick={onBack}>{copy.detail.back}</button>
+        <button type="button" className="btn-quiet" onClick={onBack}>{copy.detail.back}</button>
       </section>
     )
   }
 
-  const upload = videoStatus(video)
-  const processing = processingStatus(video)
+  const lifecycle = lifecycleStatus(video)
   const history = previousAttempts(video)
 
   return (
     <article className="page-block" aria-labelledby="video-detail-title">
       <div className="detail-header">
         <button type="button" className="text-link" onClick={onBack}>{copy.detail.back}</button>
-        <p className={`status-badge is-proc-${processing}`}>
-          <span>{copy.status.processingLabel}</span>
-          <strong>{processingStatusLabel(processing)}</strong>
+        <p className={`status-badge is-${lifecycle}`}>
+          {lifecycleStatusLabel(lifecycle)}
         </p>
         <h1 id="video-detail-title">{video.originalFilename}</h1>
       </div>
       <VideoTimeline video={video} />
 
-      {processing === 'completed' && (
+      {lifecycle === 'available' && (
         <div className="detail-actions">
           <button type="button" onClick={() => setDownloadNotice(true)}>
             {copy.detail.download}
@@ -78,8 +76,8 @@ export function VideoDetail({ userId, videoId, videoService, onBack }: VideoDeta
           )}
         </div>
       )}
-      {upload === 'expired' && <p className="page-note">{copy.detail.expiredHint}</p>}
-      {processing === 'error' && <p className="page-note">{copy.detail.failedHint}</p>}
+      {lifecycle === 'expired' && <p className="page-note">{copy.detail.expiredHint}</p>}
+      {lifecycle === 'failed' && <p className="page-note">{copy.detail.failedHint}</p>}
 
       <section className="history" aria-labelledby="history-title">
         <h2 id="history-title">{copy.detail.history}</h2>

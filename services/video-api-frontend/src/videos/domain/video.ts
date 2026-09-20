@@ -79,3 +79,12 @@ export interface VideoService {
 
 export type VideoStatusKey = 'pending' | 'uploaded' | 'rejected' | 'expired'
 export type ProcessingStatusKey = 'pending' | 'processing' | 'completed' | 'error'
+export const LIFECYCLE_STATUSES = [
+  'pending',
+  'processing',
+  'available',
+  'rejected',
+  'expired',
+  'failed',
+] as const
+export type LifecycleStatusKey = (typeof LIFECYCLE_STATUSES)[number]

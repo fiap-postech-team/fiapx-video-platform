@@ -84,11 +84,16 @@ describe('authenticated product', () => {
     )
     await signIn(user)
 
+    expect(screen.getByRole('columnheader', { name: copy.videos.colFile })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: copy.videos.colDate })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: copy.videos.colStatus })).toBeInTheDocument()
     expect(screen.getByText('campanha.mp4')).toBeInTheDocument()
-    expect(screen.getAllByText(copy.videoStatus.uploaded).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(copy.lifecycleStatus.processing).length).toBeGreaterThan(1)
+    expect(screen.getAllByText(copy.lifecycleStatus.available).length).toBeGreaterThan(1)
+    expect(screen.queryByText(copy.videoStatus.uploaded)).not.toBeInTheDocument()
     expect(screen.queryByText(copy.processingStatus.completed)).not.toBeInTheDocument()
     expect(screen.getAllByText('campanha.mp4')).toHaveLength(1)
-    expect(screen.getByRole('button', { name: copy.shell.navUpload })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: copy.shell.navUpload }).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: copy.shell.navProfile })).toBeInTheDocument()
     assertProductLanguage()
 
@@ -109,13 +114,13 @@ describe('authenticated product', () => {
     )
     await signIn(user)
 
-    const row = screen.getByText('campanha.mp4').closest('article')
+    const row = screen.getByText('campanha.mp4').closest('[role="row"]')
     await user.click(within(row as HTMLElement).getByRole('button', { name: copy.videos.openDetail }))
 
     expect(await screen.findByRole('heading', { name: 'campanha.mp4' })).toBeInTheDocument()
     expect(screen.getByText(copy.detail.sent)).toBeInTheDocument()
     expect(screen.getByText(copy.detail.history)).toBeInTheDocument()
-    expect(screen.getByText(copy.processingStatus.completed)).toBeInTheDocument()
+    expect(screen.getByText(copy.lifecycleStatus.available)).toBeInTheDocument()
     expect(screen.getByText(copy.processingStatus.error)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: copy.detail.download }))
@@ -135,6 +140,22 @@ describe('authenticated product', () => {
     expect(await screen.findByText(copy.videos.emptyBody)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: copy.videos.emptyAction })).toBeInTheDocument()
     expect(screen.queryByText(copy.prototype.title)).not.toBeInTheDocument()
+  })
+
+  it('explains when search or status filters hide every row', async () => {
+    const user = userEvent.setup()
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService()}
+      />,
+    )
+    await signIn(user)
+
+    await user.type(screen.getByPlaceholderText(copy.videos.searchPlaceholder), 'arquivo-inexistente')
+    expect(screen.getByText(copy.videos.filterEmpty)).toBeInTheDocument()
+    expect(screen.getByText(copy.videos.filterEmptyHint)).toBeInTheDocument()
+    expect(screen.queryByText(copy.videos.emptyBody)).not.toBeInTheDocument()
   })
 
   it('shows a recoverable load error', async () => {
@@ -161,7 +182,7 @@ describe('authenticated product', () => {
     render(<App authenticationService={serviceReturning({ user: DEMO_USER })} videoService={videoService} />)
     await signIn(user)
 
-    await user.click(screen.getByRole('button', { name: copy.shell.navUpload }))
+    await user.click(screen.getAllByRole('button', { name: copy.shell.navUpload })[0]!)
     const submitButton = () => screen.getAllByRole('button', { name: copy.upload.submit })
       .find((button) => button.getAttribute('type') === 'submit')
     expect(submitButton()).toBeDisabled()

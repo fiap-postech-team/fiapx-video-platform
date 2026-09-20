@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { COPY_INVENTORY, copy, findForbiddenTerms } from './product-copy'
-import { processingStatus, processingStatusLabel, videoStatus, videoStatusLabel } from './videos/application/product-status'
+import { lifecycleStatus, lifecycleStatusLabel } from './videos/application/product-status'
 import { demoVideos } from './videos/infrastructure/fixtures'
 
 describe('product copy inventory', () => {
@@ -20,20 +20,17 @@ describe('product copy inventory', () => {
     }
   })
 
-  it('maps each fixture to the allowed Portuguese status labels', () => {
-    const labels = demoVideos().map((video) => [
-      videoStatusLabel(videoStatus(video)),
-      processingStatusLabel(processingStatus(video)),
-    ])
+  it('maps each fixture to one owner-facing lifecycle label', () => {
+    const labels = demoVideos().map((video) => lifecycleStatusLabel(lifecycleStatus(video)))
     expect(labels).toEqual([
-      [copy.videoStatus.pending, copy.processingStatus.pending],
-      [copy.videoStatus.uploaded, copy.processingStatus.pending],
-      [copy.videoStatus.uploaded, copy.processingStatus.pending],
-      [copy.videoStatus.uploaded, copy.processingStatus.processing],
-      [copy.videoStatus.uploaded, copy.processingStatus.completed],
-      [copy.videoStatus.uploaded, copy.processingStatus.error],
-      [copy.videoStatus.rejected, copy.processingStatus.pending],
-      [copy.videoStatus.expired, copy.processingStatus.pending],
+      copy.lifecycleStatus.pending,
+      copy.lifecycleStatus.processing,
+      copy.lifecycleStatus.processing,
+      copy.lifecycleStatus.processing,
+      copy.lifecycleStatus.available,
+      copy.lifecycleStatus.failed,
+      copy.lifecycleStatus.rejected,
+      copy.lifecycleStatus.expired,
     ])
   })
 })

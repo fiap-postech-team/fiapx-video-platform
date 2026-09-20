@@ -14,6 +14,9 @@ export function Sidebar({ email, view, onNavigate, onLogout }: SidebarProps) {
 
   return (
     <>
+      <div className="sidebar-brand">
+        <p className="wordmark" aria-label={copy.shell.brand}>FIAP <span>X</span></p>
+      </div>
       <nav className="sidebar-nav" aria-label={copy.shell.mainNav}>
         <button
           type="button"

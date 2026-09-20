@@ -1,5 +1,6 @@
 import { copy } from '../../product-copy'
 import type {
+  LifecycleStatusKey,
   ProcessingAttempt,
   ProcessingStatusKey,
   Video,
@@ -67,6 +68,31 @@ export function videoStatusLabel(status: VideoStatusKey): string {
 
 export function processingStatusLabel(status: ProcessingStatusKey): string {
   return copy.processingStatus[status]
+}
+
+export function lifecycleStatus(video: Video): LifecycleStatusKey {
+  switch (video.uploadStatus) {
+    case 'PENDING':
+      return 'pending'
+    case 'REJECTED':
+      return 'rejected'
+    case 'EXPIRED':
+      return 'expired'
+    case 'UPLOADED': {
+      const attempt = latestAttempt(video)
+      if (attempt?.status === 'COMPLETED') {
+        return 'available'
+      }
+      if (attempt?.status === 'FAILED') {
+        return 'failed'
+      }
+      return 'processing'
+    }
+  }
+}
+
+export function lifecycleStatusLabel(status: LifecycleStatusKey): string {
+  return copy.lifecycleStatus[status]
 }
 
 export function videoMilestones(video: Video): {
