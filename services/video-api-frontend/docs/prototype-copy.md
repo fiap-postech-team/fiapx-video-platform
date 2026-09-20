@@ -60,11 +60,18 @@ Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisp
 | access.registerDuplicate | Cadastrar | Este e-mail já está cadastrado. | e-mail duplicado | fixo |
 | access.registerUnavailable | Cadastrar | Não foi possível criar a conta. Tente novamente. | falha inesperada | fixo |
 | access.registerSuccess | Entrar | Conta criada. Entre com o e-mail e a senha cadastrados. | após cadastro válido | fixo |
+| access.checkingSession | Entrar | Verificando seu acesso… | verificação inicial da sessão | fixo |
+| access.sessionEnded | Entrar | Sua sessão terminou. Entre novamente. | sessão expirada ou inválida | fixo |
+| access.sessionCheckUnavailable | Entrar | Não foi possível verificar seu acesso. Tente novamente. | falha temporária ao verificar acesso | fixo |
+| access.retrySessionCheck | Entrar | Tentar novamente | falha temporária ao verificar acesso | fixo |
 
 | shell.navVideos | Shell compartilhado | Meus vídeos | menu | fixo |
 | shell.navUpload | Shell compartilhado | Enviar vídeo | menu | fixo |
 | shell.navProfile | Shell compartilhado | Meu perfil | menu | fixo |
 | shell.logout | Shell compartilhado | Sair | encerrar sessão | fixo |
+| shell.logoutPending | Shell compartilhado | Saindo… | saída em andamento | fixo |
+| shell.logoutUnavailable | Shell compartilhado | Não foi possível sair. Tente novamente. | falha temporária ao sair | fixo |
+| shell.logoutRetry | Shell compartilhado | Tentar novamente | falha temporária ao sair | fixo |
 | shell.openMenu | Shell compartilhado | Abrir menu | menu móvel fechado | fixo |
 | shell.closeMenu | Shell compartilhado | Fechar menu | menu móvel aberto | fixo |
 
@@ -99,6 +106,7 @@ Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisp
 | upload.success | Enviar vídeo | Vídeo enviado. Você já pode acompanhar o andamento em Meus vídeos. | sucesso simulado | fixo |
 | upload.error | Enviar vídeo | Não foi possível enviar o vídeo. Tente novamente. | falha simulada | fixo |
 | profile.title | Meu perfil | Meu perfil | cabeçalho | fixo |
+| profile.lead | Meu perfil | Dados da conta em uso. | cabeçalho | fixo |
 | profile.email | Meu perfil | E-mail | dado da sessão | fixo |
 | profile.note | Meu perfil | A edição de perfil não está disponível nesta versão. | somente leitura | fixo |
 | prototype.* | Shell compartilhado | Cenários de demonstração e opções | revisão de estados | fixo |

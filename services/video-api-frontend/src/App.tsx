@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSessionBootstrap } from './auth/application/use-session-bootstrap'
 import type { AuthenticatedUser, AuthenticationService } from './auth/domain/authentication'
-import { MockAuthenticationService } from './auth/infrastructure/mock-authentication-service'
+import { AuthenticationFailure } from './auth/domain/authentication'
+import { HttpAuthenticationService } from './auth/infrastructure/http-authentication-service'
 import { LoginForm } from './auth/presentation/LoginForm'
 import { RegisterForm } from './auth/presentation/RegisterForm'
 import { copy } from './product-copy'
@@ -21,31 +23,66 @@ interface AppProps {
 
 type AccessMode = 'login' | 'register'
 
-const defaultAuthenticationService = new MockAuthenticationService()
+const defaultAuthenticationService = new HttpAuthenticationService()
 const defaultVideoService = new MockVideoService()
 
 export default function App({
   authenticationService = defaultAuthenticationService,
   videoService = defaultVideoService,
 }: AppProps) {
+  const { checking, restoredUser, bootstrapError, retryBootstrap } = useSessionBootstrap(authenticationService)
   const [user, setUser] = useState<AuthenticatedUser | null>(null)
   const [accessMode, setAccessMode] = useState<AccessMode>('login')
   const [registeredEmail, setRegisteredEmail] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
   const [view, setView] = useState<ProductView>('videos')
   const [scenario, setScenario] = useState<ScenarioKind>('default')
+  const [logoutError, setLogoutError] = useState(false)
+  const [logoutPending, setLogoutPending] = useState(false)
+  const [bootstrapApplied, setBootstrapApplied] = useState(false)
+
+  useEffect(() => {
+    if (checking) {
+      setBootstrapApplied(false)
+      return
+    }
+    setUser(restoredUser)
+    if (!restoredUser && bootstrapError) {
+      setNotice(bootstrapError)
+    }
+    setBootstrapApplied(true)
+  }, [bootstrapError, checking, restoredUser])
 
   function navigate(next: ProductView) {
     setView(next)
   }
 
-  async function handleLogout() {
-    await authenticationService.logout()
+  function resetSession(nextNotice: string | null = null) {
     setUser(null)
     setAccessMode('login')
-    setNotice(null)
+    setNotice(nextNotice)
     setView('videos')
     setScenario('default')
+    setLogoutError(false)
+    setLogoutPending(false)
+  }
+
+  async function handleLogout() {
+    if (logoutPending) {
+      return
+    }
+    setLogoutPending(true)
+    try {
+      await authenticationService.logout()
+      resetSession()
+    } catch (error) {
+      if (error instanceof AuthenticationFailure && error.error.code === 'SESSION_EXPIRED') {
+        resetSession(copy.access.sessionEnded)
+        return
+      }
+      setLogoutError(true)
+      setLogoutPending(false)
+    }
   }
 
   function handleRegistered(email: string) {
@@ -54,12 +91,22 @@ export default function App({
     setAccessMode('login')
   }
 
+  if (checking || !bootstrapApplied) {
+    return (
+      <main className="session-check">
+        <p role="status">{copy.access.checkingSession}</p>
+      </main>
+    )
+  }
+
   if (user) {
     const scenarioValue = { kind: scenario }
     return (
       <AuthenticatedShell
         email={user.email}
         view={view}
+        logoutPending={logoutPending}
+        logoutError={logoutError}
         onNavigate={navigate}
         onLogout={() => { void handleLogout() }}
       >
@@ -145,11 +192,23 @@ export default function App({
             <h2 id="page-title">{copy.access.registerTitle}</h2>
           )}
         </div>
-        {notice && accessMode === 'login' && <p className="notice" role="status">{notice}</p>}
+        {notice && accessMode === 'login' && (
+          <p className="notice" role="status">{notice}</p>
+        )}
+        {bootstrapError && accessMode === 'login' && notice === bootstrapError && (
+          <button type="button" className="text-link" onClick={retryBootstrap}>
+            {copy.access.retrySessionCheck}
+          </button>
+        )}
         {accessMode === 'login' ? (
           <LoginForm
             authenticationService={authenticationService}
-            onAuthenticated={(next) => { setUser(next); setView('videos') }}
+            onAuthenticated={(next) => {
+              setUser(next)
+              setView('videos')
+              setNotice(null)
+              setLogoutError(false)
+            }}
             initialEmail={registeredEmail}
           />
         ) : (

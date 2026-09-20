@@ -7,6 +7,8 @@ interface AuthenticatedShellProps {
   email: string
   view: ProductView
   children: ReactNode
+  logoutPending?: boolean
+  logoutError?: boolean
   onNavigate: (view: ProductView) => void
   onLogout: () => void
 }
@@ -15,6 +17,8 @@ export function AuthenticatedShell({
   email,
   view,
   children,
+  logoutPending = false,
+  logoutError = false,
   onNavigate,
   onLogout,
 }: AuthenticatedShellProps) {
@@ -79,9 +83,23 @@ export function AuthenticatedShell({
 
       <div className="shell-layout">
         <aside id={menuId} className={menuOpen ? 'shell-sidebar is-open' : 'shell-sidebar'}>
-          <Sidebar email={email} view={view} onNavigate={navigate} onLogout={onLogout} />
+          <Sidebar
+            email={email}
+            view={view}
+            logoutPending={logoutPending}
+            onNavigate={navigate}
+            onLogout={onLogout}
+          />
         </aside>
         <main className="shell-main" id="conteudo-principal">
+          {logoutError && (
+            <div className="session-banner" role="alert">
+              <p>{copy.shell.logoutUnavailable}</p>
+              <button type="button" onClick={onLogout} disabled={logoutPending}>
+                {logoutPending ? copy.shell.logoutPending : copy.shell.logoutRetry}
+              </button>
+            </div>
+          )}
           {children}
         </main>
       </div>

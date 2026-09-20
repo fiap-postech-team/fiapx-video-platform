@@ -14,6 +14,7 @@ import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.web.cors.CorsConfigurationSource;
 import br.com.fiapx.videoapi.identity.adapter.in.security.LocalJwtAuthenticationConverter;
 
 /**
@@ -36,10 +37,12 @@ public final class FoundationSecurityConfiguration {
         ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
         ProblemDetailAccessDeniedHandler accessDeniedHandler,
         CsrfTokenRepository csrfTokenRepository,
+        CorsConfigurationSource corsConfigurationSource,
         ObjectProvider<JwtDecoder> decoder,
         ObjectProvider<LocalJwtAuthenticationConverter> converter
     ) throws Exception {
         http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository)
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                 .requireCsrfProtectionMatcher(new OrRequestMatcher(
@@ -60,9 +63,14 @@ public final class FoundationSecurityConfiguration {
     @Bean
     CsrfTokenRepository csrfTokenRepository(Environment environment) {
         var repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        repository.setCookiePath("/v1/auth");
+        repository.setCookiePath("/");
         repository.setCookieCustomizer(cookie -> cookie.sameSite("Strict").secure(!environment.matchesProfiles("local")));
         return repository;
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(Environment environment) {
+        return WebCors.source(environment.getProperty("app.web.allowed-origins", ""));
     }
 
     private void configureResourceServer(HttpSecurity http, JwtDecoder decoder,
