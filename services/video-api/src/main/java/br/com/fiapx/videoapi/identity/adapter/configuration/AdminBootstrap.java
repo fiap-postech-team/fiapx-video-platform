@@ -39,7 +39,7 @@ public class AdminBootstrap {
 
     private void validate(BootstrapProperties properties) {
         var password = properties.password();
-        if (properties.email() == null || password == null || password.length() < 12 || password.length() > 128) {
+        if (properties.email() == null || password == null || password.length() < 8 || password.length() > 128) {
             throw new IllegalStateException("Bootstrap administrator configuration is invalid");
         }
     }

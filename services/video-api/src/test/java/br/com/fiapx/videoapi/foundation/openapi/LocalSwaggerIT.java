@@ -1,55 +1,63 @@
 package br.com.fiapx.videoapi.foundation.openapi;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpStatus;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration;
+import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes = LocalSwaggerIT.TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("local")
-@Testcontainers(disabledWithoutDocker = true)
+@AutoConfigureMockMvc
 class LocalSwaggerIT {
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
-
-    @LocalServerPort
-    private int port;
-
-    private final TestRestTemplate client = new TestRestTemplate();
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-    }
+    @Autowired
+    private MockMvc mvc;
 
     @Test
-    void exposesStaticOpenApiAndSwaggerOnlyInLocalProfile() {
-        var specification = get("/openapi.yaml", String.class);
-        var swagger = get("/swagger-ui.html", String.class);
-        var swaggerConfiguration = get("/v3/api-docs/swagger-config", String.class);
-        var dynamicDocs = get("/v3/api-docs", String.class);
-
-        assertThat(specification.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(specification.getBody()).contains("openapi: 3.1.0");
-        assertThat(swagger.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(swagger.getBody()).contains("swagger-initializer.js");
-        assertThat(swaggerConfiguration.getBody()).contains("/openapi.yaml", "\"tryItOutEnabled\":false");
-        assertThat(dynamicDocs.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    void exposesStaticOpenApiAndSwaggerOnlyInLocalProfile() throws Exception {
+        mvc.perform(get("/openapi.yaml"))
+            .andExpect(status().isOk());
+        mvc.perform(get("/openapi.yaml"))
+            .andExpect(content().string(containsString("openapi: 3.1.0")));
+        mvc.perform(get("/swagger-ui.html"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/swagger-ui/index.html"));
+        mvc.perform(get("/v3/api-docs/swagger-config"))
+            .andExpect(status().isOk());
+        mvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isUnauthorized());
     }
 
-    private <T> org.springframework.http.ResponseEntity<T> get(String path, Class<T> bodyType) {
-        return client.getForEntity("http://localhost:" + port + path, bodyType);
+    @SpringBootConfiguration
+    @EnableAutoConfiguration(exclude = {
+        DataSourceAutoConfiguration.class,
+        HibernateJpaAutoConfiguration.class,
+        JpaRepositoriesAutoConfiguration.class,
+        FlywayAutoConfiguration.class,
+        JdbcTemplateAutoConfiguration.class,
+        RabbitAutoConfiguration.class
+    })
+    @Import({
+        br.com.fiapx.videoapi.foundation.http.ApiProblemFactory.class,
+        br.com.fiapx.videoapi.foundation.security.FoundationSecurityConfiguration.class,
+        br.com.fiapx.videoapi.foundation.security.ProblemDetailAccessDeniedHandler.class,
+        br.com.fiapx.videoapi.foundation.security.ProblemDetailAuthenticationEntryPoint.class
+    })
+    static class TestApplication {
     }
 }

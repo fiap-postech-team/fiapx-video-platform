@@ -169,7 +169,6 @@ class IdentityAuthenticationIT {
         return Map.of("email", email, "password", password);
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> body(ResponseEntity<String> response) {
         try {
             return JSON.readValue(response.getBody(), new TypeReference<>() { });
