@@ -38,6 +38,19 @@ springdoc:
     enabled: false
 
 app:
+  video:
+    max-size-bytes: ${APP_VIDEO_MAX_SIZE_BYTES:500000000}
+    allowed-content-types: ${APP_VIDEO_ALLOWED_CONTENT_TYPES:video/mp4,video/quicktime,video/webm,video/x-matroska}
+    upload-url-ttl: ${APP_VIDEO_UPLOAD_URL_TTL:PT15M}
+    pending-ttl: ${APP_VIDEO_PENDING_TTL:PT24H}
+    cleanup-batch-size: ${APP_VIDEO_CLEANUP_BATCH_SIZE:100}
+    cleanup-interval: ${APP_VIDEO_CLEANUP_INTERVAL:PT5M}
+    bucket: ${S3_BUCKET:videos}
+    internal-endpoint: ${S3_ENDPOINT:}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
   auth:
     issuer: ${APP_AUTH_ISSUER:}
     audience: ${APP_AUTH_AUDIENCE:}

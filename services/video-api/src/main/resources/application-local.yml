@@ -19,6 +19,11 @@ springdoc:
     try-it-out-enabled: false
 
 app:
+  video:
+    internal-endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:fiapx-video-api}
+    secret-key: ${S3_SECRET_KEY:fiapx-video-api-secret}
   auth:
     issuer: http://localhost:8080
     audience: fiapx-video-api
