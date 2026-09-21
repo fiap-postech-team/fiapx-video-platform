@@ -22,6 +22,10 @@ app:
   web:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173
   video:
+    storage-mode: ${APP_VIDEO_STORAGE_MODE:mock}
+    # Demonstrative local lifecycle only; no media processing is performed.
+    local-result-simulator-enabled: ${APP_VIDEO_LOCAL_RESULT_SIMULATOR_ENABLED:true}
+    local-result-simulator-result: ${APP_VIDEO_LOCAL_RESULT_SIMULATOR_RESULT:COMPLETED}
     internal-endpoint: ${S3_ENDPOINT:http://localhost:9000}
     public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
     access-key: ${S3_ACCESS_KEY:fiapx-video-api}

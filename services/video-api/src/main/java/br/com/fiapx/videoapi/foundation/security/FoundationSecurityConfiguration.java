@@ -73,6 +73,10 @@ public final class FoundationSecurityConfiguration {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(Environment environment) {
+        if (environment.matchesProfiles("local")
+            && "mock".equalsIgnoreCase(environment.getProperty("app.video.storage-mode"))) {
+            return WebCors.localMockSource(environment.getProperty("app.video.local-allowed-origin"));
+        }
         return WebCors.source(environment.getProperty("app.web.allowed-origins", ""));
     }
 
@@ -94,6 +98,7 @@ public final class FoundationSecurityConfiguration {
         authorize.requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout").permitAll();
         if (environment.matchesProfiles("local")) {
             authorize.requestMatchers(
+                "/_local/mock-storage/uploads/**",
                 "/swagger-ui.html",
                 "/swagger-ui/**",
                 "/openapi.yaml",

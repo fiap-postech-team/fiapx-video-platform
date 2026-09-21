@@ -10,8 +10,14 @@ import java.util.UUID;
 public interface JobStore {
     Job save(Job job);
     Optional<Job> findOwned(UUID id, UUID userId);
+    default Optional<Job> findForVideo(UUID userId, UUID videoId) {
+        return Optional.empty();
+    }
     default List<Job> findOwnedPage(UUID userId, Instant createdBefore, UUID idBefore, int limit) {
         throw new UnsupportedOperationException();
+    }
+    default List<Job> findAwaitingLocalDemo(int limit) {
+        return List.of();
     }
     default void applyResult(JobResultEvent event) {
         throw new UnsupportedOperationException();

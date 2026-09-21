@@ -42,6 +42,16 @@ public final class JpaVideoStore implements VideoStore {
         return videos.expiredUncleaned(limit);
     }
 
+    public List<Video> findOwnedPage(UUID userId, int offset, int limit) {
+        return videos.findOwnedPage(userId, offset, limit).stream().map(VideoEntity::toDomain).toList();
+    }
+
+    public long countOwned(UUID userId) { return videos.countByUserId(userId); }
+
+    public Optional<Video> findOwnedById(UUID userId, UUID videoId) {
+        return videos.findByIdAndUserId(videoId, userId).map(VideoEntity::toDomain);
+    }
+
     public Video save(Video video) {
         return videos.save(new VideoEntity(video)).toDomain();
     }

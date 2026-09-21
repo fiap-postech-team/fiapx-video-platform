@@ -47,6 +47,7 @@ abstract class VideoUploadIntegrationSupport {
         registry.add("app.video.public-endpoint", VideoUploadIntegrationSupport::minioUrl);
         registry.add("app.video.access-key", () -> USER);
         registry.add("app.video.secret-key", () -> PASSWORD);
+        registry.add("app.video.storage-mode", () -> "s3");
     }
 
     static String minioUrl() {
