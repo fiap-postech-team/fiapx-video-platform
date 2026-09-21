@@ -135,7 +135,6 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
           <span className={`result-icon ${phase === 'success' ? 'is-success' : 'is-error'}`} aria-hidden="true" />
           <h2>{phase === 'success' ? copy.upload.successTitle : copy.upload.processingFailed}</h2>
           <p>{phase === 'success' ? copy.upload.successCopy : copy.detail.failedHint}</p>
-          {import.meta.env.DEV && <p className="page-note">{copy.upload.localDemoNote}</p>}
           <p className={`status-badge ${phase === 'success' ? 'is-uploaded' : 'is-failed'}`}>{phase === 'success' ? copy.upload.successStatus : copy.lifecycleStatus.failed}</p>
           <div className="result-actions">
             <button type="button" onClick={onFinished}>{copy.upload.successAction}</button>
@@ -211,7 +210,6 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
               <p className="status-badge is-processing">{copy.processingStatus.processing}</p>
               <h2>{copy.upload.processingTitle}</h2>
               <p>{copy.upload.processingCopy}</p>
-              {import.meta.env.DEV && <p className="page-note">{copy.upload.localDemoNote}</p>}
             </div>
           )}
 
@@ -243,10 +241,13 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
               {copy.upload.submit}
             </button>
           )}
-          {(phase === 'sending' || phase === 'confirming' || phase === 'processing') && (
+          {(phase === 'sending' || phase === 'confirming') && (
             <button type="button" disabled>
-              {phase === 'sending' ? copy.upload.sendingTitle : phase === 'confirming' ? copy.upload.confirmingTitle : copy.upload.processingTitle}
+              {phase === 'sending' ? copy.upload.sendingTitle : copy.upload.confirmingTitle}
             </button>
+          )}
+          {phase === 'processing' && (
+            <button type="button" onClick={onFinished}>{copy.upload.back}</button>
           )}
           {phase === 'error' && (
             <div className="result-actions">

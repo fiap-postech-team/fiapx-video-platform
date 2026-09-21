@@ -48,7 +48,7 @@ URL local: [http://localhost:5173](http://localhost:5173).
 
 Crie uma conta em Cadastrar e entre com o mesmo e-mail e senha. A senha da API tem no mínimo 12 caracteres; a interface continua validando 8 a 128 e mostra uma falha genérica se o serviço recusar o cadastro.
 
-Formatos aceitos: MP4, MOV, WebM e MKV, com arquivo não vazio e até 500 MB (500.000.000 bytes). A pessoa confirma a decisão antes da reserva; depois, a tela mostra o progresso real do `PUT`, confirma o objeto e acompanha o job até “Concluído” ou “Falhou”. No perfil local, o backend usa armazenamento e resultado demonstrativos, identificados na interface.
+Formatos aceitos: MP4, MOV, WebM e MKV, com arquivo não vazio e até 500 MB (500.000.000 bytes). A pessoa confirma a decisão antes da reserva; depois, a tela mostra o progresso real do `PUT`, confirma o objeto e acompanha o job até “Concluído” ou “Falhou”. O `POST /v1/jobs` sai só com bearer e `Content-Type`. A interface não envia `Idempotency-Key`: o CORS local não inclui esse cabeçalho e o navegador bloquearia a chamada. Um processamento por vídeo continua garantido no serviço. No perfil local, o backend ainda usa armazenamento e resultado demonstrativos, sem indicar isso na interface.
 
 ## Verificação
 

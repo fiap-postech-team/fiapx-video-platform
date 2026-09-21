@@ -88,7 +88,32 @@ describe('VideoHttpService', () => {
 
     const detail = await service.get('t7nsTQEuS4KPGL-Cz5DZaw')
     expect(detail?.processing).toBeNull()
+    expect(detail?.activityAt).toBe('2026-09-20T14:10:00Z')
     await expect(service.get('missing')).resolves.toBeNull()
+  })
+
+  it('reads a detail payload that omits activityAt', async () => {
+    const authorizedFetch = vi.fn().mockResolvedValue(json(200, {
+      videoRef: 'P2mERuvaT42euOkTh2XjXw',
+      originalFilename: 'browser-copy.mp4',
+      status: 'PROCESSING',
+      submittedAt: '2026-09-21T23:34:51.228727Z',
+      uploadedAt: '2026-09-21T23:34:51.256453Z',
+      processing: {
+        status: 'QUEUED',
+        requestedAt: '2026-09-21T23:34:51.273052Z',
+        startedAt: null,
+        finishedAt: null,
+      },
+    }))
+    const service = new VideoHttpService(authorizedFetch, 'http://localhost:8080')
+
+    await expect(service.get('P2mERuvaT42euOkTh2XjXw')).resolves.toMatchObject({
+      originalFilename: 'browser-copy.mp4',
+      status: 'PROCESSING',
+      activityAt: '2026-09-21T23:34:51.273052Z',
+      processing: { status: 'QUEUED', startedAt: null, finishedAt: null },
+    })
   })
 
   it('sends exact storage headers, reports byte progress and tracks the job to completion', async () => {
@@ -169,7 +194,7 @@ describe('VideoHttpService', () => {
     expect(request.send).toHaveBeenCalledTimes(1)
   })
 
-  it('repeats an uncertain job creation with the same idempotency key', async () => {
+  it('repeats an uncertain job creation without an idempotency key', async () => {
     const authorizedFetch = vi.fn()
       .mockResolvedValueOnce(json(201, reservation))
       .mockResolvedValueOnce(json(200, confirmed))
@@ -188,8 +213,9 @@ describe('VideoHttpService', () => {
     expect(jobCalls).toHaveLength(2)
     expect(jobCalls[0]?.[1]).toEqual(jobCalls[1]?.[1])
     expect(jobCalls[0]?.[1]).toMatchObject({
-      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `video:${reservation.videoId}` },
+      headers: { 'Content-Type': 'application/json' },
     })
+    expect(jobCalls[0]?.[1].headers).not.toHaveProperty('Idempotency-Key')
   })
 
   it('normalizes an empty browser MIME before reserving an MKV upload', async () => {

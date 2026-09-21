@@ -112,7 +112,7 @@ export class VideoHttpService implements VideoService {
 
   private async startAndTrack(confirmed: ConfirmedVideo, options: UploadOptions): Promise<UploadResult> {
     options.onPhase('processing')
-    const job = await this.createJob(confirmed.sourceKey, `video:${confirmed.videoId}`)
+    const job = await this.createJob(confirmed.sourceKey)
     let current = job
     options.onJobStatus(current.status)
     while (current.status === 'PENDING' || current.status === 'PROCESSING') {
@@ -123,9 +123,9 @@ export class VideoHttpService implements VideoService {
     return { videoId: confirmed.videoId, jobId: current.id, status: current.status }
   }
 
-  private async createJob(sourceKey: string, key: string): Promise<Job> {
+  private async createJob(sourceKey: string): Promise<Job> {
     const request = () => this.authorizedFetch(`${this.baseUrl}/v1/jobs`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key }, body: JSON.stringify({ sourceKey }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceKey }),
     })
     let response: Response
     try { response = await request() } catch { response = await request() }
@@ -197,13 +197,30 @@ function readItem(value: unknown): VideoLibraryItem {
 }
 
 function readDetail(record: Record<string, unknown>): VideoDetail {
-  const item = readItem(record)
+  const submittedAt = asString(record.submittedAt)
+  const uploadedAt = record.uploadedAt == null ? null : asString(record.uploadedAt)
+  const processing = readProcessing(record.processing)
   return {
-    ...item,
-    activityAt: asString(record.activityAt),
-    uploadedAt: record.uploadedAt === null ? null : asString(record.uploadedAt),
-    processing: readProcessing(record.processing),
+    videoRef: asString(record.videoRef),
+    originalFilename: asString(record.originalFilename),
+    status: asVideoStatus(record.status),
+    submittedAt,
+    activityAt: activityAt(record.activityAt, processing, uploadedAt, submittedAt),
+    uploadedAt,
+    processing,
   }
+}
+
+function activityAt(
+  value: unknown,
+  processing: VideoDetail['processing'],
+  uploadedAt: string | null,
+  submittedAt: string,
+): string {
+  if (typeof value === 'string' && value.length > 0) {
+    return value
+  }
+  return processing?.finishedAt ?? processing?.startedAt ?? processing?.requestedAt ?? uploadedAt ?? submittedAt
 }
 
 function readProcessing(value: unknown): VideoDetail['processing'] {
