@@ -12,6 +12,7 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.Customizer;
 import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.ObjectProvider;
 import br.com.fiapx.videoapi.identity.adapter.in.security.LocalJwtAuthenticationConverter;
@@ -52,6 +53,7 @@ public final class FoundationSecurityConfiguration {
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler))
+            .cors(Customizer.withDefaults())
             .authorizeHttpRequests(authorize -> authorizeRequests(authorize, environment));
         configureResourceServer(http, decoder.getIfAvailable(), converter.getIfAvailable());
         return http.build();
@@ -83,6 +85,7 @@ public final class FoundationSecurityConfiguration {
         authorize.requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout").permitAll();
         if (environment.matchesProfiles("local")) {
             authorize.requestMatchers(
+                "/_local/mock-storage/uploads/**",
                 "/swagger-ui.html",
                 "/swagger-ui/**",
                 "/openapi.yaml",

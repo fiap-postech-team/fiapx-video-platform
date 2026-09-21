@@ -19,6 +19,9 @@ import br.com.fiapx.videoapi.jobs.application.VideoNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadConflictException;
 import br.com.fiapx.videoapi.videos.application.StorageUnavailableException;
+import br.com.fiapx.videoapi.videos.adapter.configuration.LocalMockVideoObjectStorage.UploadExpiredException;
+import br.com.fiapx.videoapi.videos.adapter.configuration.LocalMockVideoObjectStorage.UploadTooLargeException;
+import br.com.fiapx.videoapi.videos.adapter.configuration.LocalMockVideoObjectStorage.UploadConflictException;
 
 /**
  * Converts failures reaching the MVC boundary into the shared sanitized error contract.
@@ -54,7 +57,7 @@ public final class ApiExceptionHandler {
         LOGGER.error(
             "Unexpected HTTP failure method={} path={} exceptionType={}",
             request.getMethod(),
-            request.getRequestURI(),
+            safePath(request),
             exception.getClass().getName()
         );
         return response(ProblemType.INTERNAL_ERROR, request);
@@ -71,9 +74,19 @@ public final class ApiExceptionHandler {
     }
 
     @ExceptionHandler({EmailAlreadyRegisteredException.class, IdempotencyConflictException.class,
-        VideoNotConfirmedException.class, VideoUploadConflictException.class})
+        VideoNotConfirmedException.class, VideoUploadConflictException.class, UploadConflictException.class})
     ResponseEntity<ProblemDetail> handleStateConflict(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.CONFLICT, request);
+    }
+
+    @ExceptionHandler(UploadExpiredException.class)
+    ResponseEntity<ProblemDetail> handleUploadExpired(UploadExpiredException exception, HttpServletRequest request) {
+        return response(ProblemType.UPLOAD_URL_EXPIRED, request);
+    }
+
+    @ExceptionHandler(UploadTooLargeException.class)
+    ResponseEntity<ProblemDetail> handleUploadTooLarge(UploadTooLargeException exception, HttpServletRequest request) {
+        return response(ProblemType.PAYLOAD_TOO_LARGE, request);
     }
 
     @ExceptionHandler(StorageUnavailableException.class)
@@ -90,6 +103,14 @@ public final class ApiExceptionHandler {
     private ResponseEntity<ProblemDetail> response(ProblemType type, HttpServletRequest request) {
         return ResponseEntity.status(type.status())
             .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-            .body(problems.create(type, URI.create(request.getRequestURI())));
+            .body(problems.create(type, URI.create(safePath(request))));
+    }
+
+    /** Prevents the single-use local-upload capability from reaching logs or API responses. */
+    private String safePath(HttpServletRequest request) {
+        var path = request.getRequestURI();
+        return path.startsWith("/_local/mock-storage/uploads/")
+            ? "/_local/mock-storage/uploads"
+            : path;
     }
 }

@@ -2,6 +2,27 @@ openapi: 3.1.0
 info: { title: FIAP X Video API, version: 0.1.0 }
 servers: [ { url: 'http://localhost:8080' } ]
 paths:
+  /_local/mock-storage/uploads/{capability}:
+    put:
+      summary: Recebe um vídeo pelo storage mockado local
+      description: Disponível somente com `app.video.storage-mode=mock`; a capacidade é temporária e não deve ser persistida.
+      parameters:
+        - { name: capability, in: path, required: true, schema: { type: string } }
+        - { name: If-None-Match, in: header, required: true, schema: { type: string, enum: [ '*' ] } }
+        - { name: x-amz-checksum-sha256, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          video/mp4: { schema: { type: string, format: binary } }
+          video/quicktime: { schema: { type: string, format: binary } }
+          video/webm: { schema: { type: string, format: binary } }
+          video/x-matroska: { schema: { type: string, format: binary } }
+      responses:
+        '200': { description: Arquivo recebido }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { description: Autorização de upload expirada, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        '413': { description: Arquivo acima do limite, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
   /v1/auth/register:
     post:
       summary: Cadastra uma conta USER

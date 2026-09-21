@@ -31,6 +31,7 @@ public final class EnvironmentSafetyValidator implements EnvironmentPostProcesso
         }
         validate(environment, bindProperties(environment));
         if (!environment.matchesProfiles("local")) {
+            rejectMockStorage(environment);
             requireAuthConfiguration(environment);
         }
     }
@@ -105,6 +106,12 @@ public final class EnvironmentSafetyValidator implements EnvironmentPostProcesso
         requireValue("app.auth.key-id", environment.getProperty("app.auth.key-id"));
         requireValue("app.auth.private-key-base64", environment.getProperty("app.auth.private-key-base64"));
         requireValue("app.auth.public-key-base64", environment.getProperty("app.auth.public-key-base64"));
+    }
+
+    private void rejectMockStorage(Environment environment) {
+        if ("mock".equalsIgnoreCase(environment.getProperty("app.video.storage-mode"))) {
+            throw new IllegalStateException("app.video.storage-mode=mock is only allowed in the local profile");
+        }
     }
 
     private void rejectLocalDefault(String propertyName, String value, String localDefault) {

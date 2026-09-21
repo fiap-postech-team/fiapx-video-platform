@@ -20,8 +20,18 @@ public final class JpaJobStore implements JobStore {
         return saved;
     }
     public Optional<Job> findOwned(UUID id, UUID userId) { return repository.findByIdAndUserId(id, userId).map(JobEntity::toDomain); }
+    public Optional<Job> findForVideo(UUID userId, UUID videoId) {
+        return repository.findByUserIdAndVideoIdAndSourceKind(userId, videoId,
+            br.com.fiapx.videoapi.jobs.domain.JobSourceKind.VIDEO).map(JobEntity::toDomain);
+    }
     public List<Job> findOwnedPage(UUID userId, Instant createdBefore, UUID idBefore, int limit) {
         return repository.findOwnedPage(userId, createdBefore, idBefore, limit).stream().map(JobEntity::toDomain).toList();
+    }
+    public List<Job> findAwaitingLocalDemo(int limit) {
+        return repository.findTop25ByStatusInOrderByCreatedAtAsc(List.of(
+            br.com.fiapx.videoapi.jobs.domain.JobStatus.PENDING,
+            br.com.fiapx.videoapi.jobs.domain.JobStatus.PROCESSING
+        )).stream().limit(limit).map(JobEntity::toDomain).toList();
     }
     public void applyResult(JobResultEvent event) {
         var entity = repository.findById(event.jobId()).orElseThrow();

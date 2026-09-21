@@ -35,6 +35,10 @@ public enum ProblemType {
     ),
     NOT_FOUND("not-found", "Não encontrado", 404, "Recurso não encontrado."),
     CONFLICT("conflict", "Conflito", 409, "O recurso informado já existe."),
+    UPLOAD_URL_EXPIRED("upload-url-expired", "Envio expirado", 410,
+        "A autorização de envio expirou."),
+    PAYLOAD_TOO_LARGE("payload-too-large", "Arquivo muito grande", 413,
+        "O arquivo enviado excede o limite permitido."),
     STORAGE_UNAVAILABLE("storage-unavailable", "Storage indisponível", 503,
         "Não foi possível acessar o armazenamento de vídeos agora."),
     /** An unexpected failure was replaced with a safe client response. */

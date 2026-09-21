@@ -13,6 +13,7 @@ import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -34,6 +35,7 @@ public class VideoUploadConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "s3", matchIfMissing = true)
     AwsCredentialsProvider videoStorageCredentials(VideoUploadProperties p) {
         if (p.accessKey() == null || p.accessKey().isBlank()) {
             return DefaultCredentialsProvider.create();
@@ -42,6 +44,7 @@ public class VideoUploadConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "s3", matchIfMissing = true)
     S3Client videoS3Client(VideoUploadProperties p, AwsCredentialsProvider credentials) {
         var builder = S3Client.builder().region(Region.of(p.region())).credentialsProvider(credentials);
         if (p.internalEndpoint() != null && !p.internalEndpoint().isBlank()) {
@@ -51,6 +54,7 @@ public class VideoUploadConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "s3", matchIfMissing = true)
     S3Presigner videoS3Presigner(VideoUploadProperties p, AwsCredentialsProvider credentials) {
         var builder = S3Presigner.builder().region(Region.of(p.region())).credentialsProvider(credentials);
         var publicEndpoint = p.publicEndpoint() == null || p.publicEndpoint().isBlank()
@@ -63,8 +67,26 @@ public class VideoUploadConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "s3", matchIfMissing = true)
     VideoObjectStorage videoObjectStorage(S3Client client, S3Presigner presigner, VideoUploadProperties p) {
         return new S3VideoObjectStorage(client, presigner, p.bucket());
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "mock")
+    LocalMockVideoObjectStorage localMockVideoObjectStorage(
+        VideoUploadProperties properties,
+        Clock clock,
+        @org.springframework.beans.factory.annotation.Value("${app.video.local-public-endpoint}") String publicEndpoint,
+        @org.springframework.beans.factory.annotation.Value("${app.video.local-directory}") String directory
+    ) {
+        return new LocalMockVideoObjectStorage(properties.maxSizeBytes(), publicEndpoint, java.nio.file.Path.of(directory), clock);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "mock")
+    VideoObjectStorage videoObjectStorage(LocalMockVideoObjectStorage storage) {
+        return storage;
     }
 
     @Bean
