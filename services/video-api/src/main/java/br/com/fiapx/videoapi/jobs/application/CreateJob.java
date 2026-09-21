@@ -44,12 +44,9 @@ public final class CreateJob {
         if (!video.isConfirmed()) {
             throw new VideoNotConfirmedException();
         }
-        var forVideo = jobs.findForVideo(userId, video.id());
-        if (forVideo.isPresent()) {
-            if (idempotencyKey != null) {
-                idempotency.record(userId, idempotencyKey, fingerprint, forVideo.get().id());
-            }
-            return forVideo.get();
+        videos.lock(video.id()).orElseThrow(VideoNotFoundException::new);
+        if (jobs.findVisibleByVideoId(video.id()).isPresent()) {
+            throw new ProcessingAlreadyExistsException();
         }
         var job = jobs.save(new Job(UUID.randomUUID(), userId, video.id(), sourceKey, clock.instant()));
         if (idempotencyKey != null) {

@@ -19,6 +19,8 @@ springdoc:
     try-it-out-enabled: false
 
 app:
+  web:
+    allowed-origins: http://localhost:5173,http://127.0.0.1:5173
   video:
     storage-mode: ${APP_VIDEO_STORAGE_MODE:mock}
     # Demonstrative local lifecycle only; no media processing is performed.

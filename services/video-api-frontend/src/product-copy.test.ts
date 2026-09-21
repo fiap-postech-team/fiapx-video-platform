@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { COPY_INVENTORY, copy, findForbiddenTerms } from './product-copy'
-import { lifecycleStatus, lifecycleStatusLabel } from './videos/application/product-status'
+import { lifecycleStatusLabel } from './videos/application/product-status'
 import { demoVideos } from './videos/infrastructure/fixtures'
 
 describe('product copy inventory', () => {
@@ -21,7 +21,7 @@ describe('product copy inventory', () => {
   })
 
   it('maps each fixture to one owner-facing lifecycle label', () => {
-    const labels = demoVideos().map((video) => lifecycleStatusLabel(lifecycleStatus(video)))
+    const labels = demoVideos().map((video) => lifecycleStatusLabel(video.item.status))
     expect(labels).toEqual([
       copy.lifecycleStatus.pending,
       copy.lifecycleStatus.processing,

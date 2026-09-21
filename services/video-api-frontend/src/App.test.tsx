@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { AuthenticationService } from './auth/domain/authentication'
+import { AuthenticationFailure, type AuthenticationService } from './auth/domain/authentication'
 import { DEMO_CREDENTIALS, DEMO_USER, MockAuthenticationService } from './auth/infrastructure/mock-authentication-service'
 import { copy, findForbiddenTerms } from './product-copy'
 import { MockVideoService } from './videos/infrastructure/mock-video-service'
@@ -13,12 +13,14 @@ function serviceReturning(
   return {
     authenticate: vi.fn().mockResolvedValue(result),
     register: vi.fn(),
+    bootstrap: vi.fn().mockResolvedValue({ user: null }),
     logout: vi.fn().mockResolvedValue(undefined),
+    authorizedFetch: vi.fn(),
   }
 }
 
 async function signIn(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(copy.access.emailLabel), DEMO_CREDENTIALS.email)
+  await user.type(await screen.findByLabelText(copy.access.emailLabel), DEMO_CREDENTIALS.email)
   await user.type(screen.getByLabelText(copy.access.passwordLabel), DEMO_CREDENTIALS.password)
   await user.click(screen.getByRole('button', { name: copy.access.loginSubmit }))
   await screen.findByRole('heading', { name: copy.videos.title })
@@ -34,7 +36,7 @@ describe('access', () => {
     const authenticationService = serviceReturning({ error: { code: 'INVALID_CREDENTIALS', message: 'internal' } })
     render(<App authenticationService={authenticationService} />)
 
-    expect(screen.getByRole('heading', { name: copy.access.loginTitle })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: copy.access.loginTitle })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: copy.access.createTab })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.access.loginSubmit }))
     expect(screen.getByText(copy.access.emailRequired)).toHaveAttribute('role', 'alert')
@@ -46,7 +48,7 @@ describe('access', () => {
     const user = userEvent.setup()
     render(<App authenticationService={new MockAuthenticationService()} videoService={new MockVideoService()} />)
 
-    await user.click(screen.getByRole('tab', { name: copy.access.createTab }))
+    await user.click(await screen.findByRole('tab', { name: copy.access.createTab }))
     await user.type(screen.getByLabelText(copy.access.emailLabel), 'nova@fiapx.local')
     await user.type(screen.getByLabelText(copy.access.passwordLabel), 'SenhaSegura123')
     await user.type(screen.getByLabelText(copy.access.confirmPasswordLabel), 'SenhaSegura123')
@@ -62,7 +64,7 @@ describe('access', () => {
     const { rerender } = render(
       <App authenticationService={serviceReturning({ error: { code: 'INVALID_CREDENTIALS', message: 'internal' } })} />,
     )
-    await user.type(screen.getByLabelText(copy.access.emailLabel), DEMO_CREDENTIALS.email)
+    await user.type(await screen.findByLabelText(copy.access.emailLabel), DEMO_CREDENTIALS.email)
     await user.type(screen.getByLabelText(copy.access.passwordLabel), DEMO_CREDENTIALS.password)
     await user.click(screen.getByRole('button', { name: copy.access.loginSubmit }))
     expect(await screen.findByRole('alert')).toHaveTextContent(copy.access.invalidCredentials)
@@ -70,6 +72,22 @@ describe('access', () => {
     rerender(
       <App authenticationService={serviceReturning({ error: { code: 'AUTHENTICATION_UNAVAILABLE', message: 'internal' } })} />,
     )
+    await user.type(await screen.findByLabelText(copy.access.emailLabel), DEMO_CREDENTIALS.email)
+    await user.type(screen.getByLabelText(copy.access.passwordLabel), DEMO_CREDENTIALS.password)
+    await user.click(screen.getByRole('button', { name: copy.access.loginSubmit }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(copy.access.loginUnavailable)
+  })
+
+  it('restores a valid session without asking for a password', async () => {
+    const authenticationService = serviceReturning({ user: DEMO_USER })
+    authenticationService.bootstrap = vi.fn().mockResolvedValue({ user: DEMO_USER })
+    render(
+      <App authenticationService={authenticationService} videoService={new MockVideoService()} />,
+    )
+
+    expect(await screen.findByRole('heading', { name: copy.videos.title })).toBeInTheDocument()
+    expect(screen.queryByLabelText(copy.access.passwordLabel)).not.toBeInTheDocument()
+    expect(screen.getAllByText(DEMO_USER.email).length).toBeGreaterThan(0)
   })
 })
 
@@ -88,9 +106,9 @@ describe('authenticated product', () => {
     expect(screen.getByRole('columnheader', { name: copy.videos.colDate })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: copy.videos.colStatus })).toBeInTheDocument()
     expect(screen.getByText('campanha.mp4')).toBeInTheDocument()
-    expect(screen.getAllByText(copy.lifecycleStatus.processing).length).toBeGreaterThan(1)
-    expect(screen.getAllByText(copy.lifecycleStatus.available).length).toBeGreaterThan(1)
-    expect(screen.queryByText(copy.videoStatus.uploaded)).not.toBeInTheDocument()
+    expect(screen.getAllByText(copy.lifecycleStatus.processing).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(copy.lifecycleStatus.available).length).toBeGreaterThan(0)
+    expect(screen.queryByText('5/8')).not.toBeInTheDocument()
     expect(screen.queryByText(copy.processingStatus.completed)).not.toBeInTheDocument()
     expect(screen.getAllByText('campanha.mp4')).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: copy.shell.navUpload }).length).toBeGreaterThan(0)
@@ -104,7 +122,7 @@ describe('authenticated product', () => {
     assertProductLanguage()
   })
 
-  it('opens a dedicated detail with history and a simulated download', async () => {
+  it('opens a dedicated detail with a single timeline and no retry or download', async () => {
     const user = userEvent.setup()
     render(
       <App
@@ -119,12 +137,9 @@ describe('authenticated product', () => {
 
     expect(await screen.findByRole('heading', { name: 'campanha.mp4' })).toBeInTheDocument()
     expect(screen.getByText(copy.detail.sent)).toBeInTheDocument()
-    expect(screen.getByText(copy.detail.history)).toBeInTheDocument()
     expect(screen.getByText(copy.lifecycleStatus.available)).toBeInTheDocument()
-    expect(screen.getByText(copy.processingStatus.error)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: copy.detail.download }))
-    expect(screen.getByRole('status')).toHaveTextContent(copy.detail.downloadSimulated)
+    expect(screen.queryByText('Processamentos anteriores')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Baixar/ })).not.toBeInTheDocument()
     assertProductLanguage()
   })
 
@@ -140,22 +155,6 @@ describe('authenticated product', () => {
     expect(await screen.findByText(copy.videos.emptyBody)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: copy.videos.emptyAction })).toBeInTheDocument()
     expect(screen.queryByText(copy.prototype.title)).not.toBeInTheDocument()
-  })
-
-  it('explains when search or status filters hide every row', async () => {
-    const user = userEvent.setup()
-    render(
-      <App
-        authenticationService={serviceReturning({ user: DEMO_USER })}
-        videoService={new MockVideoService()}
-      />,
-    )
-    await signIn(user)
-
-    await user.type(screen.getByPlaceholderText(copy.videos.searchPlaceholder), 'arquivo-inexistente')
-    expect(screen.getByText(copy.videos.filterEmpty)).toBeInTheDocument()
-    expect(screen.getByText(copy.videos.filterEmptyHint)).toBeInTheDocument()
-    expect(screen.queryByText(copy.videos.emptyBody)).not.toBeInTheDocument()
   })
 
   it('shows a recoverable load error', async () => {
@@ -213,5 +212,20 @@ describe('authenticated product', () => {
 
     expect(await screen.findByRole('heading', { name: copy.access.loginTitle })).toBeInTheDocument()
     expect(authenticationService.logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the authenticated area when leaving the account fails', async () => {
+    const user = userEvent.setup()
+    const authenticationService = serviceReturning({ user: DEMO_USER })
+    authenticationService.logout = vi.fn().mockRejectedValue(
+      new AuthenticationFailure({ code: 'LOGOUT_FAILED', message: copy.shell.logoutUnavailable }),
+    )
+    render(<App authenticationService={authenticationService} videoService={new MockVideoService()} />)
+    await signIn(user)
+    await user.click(screen.getByRole('button', { name: copy.shell.logout }))
+
+    expect(screen.getByRole('heading', { name: copy.videos.title })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(copy.shell.logoutUnavailable)
+    expect(screen.getByRole('button', { name: copy.shell.logoutRetry })).toBeInTheDocument()
   })
 })

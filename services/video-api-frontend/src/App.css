@@ -6,6 +6,45 @@
   min-height: 100vh;
 }
 
+.session-check {
+  align-items: center;
+  background: var(--paper);
+  color: var(--muted);
+  display: grid;
+  min-height: 100vh;
+  padding: 2rem 2.25rem;
+  place-items: center;
+}
+
+.session-check p {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.session-banner {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding: .9rem 1.15rem;
+}
+
+.session-banner p {
+  color: var(--ink);
+  font-size: 1rem;
+  margin: 0;
+}
+
+.session-banner button {
+  width: auto;
+}
+
 .proof-sheet {
   background: var(--rail);
   color: #eef0f3;
@@ -424,8 +463,8 @@ button:disabled { cursor: not-allowed; opacity: .38; }
   white-space: nowrap;
 }
 
-.is-pending { background: #f3ead0; color: #6a5416; }
-.is-uploaded, .is-processing { background: #e7edff; color: #233a86; }
+.is-pending, .is-uploaded { background: #f3ead0; color: #6a5416; }
+.is-processing { background: #e7edff; color: #233a86; }
 .is-rejected, .is-failed, .is-proc-error { background: #fde8e4; color: #9b1c10; }
 .is-expired { background: #ece7e1; color: #5c4a3a; }
 .is-available, .is-proc-completed { background: #e7f3dc; color: #2d5a18; }
@@ -441,7 +480,32 @@ button:disabled { cursor: not-allowed; opacity: .38; }
 }
 .empty-state.compact { margin: .75rem 1.15rem 1.15rem; }
 .empty-state .btn-primary { margin-top: .9rem; }
-.load-more { margin-top: 1rem; }
+.page-nav {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-top: 1rem;
+}
+.page-nav .btn-quiet,
+.page-number {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: .45rem .75rem;
+  width: auto;
+}
+.page-number {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 500;
+}
+.page-number.is-current {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
 
 .detail-header { display: grid; gap: .65rem; margin-bottom: 1.35rem; }
 .detail-header .status-badge { justify-self: start; }

@@ -1,36 +1,29 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { copy, interpolate } from '../../product-copy'
 import { formatDateTime } from '../application/format-datetime'
-import { lifecycleStatus, lifecycleStatusLabel } from '../application/product-status'
-import { LIFECYCLE_STATUSES, type LifecycleStatusKey, type PrototypeScenario, type Video, type VideoService } from '../domain/video'
+import { lifecycleStatusLabel, lifecycleTone } from '../application/product-status'
+import type { PrototypeScenario, VideoLibraryItem, VideoService } from '../domain/video'
 
 interface VideoListProps {
-  userId: string
   videoService: VideoService
   scenario: PrototypeScenario
-  onOpen: (videoId: string) => void
+  onOpen: (videoRef: string) => void
   onUpload: () => void
 }
 
-const PAGE_SIZE = 20
-const STATUS_FILTERS: Array<'all' | LifecycleStatusKey> = ['all', ...LIFECYCLE_STATUSES]
-
-export function VideoList({ userId, videoService, scenario, onOpen, onUpload }: VideoListProps) {
-  const [videos, setVideos] = useState<Video[]>([])
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
+export function VideoList({ videoService, scenario, onOpen, onUpload }: VideoListProps) {
+  const [items, setItems] = useState<VideoLibraryItem[]>([])
+  const [page, setPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [failed, setFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | LifecycleStatusKey>('all')
 
   useEffect(() => {
     let cancelled = false
     setIsLoading(true)
     setFailed(false)
-    setVideos([])
-    setNextCursor(null)
 
     if (scenario.kind === 'loading') {
       return () => {
@@ -39,15 +32,15 @@ export function VideoList({ userId, videoService, scenario, onOpen, onUpload }: 
     }
 
     videoService
-      .list(userId, { limit: PAGE_SIZE, scenario })
-      .then((page) => {
+      .list(page, { scenario })
+      .then((result) => {
         if (cancelled) return
-        setVideos(page.items)
-        setNextCursor(page.nextCursor)
+        setItems(result.items)
+        setTotalItems(result.totalItems)
+        setTotalPages(result.totalPages)
       })
       .catch(() => {
-        if (cancelled) return
-        setFailed(true)
+        if (!cancelled) setFailed(true)
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -56,31 +49,7 @@ export function VideoList({ userId, videoService, scenario, onOpen, onUpload }: 
     return () => {
       cancelled = true
     }
-  }, [userId, videoService, scenario, reloadKey])
-
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return videos.filter((video) => {
-      const status = lifecycleStatus(video)
-      if (statusFilter !== 'all' && status !== statusFilter) return false
-      if (needle && !video.originalFilename.toLowerCase().includes(needle)) return false
-      return true
-    })
-  }, [videos, query, statusFilter])
-
-  async function loadMore() {
-    if (!nextCursor || isLoadingMore) return
-    setIsLoadingMore(true)
-    try {
-      const page = await videoService.list(userId, { cursor: nextCursor, limit: PAGE_SIZE, scenario })
-      setVideos((current) => [...current, ...page.items])
-      setNextCursor(page.nextCursor)
-    } catch {
-      setFailed(true)
-    } finally {
-      setIsLoadingMore(false)
-    }
-  }
+  }, [videoService, scenario, page, reloadKey])
 
   return (
     <section className="page-block" aria-labelledby="videos-title">
@@ -103,7 +72,7 @@ export function VideoList({ userId, videoService, scenario, onOpen, onUpload }: 
             {copy.videos.retry}
           </button>
         </div>
-      ) : videos.length === 0 ? (
+      ) : totalItems === 0 ? (
         <div className="empty-state">
           <h2>{copy.videos.emptyTitle}</h2>
           <p>{copy.videos.emptyBody}</p>
@@ -111,32 +80,6 @@ export function VideoList({ userId, videoService, scenario, onOpen, onUpload }: 
         </div>
       ) : (
         <>
-          <div className="list-toolbar">
-            <p className="list-count">{interpolate(copy.videos.count, { n: visible.length })}</p>
-            <label className="search-field">
-              <span className="visually-hidden">{copy.videos.searchLabel}</span>
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={copy.videos.searchPlaceholder}
-              />
-            </label>
-            <div className="filter-row" role="group" aria-label={copy.videos.colStatus}>
-              {STATUS_FILTERS.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={statusFilter === key ? 'filter-chip is-on' : 'filter-chip'}
-                  aria-pressed={statusFilter === key}
-                  onClick={() => setStatusFilter(key)}
-                >
-                  {key === 'all' ? copy.videos.filterAll : lifecycleStatusLabel(key)}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="video-table" role="table" aria-label={copy.videos.title}>
             <div className="video-head" role="row">
               <span role="columnheader">{copy.videos.colFile}</span>
@@ -144,40 +87,57 @@ export function VideoList({ userId, videoService, scenario, onOpen, onUpload }: 
               <span role="columnheader">{copy.videos.colStatus}</span>
               <span role="columnheader" className="video-head-action">{copy.videos.openDetail}</span>
             </div>
-            {visible.length === 0 ? (
-              <div className="empty-state compact">
-                <p>{copy.videos.filterEmpty}</p>
-                <p className="page-note">{copy.videos.filterEmptyHint}</p>
-              </div>
-            ) : (
-              visible.map((video) => {
-                const status = lifecycleStatus(video)
-                return (
-                  <div key={video.id} className="video-row" role="row">
-                    <span className="file-name" role="cell">{video.originalFilename}</span>
-                    <span className="file-date" role="cell">
-                      {video.uploadedAt ? formatDateTime(video.uploadedAt) : '—'}
-                    </span>
-                    <span role="cell">
-                      <span className={`status-badge is-${status}`}>{lifecycleStatusLabel(status)}</span>
-                    </span>
-                    <span role="cell" className="row-action">
-                      <button type="button" className="btn-quiet" onClick={() => onOpen(video.id)}>
-                        {copy.videos.openDetail}
-                      </button>
-                    </span>
-                  </div>
-                )
-              })
-            )}
+            {items.map((video) => {
+              const tone = lifecycleTone(video.status)
+              return (
+                <div key={video.videoRef} className="video-row" role="row">
+                  <span className="file-name" role="cell">{video.originalFilename}</span>
+                  <span className="file-date" role="cell">{formatDateTime(video.activityAt)}</span>
+                  <span role="cell">
+                    <span className={`status-badge is-${tone}`}>{lifecycleStatusLabel(video.status)}</span>
+                  </span>
+                  <span role="cell" className="row-action">
+                    <button type="button" className="btn-quiet" onClick={() => onOpen(video.videoRef)}>
+                      {copy.videos.openDetail}
+                    </button>
+                  </span>
+                </div>
+              )
+            })}
           </div>
+          {totalPages > 1 && (
+            <nav className="page-nav" aria-label={copy.videos.pagination}>
+              <button
+                type="button"
+                className="btn-quiet"
+                disabled={page <= 1}
+                onClick={() => setPage((current) => current - 1)}
+              >
+                {copy.videos.pagePrevious}
+              </button>
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map((number) => (
+                <button
+                  key={number}
+                  type="button"
+                  className={number === page ? 'page-number is-current' : 'page-number'}
+                  aria-current={number === page ? 'page' : undefined}
+                  aria-label={interpolate(copy.videos.pageLabel, { n: number })}
+                  onClick={() => setPage(number)}
+                >
+                  {number}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="btn-quiet"
+                disabled={page >= totalPages}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                {copy.videos.pageNext}
+              </button>
+            </nav>
+          )}
         </>
-      )}
-
-      {nextCursor && !failed && !isLoading && (
-        <button type="button" className="btn-quiet load-more" onClick={() => { void loadMore() }} disabled={isLoadingMore}>
-          {isLoadingMore ? copy.videos.loadMorePending : copy.videos.loadMore}
-        </button>
       )}
     </section>
   )

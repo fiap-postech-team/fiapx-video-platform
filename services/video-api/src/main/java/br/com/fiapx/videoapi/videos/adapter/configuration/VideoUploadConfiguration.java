@@ -85,7 +85,7 @@ public class VideoUploadConfiguration {
 
     @Bean
     @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "mock")
-    VideoObjectStorage videoObjectStorage(LocalMockVideoObjectStorage storage) {
+    VideoObjectStorage mockVideoObjectStorage(LocalMockVideoObjectStorage storage) {
         return storage;
     }
 

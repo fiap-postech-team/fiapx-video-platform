@@ -4,23 +4,17 @@ import br.com.fiapx.videoapi.identity.application.Login;
 import br.com.fiapx.videoapi.identity.application.LogoutSession;
 import br.com.fiapx.videoapi.identity.application.RefreshSession;
 import br.com.fiapx.videoapi.identity.application.RegisterUser;
-import br.com.fiapx.videoapi.identity.domain.IdentityUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import java.time.Duration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -93,7 +87,7 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    record CredentialsRequest(@NotBlank @Email String email, @NotBlank @Size(min = 12, max = 128) String password) {
+    record CredentialsRequest(@NotBlank @Email String email, @NotBlank @Size(min = 8, max = 128) String password) {
     }
 
     record LoginResponse(UserResponse user, String accessToken, String tokenType, long expiresIn) {

@@ -2,19 +2,21 @@ package br.com.fiapx.videoapi.foundation.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.config.Customizer;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.core.env.Environment;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.web.cors.CorsConfigurationSource;
 import br.com.fiapx.videoapi.identity.adapter.in.security.LocalJwtAuthenticationConverter;
 
 /**
@@ -37,23 +39,25 @@ public final class FoundationSecurityConfiguration {
         ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
         ProblemDetailAccessDeniedHandler accessDeniedHandler,
         CsrfTokenRepository csrfTokenRepository,
+        CorsConfigurationSource corsConfigurationSource,
         ObjectProvider<JwtDecoder> decoder,
         ObjectProvider<LocalJwtAuthenticationConverter> converter
     ) throws Exception {
+        var requestMatcherBuilder = PathPatternRequestMatcher.withDefaults();
         http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .csrf(csrf -> csrf.csrfTokenRepository(csrfTokenRepository)
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                 .requireCsrfProtectionMatcher(new OrRequestMatcher(
-                    new AntPathRequestMatcher("/v1/auth/refresh", "POST"),
-                    new AntPathRequestMatcher("/v1/auth/logout", "POST"))))
-            .httpBasic(httpBasic -> httpBasic.disable())
-            .formLogin(formLogin -> formLogin.disable())
-            .logout(logout -> logout.disable())
+                    requestMatcherBuilder.matcher(HttpMethod.POST, "/v1/auth/refresh"),
+                    requestMatcherBuilder.matcher(HttpMethod.POST, "/v1/auth/logout"))))
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .formLogin(AbstractHttpConfigurer::disable)
+            .logout(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint(authenticationEntryPoint)
                 .accessDeniedHandler(accessDeniedHandler))
-            .cors(Customizer.withDefaults())
             .authorizeHttpRequests(authorize -> authorizeRequests(authorize, environment));
         configureResourceServer(http, decoder.getIfAvailable(), converter.getIfAvailable());
         return http.build();
@@ -62,9 +66,14 @@ public final class FoundationSecurityConfiguration {
     @Bean
     CsrfTokenRepository csrfTokenRepository(Environment environment) {
         var repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        repository.setCookiePath("/v1/auth");
+        repository.setCookiePath("/");
         repository.setCookieCustomizer(cookie -> cookie.sameSite("Strict").secure(!environment.matchesProfiles("local")));
         return repository;
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(Environment environment) {
+        return WebCors.source(environment.getProperty("app.web.allowed-origins", ""));
     }
 
     private void configureResourceServer(HttpSecurity http, JwtDecoder decoder,
@@ -85,7 +94,6 @@ public final class FoundationSecurityConfiguration {
         authorize.requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout").permitAll();
         if (environment.matchesProfiles("local")) {
             authorize.requestMatchers(
-                "/_local/mock-storage/uploads/**",
                 "/swagger-ui.html",
                 "/swagger-ui/**",
                 "/openapi.yaml",
