@@ -67,20 +67,38 @@ class CreateJobTest {
                 .isInstanceOf(IdempotencyConflictException.class);
     }
 
+    @Test
+    void rejectsASecondProcessingForTheSameVideo() {
+        var jobs = new RecordingJobStore();
+        var userId = UUID.randomUUID();
+        var useCase = new CreateJob(jobs, new RecordingOutboxStore(), videos(userId), Clock.systemUTC());
+        useCase.execute(userId, "uploads/source.mp4");
+
+        assertThatThrownBy(() -> useCase.execute(userId, "uploads/source.mp4"))
+                .isInstanceOf(ProcessingAlreadyExistsException.class);
+        assertThat(jobs.savedCount).isEqualTo(1);
+    }
+
     private VideoStore videos(UUID userId) {
         var video = new Video(UUID.randomUUID(), userId, "uploads/source.mp4", "source.mp4", "video/mp4", 1,
             "a".repeat(64), VideoStatus.UPLOADED, Instant.EPOCH, Instant.EPOCH);
         return new VideoStore() {
             public Optional<Video> findConfirmed(UUID owner, String key) { return Optional.of(video); }
+            public Optional<Video> lock(UUID videoId) { return Optional.of(video); }
             public Video save(Video candidate) { return candidate; }
         };
     }
 
     private static final class RecordingJobStore implements JobStore {
         private Job saved;
-        public Job save(Job job) { saved = job; return job; }
+        private int savedCount;
+        public Job save(Job job) { saved = job; savedCount++; return job; }
         public Optional<Job> findOwned(UUID id, UUID userId) {
             return saved != null && saved.id().equals(id) && saved.userId().equals(userId)
+                    ? Optional.of(saved) : Optional.empty();
+        }
+        public Optional<Job> findVisibleByVideoId(UUID videoId) {
+            return saved != null && videoId.equals(saved.videoId()) && saved.libraryVisible()
                     ? Optional.of(saved) : Optional.empty();
         }
     }

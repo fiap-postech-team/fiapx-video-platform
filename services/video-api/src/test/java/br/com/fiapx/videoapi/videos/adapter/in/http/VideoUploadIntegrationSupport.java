@@ -79,6 +79,14 @@ abstract class VideoUploadIntegrationSupport {
         return client.exchange(url(path), HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
     }
 
+    ResponseEntity<Map> get(String path, String token) {
+        var headers = new HttpHeaders();
+        if (token != null) {
+            headers.setBearerAuth(token);
+        }
+        return client.exchange(url(path), HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+    }
+
     int put(Map<String, Object> upload, byte[] bytes) throws Exception {
         var builder = HttpRequest.newBuilder(URI.create((String) upload.get("uploadUrl")))
             .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes));

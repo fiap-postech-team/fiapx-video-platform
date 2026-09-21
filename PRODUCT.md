@@ -12,13 +12,13 @@ Primary user: the video owner. They create a USER account, sign in, send a video
 
 ## Product Purpose
 
-FIAP X exists so a person can send a video and follow the extraction of still images without seeing implementation details. This phase connects cadastro, entrada, sessão e saída to `video-api`. Lista, detalhe, envio e download remain simulated.
+FIAP X exists so a person can send a video and follow the extraction of still images without seeing implementation details. This phase connects cadastro, entrada, sessão, saída, lista e detalhe to `video-api`. Envio e download remain simulated.
 
-The durable product-target remains asynchronous frame extraction (FFmpeg, ZIP of images). Confirmed for this record: authentication is real HTTP; upload, processing, and download are still simulated.
+The durable product-target remains asynchronous frame extraction (FFmpeg, ZIP of images). Confirmed for this record: authentication and the Meus vídeos library are real HTTP; upload and download remain simulated.
 
 ## Positioning
 
-The interface speaks only in product language. A neighboring job dashboard could list PENDING jobs and source keys; FIAP X must not. The list shows one owner-facing lifecycle status derived from existing upload and latest-attempt data:
+The interface speaks only in product language. A neighboring job dashboard could list PENDING jobs and source keys; FIAP X must not. The list shows one owner-facing lifecycle status:
 
 - Pendente
 - Processando
@@ -37,8 +37,8 @@ Confirmed:
 
 - Register USER against the API (email unique); login does not auto-happen after register. Local field checks remain 8–128 characters.
 - Login, silent session restore, read-only profile from `GET /v1/me`, and logout. Access token stays in memory only.
-- List videos owned by the signed-in account; one row per file; one lifecycle status. Video data is still mocked.
-- Detail shows the same lifecycle status, timeline, and prior processing history.
+- List videos owned by the signed-in account; one row per file; one lifecycle status; numbered pages of 5 from `GET /v1/videos`.
+- Detail shows the same lifecycle status and a timeline of the upload plus the single processing. No history, reprocess, or download.
 - Simulated upload: empty picker, selected file, progress, confirmation, success, recoverable failure, pending confirmation. No file bytes leave the browser.
 - Profile is read-only email. No profile edit, password recovery, or admin UI.
 
@@ -48,7 +48,7 @@ Constraints:
 - Do not expose job, sourceKey, resultKey, endpoints, UUIDs, or English internal enums as user-facing copy.
 - Frontend stack is already React 19 + TypeScript + Vite in `services/video-api-frontend`.
 
-Undecided: when video list/upload/download replace the mock, and whether download of the image ZIP ships in the same epic.
+Undecided: when upload and ZIP download replace the remaining mocks.
 
 ## Brand Commitments
 
@@ -67,7 +67,7 @@ Authenticated UI sits alongside Linear, Stripe Dashboard, and Frame.io: a mature
 
 1. The owner only sees their own videos and only the statuses listed above.
 2. Language stays in Brazilian Portuguese and never leaks internals.
-3. Authentication is a real session; send/download stay simulated until the video epic.
+3. Authentication and the library are a real session; send/download stay simulated until their epics.
 4. Cadastro, sessão e saída existem para o fluxo completo, não como um painel técnico.
 5. Future integration must not invent missing API fields in the UI; gaps stay documented.
 

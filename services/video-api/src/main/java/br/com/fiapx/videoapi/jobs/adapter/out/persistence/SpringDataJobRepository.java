@@ -12,6 +12,7 @@ import jakarta.persistence.LockModeType;
 
 interface SpringDataJobRepository extends JpaRepository<JobEntity, UUID> {
     Optional<JobEntity> findByIdAndUserId(UUID id, UUID userId);
+    Optional<JobEntity> findByVideoIdAndVideoLibraryVisibleIsTrue(UUID videoId);
     @Lock(LockModeType.PESSIMISTIC_WRITE) Optional<JobEntity> findById(UUID id);
     @Query(value = """
             select * from jobs

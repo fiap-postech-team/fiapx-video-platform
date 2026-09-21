@@ -44,6 +44,26 @@ paths:
       responses:
         '200': { description: Conta autenticada, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/videos:
+    get:
+      summary: Lista os vídeos do proprietário autenticado em páginas numeradas
+      security: [ { bearerAuth: [ ] } ]
+      parameters:
+        - { name: page, in: query, required: false, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        '200': { description: Página de vídeos de produto, content: { application/json: { schema: { $ref: '#/components/schemas/VideoLibraryPage' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/videos/{videoRef}:
+    get:
+      summary: Consulta o detalhe de produto de um vídeo do proprietário
+      security: [ { bearerAuth: [ ] } ]
+      parameters:
+        - { name: videoRef, in: path, required: true, schema: { type: string }, description: Referência opaca Base64 URL-safe; não é UUID }
+      responses:
+        '200': { description: Detalhe de produto, content: { application/json: { schema: { $ref: '#/components/schemas/VideoLibraryDetail' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/videos/uploads:
     post:
       summary: Reserva uma chave opaca e autoriza upload direto ao object storage
@@ -107,7 +127,7 @@ components:
     Unauthorized: { description: Bearer token inválido ou ausente, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
     AccessDenied: { description: CSRF ou autorização inválida, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
     NotFound: { description: Vídeo ou recurso não encontrado para o proprietário, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
-    Conflict: { description: Estado incompatível, e-mail já cadastrado, chave de idempotência reutilizada com outro payload ou vídeo não confirmado, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+    Conflict: { description: Estado incompatível, e-mail já cadastrado, chave de idempotência reutilizada com outro payload, vídeo não confirmado ou segundo processamento, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
     StorageUnavailable: { description: Object storage temporariamente indisponível, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
   schemas:
     VideoUploadRequest:
@@ -143,3 +163,41 @@ components:
     Problem: { type: object, properties: { type: { type: string }, title: { type: string }, status: { type: integer }, detail: { type: string }, instance: { type: string }, code: { type: string } } }
     Job: { type: object, properties: { id: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string }, resultKey: { type: [ string, 'null' ] }, status: { enum: [ PENDING, PROCESSING, COMPLETED, FAILED ] }, createdAt: { type: string, format: date-time } } }
     JobPage: { type: object, required: [ items ], properties: { items: { type: array, items: { $ref: '#/components/schemas/Job' } }, nextCursor: { type: [ string, 'null' ] } } }
+    VideoLibraryStatus: { type: string, enum: [ AWAITING_UPLOAD, UPLOADED, PROCESSING, AVAILABLE, FAILED, REJECTED, EXPIRED ] }
+    VideoProcessingStatus: { type: string, enum: [ QUEUED, PROCESSING, AVAILABLE, FAILED ] }
+    VideoLibraryItem:
+      type: object
+      required: [ videoRef, originalFilename, status, submittedAt, activityAt ]
+      properties:
+        videoRef: { type: string }
+        originalFilename: { type: string }
+        status: { $ref: '#/components/schemas/VideoLibraryStatus' }
+        submittedAt: { type: string, format: date-time }
+        activityAt: { type: string, format: date-time }
+    VideoLibraryPage:
+      type: object
+      required: [ items, page, pageSize, totalItems, totalPages ]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/VideoLibraryItem' } }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, enum: [ 5 ] }
+        totalItems: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    ProcessingView:
+      type: object
+      required: [ status, requestedAt, startedAt, finishedAt ]
+      properties:
+        status: { $ref: '#/components/schemas/VideoProcessingStatus' }
+        requestedAt: { type: string, format: date-time }
+        startedAt: { type: [ string, 'null' ], format: date-time }
+        finishedAt: { type: [ string, 'null' ], format: date-time }
+    VideoLibraryDetail:
+      type: object
+      required: [ videoRef, originalFilename, status, submittedAt, uploadedAt, processing ]
+      properties:
+        videoRef: { type: string }
+        originalFilename: { type: string }
+        status: { $ref: '#/components/schemas/VideoLibraryStatus' }
+        submittedAt: { type: string, format: date-time }
+        uploadedAt: { type: [ string, 'null' ], format: date-time }
+        processing: { anyOf: [ { $ref: '#/components/schemas/ProcessingView' }, { type: 'null' } ] }

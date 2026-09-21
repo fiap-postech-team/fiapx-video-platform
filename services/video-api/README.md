@@ -10,6 +10,8 @@ O serviço é organizado por capacidades (`identity`, `videos`, `jobs`, `outbox`
 `inbox`). PostgreSQL mantém identidades, metadados dos vídeos, jobs e eventos;
 os arquivos ficam no object storage. O cliente envia o vídeo diretamente ao
 S3/MinIO por URL pré-assinada e confirma o upload antes de criar um job.
+A biblioteca do proprietário é consultada em `GET /v1/videos` e
+`GET /v1/videos/{videoRef}` (Flyway `V5`).
 
 Na criação do job, o estado `PENDING`, o histórico inicial e a intenção de
 publicar `video.job.requested.v1` são persistidos na mesma transação. O schema e
