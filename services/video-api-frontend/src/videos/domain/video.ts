@@ -50,6 +50,7 @@ export interface VideoDetail {
   originalFilename: string
   status: ProductVideoStatus
   submittedAt: string
+  activityAt: string
   uploadedAt: string | null
   processing: ProcessingView | null
 }
@@ -58,6 +59,29 @@ export interface UploadSelection {
   name: string
   sizeBytes: number
   contentType: string
+}
+
+export type UploadPhase = 'sending' | 'confirming' | 'processing'
+export type UploadJobStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+export type UploadFailureCode = 'UPLOAD_EXPIRED' | 'UPLOAD_UNCERTAIN' | 'UPLOAD_UNAVAILABLE'
+
+export interface UploadOptions {
+  signal?: AbortSignal
+  onProgress: (percent: number) => void
+  onPhase: (phase: UploadPhase) => void
+  onJobStatus: (status: UploadJobStatus) => void
+}
+
+export interface UploadResult {
+  videoId: string
+  jobId: string
+  status: UploadJobStatus
+}
+
+export class UploadFailure extends Error {
+  constructor(readonly code: UploadFailureCode) {
+    super(code)
+  }
 }
 
 export type ScenarioKind =
@@ -99,4 +123,5 @@ export interface VideoService {
     selection: UploadSelection,
     options?: { scenario?: PrototypeScenario; onProgress?: (percent: number) => void },
   ): Promise<void>
+  upload?(file: File, options: UploadOptions): Promise<UploadResult>
 }

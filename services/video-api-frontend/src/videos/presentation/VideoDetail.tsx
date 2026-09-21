@@ -17,10 +17,15 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
 
   useEffect(() => {
     let cancelled = false
+    let pollTimer: ReturnType<typeof setTimeout> | undefined
     setVideo(undefined)
     setFailed(false)
     videoService.get(videoRef).then((result) => {
-      if (!cancelled) setVideo(result)
+      if (cancelled) return
+      setVideo(result)
+      if (result && (result.status === 'UPLOADED' || result.status === 'PROCESSING')) {
+        pollTimer = setTimeout(() => setReloadKey((value) => value + 1), 3_000)
+      }
     }).catch((error) => {
       if (cancelled) return
       if (isVideoServiceError(error)) {
@@ -31,6 +36,7 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
     })
     return () => {
       cancelled = true
+      if (pollTimer) clearTimeout(pollTimer)
     }
   }, [videoRef, videoService, reloadKey])
 
@@ -53,7 +59,7 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
     )
   }
 
-  if (video === null) {
+  if (!video) {
     return (
       <section className="page-block">
         <p role="alert">{copy.detail.notFound}</p>

@@ -22,6 +22,7 @@ export function VideoList({ videoService, scenario, onOpen, onUpload }: VideoLis
 
   useEffect(() => {
     let cancelled = false
+    let pollTimer: ReturnType<typeof setTimeout> | undefined
     setIsLoading(true)
     setFailed(false)
 
@@ -38,6 +39,9 @@ export function VideoList({ videoService, scenario, onOpen, onUpload }: VideoLis
         setItems(result.items)
         setTotalItems(result.totalItems)
         setTotalPages(result.totalPages)
+        if (result.items.some((item) => item.status === 'UPLOADED' || item.status === 'PROCESSING')) {
+          pollTimer = setTimeout(() => setReloadKey((value) => value + 1), 3_000)
+        }
       })
       .catch(() => {
         if (!cancelled) setFailed(true)
@@ -48,6 +52,7 @@ export function VideoList({ videoService, scenario, onOpen, onUpload }: VideoLis
 
     return () => {
       cancelled = true
+      if (pollTimer) clearTimeout(pollTimer)
     }
   }, [videoService, scenario, page, reloadKey])
 
