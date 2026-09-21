@@ -127,6 +127,9 @@ class JobControllerTest {
                 return Optional.of(new Video(UUID.randomUUID(), user, key, "source.mp4", "video/mp4", 1,
                     "a".repeat(64), VideoStatus.UPLOADED, Instant.EPOCH, Instant.EPOCH));
             }
+            public Optional<Video> lock(UUID videoId) {
+                return findConfirmed(UUID.randomUUID(), "uploads/source.mp4");
+            }
             public Video save(Video video) { return video; }
         };
     }
@@ -156,6 +159,11 @@ class JobControllerTest {
                     || (job.createdAt().equals(createdBefore) && job.id().compareTo(idBefore) < 0))
                 .limit(limit)
                 .toList();
+        }
+        public Optional<Job> findVisibleByVideoId(UUID videoId) {
+            return jobs.stream()
+                .filter(job -> videoId.equals(job.videoId()) && job.libraryVisible())
+                .findFirst();
         }
     }
 }

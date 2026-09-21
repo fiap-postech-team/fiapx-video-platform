@@ -172,7 +172,7 @@ Filenames and table headers: 600. Dates: 400, muted, `font-variant-numeric: tabu
 
 **The Floor Rule.** Do not use type under 15px for authenticated chrome. Do not recreate hierarchy by shrinking secondary text. Use weight, muted color, and space.
 
-**The Sentence-Case Rule.** Column titles are `Arquivo`, `Enviado em`, `Status`. No `letter-spacing` tracking on table heads. No `text-transform: uppercase` on product chrome.
+**The Sentence-Case Rule.** Column titles are `Arquivo`, `Atualizado em`, `Status`. No `letter-spacing` tracking on table heads. No `text-transform: uppercase` on product chrome.
 
 ## Layout
 
@@ -189,11 +189,11 @@ Title and optional lead on the left; one primary action on the right (`Enviar v�
 The approved list is a single white table on the stage:
 
 1. Arquivo (filename, 600, ellipsis)
-2. Enviado em (tabular date or em dash)
+2. Atualizado em (tabular activity datetime)
 3. Status (one lifecycle pill)
 4. Ver detalhes (quiet indigo text button)
 
-Optional count (`{n} vídeos`) may sit above the table. **Search and filters are not part of the approved UI.** Do not add search fields, status chips, or extra toolbars. If leftover prototype controls exist in code, do not expand, restyle, or treat them as a pattern.
+Do not show a `5/20` (or `{n} vídeos`) count above the table. **Search and filters are not part of the approved UI.** Do not add search fields, status chips, or extra toolbars. If leftover prototype controls exist in code, do not expand, restyle, or treat them as a pattern.
 
 ### Column alignment
 Header row and every data row **must share the exact same grid**:
@@ -248,24 +248,24 @@ No neobrutal offsets, no squircle fashion, no mixed radius scales on one surface
 
 ### Buttons
 - **Primary:** ink fill, white 16px/600 text, `6px` radius, padding about `0.7rem 1rem`. Hover `#2a3139`.
-- **Quiet:** transparent, indigo text, 16px/600, used for Ver detalhes, Voltar, Carregar mais, Sair (ghost on rail).
+- **Quiet:** transparent, indigo text, 16px/600, used for Ver detalhes, Voltar, paginação numerada, Sair (ghost on rail).
 - One primary per page header. Do not add a second competing fill button in the list.
 
 ### Status badges
 Compact pills, 16px/600, padding `0.28rem 0.7rem`, `nowrap`. One badge per video. The pill is not a heading and not a full-width bar. On detail, the same lifecycle pill sits with `justify-self: start` near the filename — not a kicker stretched across the column.
 
-Owner-facing lifecycle (derived in the frontend from `uploadStatus` + latest attempt; do not invent backend states):
+Owner-facing lifecycle comes from the library contract (`GET /v1/videos`). Do not show English enums.
 
-| Label | Derivation |
+| Label | Contract status |
 |---|---|
-| Pendente | `uploadStatus: PENDING` |
-| Processando | `UPLOADED` and latest attempt missing, `PENDING`, or `PROCESSING` |
-| Processado | `UPLOADED` and latest attempt `COMPLETED` |
+| Pendente | `AWAITING_UPLOAD` |
+| Processando | `UPLOADED` or `PROCESSING` |
+| Processado | `AVAILABLE` |
 | Rejeitado | `REJECTED` |
 | Expirado | `EXPIRED` |
-| Falha no processamento | `UPLOADED` and latest attempt `FAILED` |
+| Falha no processamento | `FAILED` |
 
-Do not show separate upload vs processing statuses on the list. Do not revive `enviado` or English `error`.
+Do not show separate upload vs processing statuses on the list.
 
 ### Table / list
 White surface, 1px line border, `8px` radius. Header row `#f8f9fb` with muted 16px/600 labels. Body rows 16px filename, 15px date. Row min-height about `3.75rem`. No card gallery, no icon columns, no avatars.

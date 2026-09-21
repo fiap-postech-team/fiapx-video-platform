@@ -14,8 +14,10 @@ import br.com.fiapx.videoapi.jobs.adapter.in.http.JobNotFoundException;
 import br.com.fiapx.videoapi.identity.application.AuthenticationFailedException;
 import br.com.fiapx.videoapi.identity.application.EmailAlreadyRegisteredException;
 import br.com.fiapx.videoapi.jobs.application.IdempotencyConflictException;
+import br.com.fiapx.videoapi.jobs.application.ProcessingAlreadyExistsException;
 import br.com.fiapx.videoapi.jobs.application.VideoNotConfirmedException;
 import br.com.fiapx.videoapi.jobs.application.VideoNotFoundException;
+import br.com.fiapx.videoapi.videos.application.VideoLibraryNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadConflictException;
 import br.com.fiapx.videoapi.videos.application.StorageUnavailableException;
@@ -60,7 +62,8 @@ public final class ApiExceptionHandler {
         return response(ProblemType.INTERNAL_ERROR, request);
     }
 
-    @ExceptionHandler({JobNotFoundException.class, VideoNotFoundException.class, VideoUploadNotFoundException.class})
+    @ExceptionHandler({JobNotFoundException.class, VideoNotFoundException.class, VideoUploadNotFoundException.class,
+        VideoLibraryNotFoundException.class})
     ResponseEntity<ProblemDetail> handleNotFound(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.NOT_FOUND, request);
     }
@@ -74,6 +77,12 @@ public final class ApiExceptionHandler {
         VideoNotConfirmedException.class, VideoUploadConflictException.class})
     ResponseEntity<ProblemDetail> handleStateConflict(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.CONFLICT, request);
+    }
+
+    @ExceptionHandler(ProcessingAlreadyExistsException.class)
+    ResponseEntity<ProblemDetail> handleProcessingExists(ProcessingAlreadyExistsException exception,
+                                                         HttpServletRequest request) {
+        return response(ProblemType.PROCESSING_ALREADY_EXISTS, request);
     }
 
     @ExceptionHandler(StorageUnavailableException.class)

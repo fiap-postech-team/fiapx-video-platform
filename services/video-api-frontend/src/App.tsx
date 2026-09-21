@@ -11,6 +11,7 @@ import { AuthenticatedShell } from './shell/AuthenticatedShell'
 import { isDetailView, type ProductView } from './shell/navigation'
 import type { ScenarioKind, VideoService } from './videos/domain/video'
 import { MockVideoService } from './videos/infrastructure/mock-video-service'
+import { VideoHttpService } from './videos/infrastructure/video-http-service'
 import { UploadVideo } from './videos/presentation/UploadVideo'
 import { VideoDetail } from './videos/presentation/VideoDetail'
 import { VideoList } from './videos/presentation/VideoList'
@@ -23,8 +24,18 @@ interface AppProps {
 
 type AccessMode = 'login' | 'register'
 
+function createDefaultVideoService(auth: AuthenticationService): VideoService {
+  const library = new VideoHttpService((input, init) => auth.authorizedFetch(input, init))
+  const upload = new MockVideoService()
+  return {
+    list: (page, options) => library.list(page, options),
+    get: (ref) => library.get(ref),
+    simulateUpload: (userId, selection, options) => upload.simulateUpload(userId, selection, options),
+  }
+}
+
 const defaultAuthenticationService = new HttpAuthenticationService()
-const defaultVideoService = new MockVideoService()
+const defaultVideoService = createDefaultVideoService(defaultAuthenticationService)
 
 export default function App({
   authenticationService = defaultAuthenticationService,
@@ -112,17 +123,15 @@ export default function App({
       >
         {view === 'videos' && (
           <VideoList
-            userId={user.id}
             videoService={videoService}
             scenario={scenarioValue}
-            onOpen={(videoId) => navigate({ kind: 'video-detail', videoId })}
+            onOpen={(videoRef) => navigate({ kind: 'video-detail', videoRef })}
             onUpload={() => navigate('upload')}
           />
         )}
         {isDetailView(view) && (
           <VideoDetail
-            userId={user.id}
-            videoId={view.videoId}
+            videoRef={view.videoRef}
             videoService={videoService}
             onBack={() => navigate('videos')}
           />

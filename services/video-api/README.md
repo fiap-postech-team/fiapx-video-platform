@@ -13,7 +13,8 @@ PostgreSQL. O contrato HTTP canônico é o
 | Login, refresh e logout | Implementados; refresh token rotativo fica em cookie HttpOnly e refresh/logout exigem CSRF |
 | JWT | Emitido com `RS256`; no perfil `local`, usa par RSA efêmero e validade padrão de 15 minutos |
 | Jobs | Criação, consulta do proprietário, paginação por cursor e idempotência implementadas |
-| Persistência | Flyway executa as migrations `V1` a `V4`; Hibernate apenas valida o schema |
+| Persistência | Flyway executa as migrations `V1` a `V5`; Hibernate apenas valida o schema |
+| Biblioteca de vídeos | `GET /v1/videos` e `GET /v1/videos/{videoRef}` devolvem DTOs de produto do proprietário |
 | Swagger | Disponível somente com o perfil `local` |
 | Upload de vídeo | URL temporária para PUT direto no MinIO/S3, confirmação por HEAD e expiração de pendências |
 | Download de vídeo | Ainda não há endpoint HTTP |

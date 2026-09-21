@@ -10,6 +10,7 @@ public final class Job {
     private final JobSourceKind sourceKind;
     private final String sourceKey;
     private final Instant createdAt;
+    private final boolean libraryVisible;
     private JobStatus status;
     private String resultKey;
 
@@ -27,8 +28,15 @@ public final class Job {
 
     public Job(UUID id, UUID userId, UUID videoId, JobSourceKind sourceKind, String sourceKey,
                String resultKey, JobStatus status, Instant createdAt) {
-        this.id = id; this.userId = userId; this.videoId = videoId; this.sourceKind = sourceKind; this.sourceKey = sourceKey; this.resultKey = resultKey;
-        this.status = status; this.createdAt = createdAt;
+        this(id, userId, videoId, sourceKind, sourceKey, resultKey, status, createdAt,
+            sourceKind == JobSourceKind.VIDEO);
+    }
+
+    public Job(UUID id, UUID userId, UUID videoId, JobSourceKind sourceKind, String sourceKey,
+               String resultKey, JobStatus status, Instant createdAt, boolean libraryVisible) {
+        this.id = id; this.userId = userId; this.videoId = videoId; this.sourceKind = sourceKind;
+        this.sourceKey = sourceKey; this.resultKey = resultKey; this.status = status;
+        this.createdAt = createdAt; this.libraryVisible = libraryVisible;
     }
 
     public void apply(JobStatus nextStatus, String nextResultKey) {
@@ -50,4 +58,5 @@ public final class Job {
     public String resultKey() { return resultKey; }
     public JobStatus status() { return status; }
     public Instant createdAt() { return createdAt; }
+    public boolean libraryVisible() { return libraryVisible; }
 }

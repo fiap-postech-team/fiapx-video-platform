@@ -1,6 +1,6 @@
 # Video API Frontend
 
-Interface React da FIAP X para uma pessoa que envia vídeos e acompanha a extração de imagens. Há seis telas navegáveis: Entrar, Cadastrar, Meus vídeos, Detalhe do vídeo, Enviar vídeo e Meu perfil. Cadastro, entrada, renovação de sessão e saída usam o `video-api`. Lista, envio e download de vídeos ainda são simulados em memória.
+Interface React da FIAP X para uma pessoa que envia vídeos e acompanha a extração de imagens. Há seis telas navegáveis: Entrar, Cadastrar, Meus vídeos, Detalhe do vídeo, Enviar vídeo e Meu perfil. Cadastro, entrada, renovação de sessão, saída, lista e detalhe usam o `video-api`. Envio de vídeo ainda é simulado em memória.
 
 A linguagem visível está em português do Brasil e documentada em [docs/prototype-copy.md](docs/prototype-copy.md). Estados internos, identificadores e contratos da API não aparecem na interface. O token de acesso fica só na memória do navegador.
 
@@ -10,14 +10,14 @@ A linguagem visível está em português do Brasil e documentada em [docs/protot
 | --- | --- |
 | Entrar | Acessa a conta com e-mail e senha |
 | Cadastrar | Cria uma conta e volta para Entrar |
-| Meus vídeos | Vê um item por arquivo, com status do vídeo e do processamento |
-| Detalhe do vídeo | Consulta andamento, histórico e a ação de baixar imagens (simulada) |
+| Meus vídeos | Vê um item por arquivo, com um status de produto e páginas numeradas |
+| Detalhe do vídeo | Consulta o andamento do envio e do único processamento |
 | Enviar vídeo | Seleciona um arquivo e inspeciona progresso, sucesso e falha |
 | Meu perfil | Consulta o e-mail da sessão, sem edição |
 
 Depois de entrar, o menu leva a Meus vídeos, Enviar vídeo, Meu perfil e Sair. No celular o menu é recolhível.
 
-A lista mostra só o status do vídeo (`pendente`, `enviado`, `rejeitado`, `expirado`). O detalhe mostra o status do processamento (`pendente`, `processando`, `completado`, `error`).
+A lista mostra um status de produto por arquivo (Pendente, Processando, Processado, Rejeitado, Expirado, Falha no processamento), com 5 itens por página. O detalhe repete esse status e a linha do tempo do envio e do processamento único.
 
 ## Tecnologias
 
@@ -31,7 +31,7 @@ A lista mostra só o status do vídeo (`pendente`, `enviado`, `rejeitado`, `expi
 - `shell` e `profile`: estrutura autenticada e consulta da conta
 - `product-copy.ts`: catálogo dos textos visíveis
 
-A porta `VideoService` permanece mockada. Chamadas autenticadas futuras devem usar `authorizedFetch`.
+Lista e detalhe usam `authorizedFetch`. O envio continua no mock até o épico de upload.
 
 ## Executar
 

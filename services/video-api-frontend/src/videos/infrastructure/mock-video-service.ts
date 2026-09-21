@@ -1,21 +1,23 @@
-import { compareVideos } from '../application/product-status'
 import type {
   PrototypeScenario,
   UploadSelection,
-  Video,
-  VideoPage,
+  VideoDetail,
+  VideoLibraryItem,
+  VideoLibraryPage,
   VideoService,
 } from '../domain/video'
-import { demoVideos } from './fixtures'
+import { demoVideos, type DemoVideo } from './fixtures'
 
-const DEFAULT_LIMIT = 20
-const MAX_LIMIT = 100
+const PAGE_SIZE = 5
 
-function cloneVideos(videos: Video[]): Video[] {
-  return videos.map((video) => ({
-    ...video,
-    attempts: video.attempts.map((attempt) => ({ ...attempt })),
-  }))
+function clone(video: DemoVideo): DemoVideo {
+  return {
+    item: { ...video.item },
+    detail: {
+      ...video.detail,
+      processing: video.detail.processing ? { ...video.detail.processing } : null,
+    },
+  }
 }
 
 function wait(ms: number): Promise<void> {
@@ -27,88 +29,80 @@ function wait(ms: number): Promise<void> {
   })
 }
 
-export class MockVideoService implements VideoService {
-  private readonly videos: Video[]
+function byActivity(left: VideoLibraryItem, right: VideoLibraryItem): number {
+  return right.activityAt.localeCompare(left.activityAt) || right.videoRef.localeCompare(left.videoRef)
+}
 
-  constructor(videos: Video[] = demoVideos()) {
-    this.videos = cloneVideos(videos)
+export class MockVideoService implements VideoService {
+  private readonly videos: DemoVideo[]
+
+  constructor(videos: DemoVideo[] = demoVideos()) {
+    this.videos = videos.map(clone)
   }
 
-  async list(
-    userId: string,
-    query?: { cursor?: string; limit?: number; scenario?: PrototypeScenario },
-  ): Promise<VideoPage> {
-    const scenario = query?.scenario
+  async list(page = 1, options?: { scenario?: PrototypeScenario }): Promise<VideoLibraryPage> {
+    const scenario = options?.scenario
     await wait(scenario?.delayMs ?? 0)
-
     if (scenario?.kind === 'loading') {
       return new Promise(() => undefined)
     }
     if (scenario?.kind === 'list-error') {
-      return Promise.reject({
-        code: 'LIST_UNAVAILABLE',
-        message: 'mock scenario: list unavailable',
-      })
+      return Promise.reject({ code: 'LIST_UNAVAILABLE', message: 'mock scenario: list unavailable' })
     }
-
-    const limit = query?.limit ?? DEFAULT_LIMIT
-    if (limit < 1 || limit > MAX_LIMIT) {
-      throw new Error('Invalid page size')
-    }
-
-    const owned = (scenario?.kind === 'empty' ? [] : this.videos.filter((video) => video.ownerId === userId))
+    const owned = (scenario?.kind === 'empty' ? [] : this.videos.map((video) => video.item))
       .slice()
-      .sort(compareVideos)
-
-    const start = query?.cursor ? owned.findIndex((video) => video.id === query.cursor) + 1 : 0
-    const sliceStart = start < 1 && query?.cursor ? owned.length : start
-    const items = owned.slice(sliceStart, sliceStart + limit)
-    const last = items.at(-1)
-    const hasMore = sliceStart + items.length < owned.length
-
+      .sort(byActivity)
+    const totalItems = owned.length
+    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / PAGE_SIZE)
+    const start = Math.max(0, (page - 1) * PAGE_SIZE)
     return {
-      items: cloneVideos(items),
-      nextCursor: hasMore && last ? last.id : null,
+      items: owned.slice(start, start + PAGE_SIZE).map((item) => ({ ...item })),
+      page,
+      pageSize: PAGE_SIZE,
+      totalItems,
+      totalPages,
     }
   }
 
-  async get(userId: string, videoId: string): Promise<Video | null> {
-    const video = this.videos.find((item) => item.id === videoId && item.ownerId === userId)
-    return video ? cloneVideos([video])[0] ?? null : null
+  async get(videoRef: string): Promise<VideoDetail | null> {
+    const video = this.videos.find((item) => item.item.videoRef === videoRef)
+    return video ? clone(video).detail : null
   }
 
   async simulateUpload(
-    userId: string,
+    _userId: string,
     selection: UploadSelection,
     options?: { scenario?: PrototypeScenario; onProgress?: (percent: number) => void },
-  ): Promise<Video> {
+  ): Promise<void> {
     const scenario = options?.scenario
     const delayMs = scenario?.delayMs ?? 0
     options?.onProgress?.(20)
     await wait(delayMs)
     if (scenario?.kind === 'upload-error') {
-      return Promise.reject({
-        code: 'UPLOAD_UNAVAILABLE',
-        message: 'mock scenario: upload unavailable',
-      })
+      return Promise.reject({ code: 'UPLOAD_UNAVAILABLE', message: 'mock scenario: upload unavailable' })
     }
     options?.onProgress?.(70)
     await wait(delayMs)
     options?.onProgress?.(100)
-
     const now = '2026-09-20T12:00:00Z'
-    const video: Video = {
-      id: crypto.randomUUID(),
-      ownerId: userId,
-      originalFilename: selection.name,
-      sizeBytes: selection.sizeBytes,
-      contentType: selection.contentType,
-      uploadStatus: 'UPLOADED',
-      requestedAt: now,
-      uploadedAt: now,
-      attempts: [],
-    }
-    this.videos.unshift(video)
-    return cloneVideos([video])[0]!
+    const videoRef = `ref-${selection.name}`
+    this.videos.unshift(clone({
+      item: {
+        videoRef,
+        originalFilename: selection.name,
+        status: 'UPLOADED',
+        submittedAt: now,
+        activityAt: now,
+      },
+      detail: {
+        videoRef,
+        originalFilename: selection.name,
+        status: 'UPLOADED',
+        submittedAt: now,
+        activityAt: now,
+        uploadedAt: now,
+        processing: null,
+      },
+    }))
   }
 }
