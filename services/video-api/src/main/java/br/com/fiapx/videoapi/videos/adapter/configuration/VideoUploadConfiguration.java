@@ -84,12 +84,6 @@ public class VideoUploadConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(prefix = "app.video", name = "storage-mode", havingValue = "mock")
-    VideoObjectStorage mockVideoObjectStorage(LocalMockVideoObjectStorage storage) {
-        return storage;
-    }
-
-    @Bean
     CreateVideoUpload createVideoUpload(VideoStore videos, VideoObjectStorage storage,
                                         VideoTransactions transactions, VideoUploadPolicy policy, Clock clock) {
         return new CreateVideoUpload(videos, storage, transactions, policy, clock);

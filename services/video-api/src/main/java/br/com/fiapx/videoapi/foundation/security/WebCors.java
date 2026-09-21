@@ -26,4 +26,20 @@ final class WebCors {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+
+    static CorsConfigurationSource localMockSource(String allowedOrigin) {
+        var api = new CorsConfiguration();
+        api.setAllowedOrigins(List.of(allowedOrigin));
+        api.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        api.setAllowedHeaders(List.of("Authorization", "Content-Type", "If-None-Match",
+            "x-amz-checksum-sha256", "X-XSRF-TOKEN"));
+        api.setAllowCredentials(true);
+        api.setMaxAge(Duration.ofMinutes(10));
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/v1/**", api);
+        var upload = new CorsConfiguration(api);
+        upload.setAllowCredentials(false);
+        source.registerCorsConfiguration("/_local/mock-storage/**", upload);
+        return source;
+    }
 }
