@@ -191,6 +191,10 @@ describe('authenticated product', () => {
     expect(submitButton()).toBeEnabled()
     await user.click(submitButton()!)
 
+    expect(screen.getByRole('heading', { name: copy.upload.reviewTitle })).toBeInTheDocument()
+    expect(simulate).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: copy.upload.confirm }))
+
     expect(await screen.findByRole('heading', { name: copy.upload.successTitle }, { timeout: 4000 })).toBeInTheDocument()
     expect(screen.getByText(copy.upload.successStatus)).toBeInTheDocument()
     expect(simulate).toHaveBeenCalledWith(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { copy } from '../../product-copy'
 import { lifecycleStatusLabel, lifecycleTone } from '../application/product-status'
 import { isVideoServiceError, type VideoDetail as VideoDetailModel, type VideoService } from '../domain/video'
@@ -10,17 +10,29 @@ interface VideoDetailProps {
   onBack: () => void
 }
 
+const DETAIL_POLL_INTERVAL_MS = 15_000
+
 export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps) {
   const [video, setVideo] = useState<VideoDetailModel | null | undefined>(undefined)
   const [failed, setFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const shownRef = useRef<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    setVideo(undefined)
-    setFailed(false)
+    let pollTimer: ReturnType<typeof setTimeout> | undefined
+    if (shownRef.current !== videoRef) {
+      setVideo(undefined)
+      setFailed(false)
+    }
     videoService.get(videoRef).then((result) => {
-      if (!cancelled) setVideo(result)
+      if (cancelled) return
+      shownRef.current = videoRef
+      setFailed(false)
+      setVideo(result)
+      if (result && (result.status === 'UPLOADED' || result.status === 'PROCESSING')) {
+        pollTimer = setTimeout(() => setReloadKey((value) => value + 1), DETAIL_POLL_INTERVAL_MS)
+      }
     }).catch((error) => {
       if (cancelled) return
       if (isVideoServiceError(error)) {
@@ -31,6 +43,7 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
     })
     return () => {
       cancelled = true
+      if (pollTimer) clearTimeout(pollTimer)
     }
   }, [videoRef, videoService, reloadKey])
 
@@ -53,11 +66,13 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
     )
   }
 
-  if (video === null) {
+  if (!video) {
     return (
       <section className="page-block">
         <p role="alert">{copy.detail.notFound}</p>
-        <button type="button" className="btn-quiet" onClick={onBack}>{copy.detail.back}</button>
+        <div className="detail-actions">
+          <button type="button" onClick={onBack}>{copy.detail.back}</button>
+        </div>
       </section>
     )
   }
@@ -67,7 +82,6 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
   return (
     <article className="page-block" aria-labelledby="video-detail-title">
       <div className="detail-header">
-        <button type="button" className="text-link" onClick={onBack}>{copy.detail.back}</button>
         <p className={`status-badge is-${tone}`}>
           {lifecycleStatusLabel(video.status)}
         </p>
@@ -76,6 +90,9 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
       <VideoTimeline video={video} />
       {video.status === 'EXPIRED' && <p className="page-note">{copy.detail.expiredHint}</p>}
       {video.status === 'FAILED' && <p className="page-note">{copy.detail.failedHint}</p>}
+      <div className="detail-actions">
+        <button type="button" onClick={onBack}>{copy.detail.back}</button>
+      </div>
     </article>
   )
 }

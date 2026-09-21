@@ -129,9 +129,9 @@ paths:
     post:
       summary: Cria um job a partir de um objeto já enviado
       security: [ { bearerAuth: [ ] } ]
-      parameters: [ { name: Idempotency-Key, in: header, required: false, description: Chave opaca (até 128 caracteres) para repetir a criação com segurança, schema: { type: string, maxLength: 128 } } ]
+      parameters: [ { name: Idempotency-Key, in: header, required: false, description: Opcional para outros clientes, até 128 caracteres. A SPA não envia este cabeçalho porque o CORS local não o libera e o navegador bloquearia o POST. Um job por vídeo continua garantido no serviço., schema: { type: string, maxLength: 128 } } ]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [ sourceKey ], properties: { sourceKey: { type: string } } } } } }
-      responses: { '201': { description: Job criado ou recuperado para a mesma chave de idempotência, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '400': { $ref: '#/components/responses/ValidationError' }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+      responses: { '201': { description: Job criado. Com a mesma Idempotency-Key, devolve o job já gravado. Sem a chave, um segundo início do mesmo vídeo responde 409., content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '400': { $ref: '#/components/responses/ValidationError' }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/jobs/{id}:
     get:
       summary: Consulta o estado de um job

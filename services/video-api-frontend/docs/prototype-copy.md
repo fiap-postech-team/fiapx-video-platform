@@ -88,7 +88,7 @@ Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisp
 | videos.openDetail | Meus vídeos | Ver detalhes | item da lista | fixo |
 | videos.sentAt | Meus vídeos | Enviado em {data} | item com horário de envio | dinâmico |
 | videos.pagination | Meus vídeos | Paginação da biblioteca | navegação entre páginas | fixo |
-| detail.back | Detalhe do vídeo | Voltar para meus vídeos | navegação interna | fixo |
+| detail.back | Detalhe do vídeo | Voltar para meus vídeos | botão abaixo do detalhe | fixo |
 | detail.timeline | Detalhe do vídeo | Andamento | linha do tempo | fixo |
 | detail.sent | Detalhe do vídeo | Enviado em | marco | fixo |
 | detail.processed | Detalhe do vídeo | Processado em | marco | fixo |

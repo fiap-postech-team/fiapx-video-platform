@@ -10,7 +10,6 @@ import { Profile } from './profile/Profile'
 import { AuthenticatedShell } from './shell/AuthenticatedShell'
 import { isDetailView, type ProductView } from './shell/navigation'
 import type { ScenarioKind, VideoService } from './videos/domain/video'
-import { MockVideoService } from './videos/infrastructure/mock-video-service'
 import { VideoHttpService } from './videos/infrastructure/video-http-service'
 import { UploadVideo } from './videos/presentation/UploadVideo'
 import { VideoDetail } from './videos/presentation/VideoDetail'
@@ -25,13 +24,7 @@ interface AppProps {
 type AccessMode = 'login' | 'register'
 
 function createDefaultVideoService(auth: AuthenticationService): VideoService {
-  const library = new VideoHttpService((input, init) => auth.authorizedFetch(input, init))
-  const upload = new MockVideoService()
-  return {
-    list: (page, options) => library.list(page, options),
-    get: (ref) => library.get(ref),
-    simulateUpload: (userId, selection, options) => upload.simulateUpload(userId, selection, options),
-  }
+  return new VideoHttpService((input, init) => auth.authorizedFetch(input, init))
 }
 
 const defaultAuthenticationService = new HttpAuthenticationService()

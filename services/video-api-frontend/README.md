@@ -1,6 +1,6 @@
 # Video API Frontend
 
-Interface React da FIAP X para uma pessoa que envia vídeos e acompanha a extração de imagens. Há seis telas navegáveis: Entrar, Cadastrar, Meus vídeos, Detalhe do vídeo, Enviar vídeo e Meu perfil. Cadastro, entrada, renovação de sessão, saída, lista e detalhe usam o `video-api`. Envio de vídeo ainda é simulado em memória.
+Interface React da FIAP X para uma pessoa que envia vídeos e acompanha a extração de imagens. Há seis telas navegáveis: Entrar, Cadastrar, Meus vídeos, Detalhe do vídeo, Enviar vídeo e Meu perfil. Cadastro, entrada, renovação de sessão, saída, upload, processamento, lista e detalhe usam o `video-api`.
 
 A linguagem visível está em português do Brasil e documentada em [docs/prototype-copy.md](docs/prototype-copy.md). Estados internos, identificadores e contratos da API não aparecem na interface. O token de acesso fica só na memória do navegador.
 
@@ -27,11 +27,11 @@ A lista mostra um status de produto por arquivo (Pendente, Processando, Processa
 ## Arquitetura
 
 - `auth`: validação, adaptador HTTP de conta/sessão e store do token em memória
-- `videos`: modelo de vídeo, estados visíveis, mock e telas de lista, detalhe e envio
+- `videos`: modelo de vídeo, adaptador HTTP, estados visíveis e telas de lista, detalhe e envio
 - `shell` e `profile`: estrutura autenticada e consulta da conta
 - `product-copy.ts`: catálogo dos textos visíveis
 
-Lista e detalhe usam `authorizedFetch`. O envio continua no mock até o épico de upload.
+As chamadas JSON usam `authorizedFetch`. O arquivo é enviado diretamente para a URL temporária retornada pela API, sem bearer ou cookie, e essa URL fica somente em memória.
 
 ## Executar
 
@@ -48,7 +48,7 @@ URL local: [http://localhost:5173](http://localhost:5173).
 
 Crie uma conta em Cadastrar e entre com o mesmo e-mail e senha. A senha da API tem no mínimo 12 caracteres; a interface continua validando 8 a 128 e mostra uma falha genérica se o serviço recusar o cadastro.
 
-Formatos aceitos no envio simulado: MP4, MOV, WebM e MKV, até 500 MB (500.000.000 bytes). Nenhum byte de vídeo é enviado nem gravado no serviço.
+Formatos aceitos: MP4, MOV, WebM e MKV, com arquivo não vazio e até 500 MB (500.000.000 bytes). A pessoa confirma a decisão antes da reserva; depois, a tela mostra o progresso real do `PUT`, confirma o objeto e acompanha o job até “Concluído” ou “Falhou”. O `POST /v1/jobs` sai só com bearer e `Content-Type`. A interface não envia `Idempotency-Key`: o CORS local não inclui esse cabeçalho e o navegador bloquearia a chamada. Um processamento por vídeo continua garantido no serviço. No perfil local, o backend ainda usa armazenamento e resultado demonstrativos, sem indicar isso na interface.
 
 ## Verificação
 
