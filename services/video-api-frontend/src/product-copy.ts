@@ -311,7 +311,7 @@ export const COPY_INVENTORY: ProductCopyEntry[] = [
 ]
 
 export function interpolate(pattern: string, vars: Record<string, string | number>): string {
-  return pattern.replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? ''))
+  return pattern.replace(/\{(\w+)}/g, (_, name: string) => String(vars[name] ?? ''))
 }
 
 export const FORBIDDEN_UI_PATTERNS = [

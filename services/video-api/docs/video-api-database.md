@@ -2,11 +2,11 @@
 
 ## Objetivo
 
-Este modelo cobre o cadastro e a autenticação local de usuários, a persistência
-de vídeos e jobs, histórico de estado, outbox e inbox. Cadastro, login, jobs e
-as operações de persistência estão implementados. Upload direto para object
-storage, confirmação do vídeo e integração da outbox/inbox com RabbitMQ são o
-fluxo-alvo, ainda não uma superfície HTTP disponível.
+Este modelo cobre o cadastro e a autenticação local de usuários, o upload direto
+para object storage, a persistência de vídeos e jobs, o histórico de estado,
+outbox e inbox. Cadastro, login, upload, confirmação do vídeo, jobs e as
+operações de persistência estão implementados. A integração da outbox/inbox com
+RabbitMQ permanece pendente.
 
 O PostgreSQL é a fonte de verdade dos metadados. Os binários permanecem no S3 e
 as mensagens no RabbitMQ carregam somente identificadores, object keys e
@@ -159,7 +159,7 @@ erDiagram
 | `users` | perfil e estado da conta; e-mail normalizado e único |
 | `user_credentials` | credencial local separada do perfil; guarda somente hash forte da senha |
 | `auth_sessions` | refresh tokens rotacionáveis e revogáveis; access token JWT continua stateless |
-| `videos` | metadados e ciclo de vida previsto para o objeto; ainda não há endpoint de upload/confirmação |
+| `videos` | metadados e ciclo de vida do objeto enviado diretamente ao S3/MinIO |
 | `jobs` | agregado proprietário do processamento e seu estado atual |
 | `job_status_history` | trilha append-only de todas as transições aceitas |
 | `outbox_events` | intenção durável de publicar `video.job.requested.v1`; publisher RabbitMQ ainda não está conectado |
@@ -176,15 +176,15 @@ curta no momento do upload ou download. Se houver URL pública permanente, ela
 pode ser derivada da configuração do bucket/CDN sem duplicá-la em todas as
 linhas.
 
-O fluxo recomendado, ainda pendente de endpoints e integração S3, é:
+O fluxo de upload e submissão é:
 
 1. a API cria `videos` com `upload_status = 'PENDING'` e devolve URL pré-assinada;
 2. o cliente envia o binário diretamente ao S3, sem passar pela API;
 3. a API confirma tamanho, tipo e checksum e muda para `UPLOADED`;
 4. na mesma transação, cria `jobs` em `PENDING`, o primeiro histórico
    e `outbox_events` com `video.job.requested.v1`;
-5. o publisher envia a mensagem e somente depois do publisher confirm marca a
-   outbox como `PUBLISHED`.
+5. futuramente, o publisher enviará a mensagem e somente depois do publisher
+   confirm marcará a outbox como `PUBLISHED`.
 
 ### Cadastro e login
 

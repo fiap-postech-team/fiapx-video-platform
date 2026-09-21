@@ -1,10 +1,10 @@
 package br.com.fiapx.videoapi.identity.adapter.in.http;
 
-import br.com.fiapx.videoapi.identity.adapter.configuration.AuthProperties;
-import java.time.Instant;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
+
+import java.time.Instant;
 
 @Component
 public final class AuthCookieFactory {
