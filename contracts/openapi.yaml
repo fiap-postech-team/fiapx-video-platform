@@ -124,24 +124,28 @@ paths:
     get:
       summary: Lista jobs do proprietário por cursor
       security: [ { bearerAuth: [ ] } ]
-      parameters: [ { name: cursor, in: query, required: false, schema: { type: string } }, { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } } ]
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [ PENDING, PROCESSING, COMPLETED, FAILED ] } }
       responses: { '200': { description: Página de jobs, content: { application/json: { schema: { $ref: '#/components/schemas/JobPage' } } } }, '400': { $ref: '#/components/responses/ValidationError' }, '401': { $ref: '#/components/responses/Unauthorized' } }
     post:
       summary: Cria um job a partir de um objeto já enviado
       security: [ { bearerAuth: [ ] } ]
       parameters: [ { name: Idempotency-Key, in: header, required: false, description: Opcional para outros clientes, até 128 caracteres. A SPA não envia este cabeçalho porque o CORS local não o libera e o navegador bloquearia o POST. Um job por vídeo continua garantido no serviço., schema: { type: string, maxLength: 128 } } ]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [ sourceKey ], properties: { sourceKey: { type: string } } } } } }
-      responses: { '201': { description: Job criado. Com a mesma Idempotency-Key, devolve o job já gravado. Sem a chave, um segundo início do mesmo vídeo responde 409., content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '400': { $ref: '#/components/responses/ValidationError' }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+      responses: { '201': { description: Job criado. Com a mesma Idempotency-Key, devolve o job já gravado. Sem a chave ou com uma nova chave, um segundo início do mesmo vídeo responde 409., headers: { Location: { $ref: '#/components/headers/Location' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '400': { $ref: '#/components/responses/ValidationError' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/AccessDenied' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/jobs/{id}:
     get:
       summary: Consulta o estado de um job
       security: [ { bearerAuth: [ ] } ]
       parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
-      responses: { '200': { description: Estado atual, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } }
+      responses: { '200': { description: Estado atual, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' } }
 components:
   securitySchemes: { bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT } }
   headers:
     RefreshCookie: { description: Cookie FIAPX_REFRESH HttpOnly; também pode expirar os cookies de sessão, schema: { type: string } }
+    Location: { description: URL do job criado, schema: { type: string, format: uri-reference } }
   responses:
     ValidationError: { description: Dados inválidos, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
     AuthenticationFailed: { description: Credenciais ou sessão inválidas, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
@@ -182,7 +186,7 @@ components:
     AccessToken: { type: object, required: [ accessToken, tokenType, expiresIn ], properties: { accessToken: { type: string }, tokenType: { type: string, example: Bearer }, expiresIn: { type: integer, example: 900 } } }
     Login: { allOf: [ { $ref: '#/components/schemas/AccessToken' }, { type: object, required: [ user ], properties: { user: { $ref: '#/components/schemas/User' } } } ] }
     Problem: { type: object, properties: { type: { type: string }, title: { type: string }, status: { type: integer }, detail: { type: string }, instance: { type: string }, code: { type: string } } }
-    Job: { type: object, properties: { id: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string }, resultKey: { type: [ string, 'null' ] }, status: { enum: [ PENDING, PROCESSING, COMPLETED, FAILED ] }, createdAt: { type: string, format: date-time } } }
+    Job: { type: object, required: [ id, userId, sourceKey, status, createdAt ], properties: { id: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string }, resultKey: { type: [ string, 'null' ] }, status: { enum: [ PENDING, PROCESSING, COMPLETED, FAILED ] }, createdAt: { type: string, format: date-time } } }
     JobPage: { type: object, required: [ items ], properties: { items: { type: array, items: { $ref: '#/components/schemas/Job' } }, nextCursor: { type: [ string, 'null' ] } } }
     VideoLibraryStatus: { type: string, enum: [ AWAITING_UPLOAD, UPLOADED, PROCESSING, AVAILABLE, FAILED, REJECTED, EXPIRED ] }
     VideoProcessingStatus: { type: string, enum: [ QUEUED, PROCESSING, AVAILABLE, FAILED ] }

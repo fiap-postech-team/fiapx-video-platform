@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
+import br.com.fiapx.videoapi.jobs.domain.JobStatus;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -68,6 +70,14 @@ class ApiExceptionHandlerMvcTest {
     }
 
     @Test
+    void returnsProblemDetailForInvalidQueryParameter() throws Exception {
+        mockMvc.perform(get("/fixture/status").param("status", "UNKNOWN"))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     void sanitizesUnexpectedFailure(CapturedOutput output) throws Exception {
         mockMvc.perform(get("/fixture/failure"))
             .andExpect(status().isInternalServerError())
@@ -91,6 +101,10 @@ class ApiExceptionHandlerMvcTest {
         @GetMapping("/fixture/failure")
         void fail() {
             throw new IllegalStateException("internal database failure");
+        }
+
+        @GetMapping("/fixture/status")
+        void status(@RequestParam JobStatus status) {
         }
     }
 

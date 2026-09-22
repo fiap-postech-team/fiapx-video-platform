@@ -40,13 +40,14 @@ public final class Job {
     }
 
     public void apply(JobStatus nextStatus, String nextResultKey) {
-        if (!accepts(nextStatus)) throw new IllegalStateException("Invalid job transition");
+        if (!accepts(nextStatus)) throw new InvalidJobTransitionException(status, nextStatus);
         status = nextStatus;
         resultKey = nextResultKey;
     }
 
     private boolean accepts(JobStatus nextStatus) {
-        return (status == JobStatus.PENDING && (nextStatus == JobStatus.PROCESSING || nextStatus == JobStatus.FAILED))
+        return (status == JobStatus.PENDING && (nextStatus == JobStatus.PROCESSING
+                || nextStatus == JobStatus.COMPLETED || nextStatus == JobStatus.FAILED))
             || (status == JobStatus.PROCESSING && (nextStatus == JobStatus.COMPLETED || nextStatus == JobStatus.FAILED));
     }
 

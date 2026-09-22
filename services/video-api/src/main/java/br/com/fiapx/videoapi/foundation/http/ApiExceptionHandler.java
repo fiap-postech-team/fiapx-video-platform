@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import br.com.fiapx.videoapi.jobs.adapter.in.http.JobNotFoundException;
@@ -17,6 +18,8 @@ import br.com.fiapx.videoapi.jobs.application.IdempotencyConflictException;
 import br.com.fiapx.videoapi.jobs.application.ProcessingAlreadyExistsException;
 import br.com.fiapx.videoapi.jobs.application.VideoNotConfirmedException;
 import br.com.fiapx.videoapi.jobs.application.VideoNotFoundException;
+import br.com.fiapx.videoapi.jobs.application.UserInactiveException;
+import br.com.fiapx.videoapi.jobs.domain.InvalidJobTransitionException;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadConflictException;
@@ -48,6 +51,14 @@ public final class ApiExceptionHandler {
         return response(ProblemType.VALIDATION_ERROR, request);
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ProblemDetail> handleTypeMismatch(
+        MethodArgumentTypeMismatchException exception,
+        HttpServletRequest request
+    ) {
+        return response(ProblemType.VALIDATION_ERROR, request);
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(
         Exception exception,
@@ -74,7 +85,8 @@ public final class ApiExceptionHandler {
     }
 
     @ExceptionHandler({EmailAlreadyRegisteredException.class, IdempotencyConflictException.class,
-        VideoNotConfirmedException.class, VideoUploadConflictException.class})
+        VideoNotConfirmedException.class, VideoUploadConflictException.class,
+        InvalidJobTransitionException.class})
     ResponseEntity<ProblemDetail> handleStateConflict(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.CONFLICT, request);
     }
@@ -83,6 +95,11 @@ public final class ApiExceptionHandler {
     ResponseEntity<ProblemDetail> handleProcessingExists(ProcessingAlreadyExistsException exception,
                                                          HttpServletRequest request) {
         return response(ProblemType.PROCESSING_ALREADY_EXISTS, request);
+    }
+
+    @ExceptionHandler(UserInactiveException.class)
+    ResponseEntity<ProblemDetail> handleInactiveUser(UserInactiveException exception, HttpServletRequest request) {
+        return response(ProblemType.ACCESS_DENIED, request);
     }
 
     @ExceptionHandler(StorageUnavailableException.class)

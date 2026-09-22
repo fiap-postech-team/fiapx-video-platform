@@ -6,7 +6,7 @@ Este modelo cobre o cadastro e a autenticação local de usuários, o upload dir
 para object storage, a persistência de vídeos e jobs, o histórico de estado,
 outbox e inbox. Cadastro, login, upload, confirmação do vídeo, jobs e as
 operações de persistência estão implementados. A integração da outbox/inbox com
-RabbitMQ permanece pendente.
+RabbitMQ usa publisher em background, confirms e listener idempotente de resultados.
 
 O PostgreSQL é a fonte de verdade dos metadados. Os binários permanecem no S3 e
 as mensagens no RabbitMQ carregam somente identificadores, object keys e
@@ -162,8 +162,8 @@ erDiagram
 | `videos` | metadados e ciclo de vida do objeto enviado diretamente ao S3/MinIO |
 | `jobs` | agregado proprietário do processamento e seu estado atual |
 | `job_status_history` | trilha append-only de todas as transições aceitas |
-| `outbox_events` | intenção durável de publicar `video.job.requested.v1`; publisher RabbitMQ ainda não está conectado |
-| `inbox_events` | base de deduplicação durável para resultados; listener RabbitMQ ainda não está conectado |
+| `outbox_events` | intenção durável de publicar `video.job.requested.v1`, com claim, retry e confirms |
+| `inbox_events` | base de deduplicação durável para resultados recebidos pelo listener RabbitMQ |
 
 ## Decisões importantes
 
@@ -183,8 +183,8 @@ O fluxo de upload e submissão é:
 3. a API confirma tamanho, tipo e checksum e muda para `UPLOADED`;
 4. na mesma transação, cria `jobs` em `PENDING`, o primeiro histórico
    e `outbox_events` com `video.job.requested.v1`;
-5. futuramente, o publisher enviará a mensagem e somente depois do publisher
-   confirm marcará a outbox como `PUBLISHED`.
+5. o publisher envia a mensagem em background e somente depois do publisher
+   confirm marca a outbox como `PUBLISHED`.
 
 ### Cadastro e login
 
@@ -201,23 +201,21 @@ fronteira de migração está no ADR 0011.
 ### Outbox e inbox
 
 Job, histórico inicial e outbox são gravados em uma única transação. A
-persistência possui operações de claim/retry com `next_attempt_at`; o publisher
-RabbitMQ com confirms ainda deve ser conectado. Como envio e atualização da
-outbox não serão atômicos, consumidores continuam obrigatoriamente idempotentes
-por `eventId`.
+persistência possui operações de claim/retry com `next_attempt_at` e o publisher
+RabbitMQ usa confirms. Como envio e atualização da outbox não são atômicos,
+consumidores continuam obrigatoriamente idempotentes por `eventId`.
 
 O caso de uso de resultados registra `eventId` na inbox antes de aplicar a
-transição. A chave única elimina redelivery, mas o listener RabbitMQ e a
-validação completa do fluxo de resultados ainda devem ser conectados e validados
-em integração.
+transição. A chave única elimina redelivery e o listener confirma somente após
+processar inbox, job e histórico na mesma transação.
 
 ## Constraints recomendadas
 
 - `users.email`: `UNIQUE (lower(email))`, ou tipo `citext` se a extensão estiver
   aprovada;
 - `videos`: `UNIQUE (object_key)` e checks para tamanho positivo e estados válidos;
-- `jobs`: `video_id`, proprietário e `version` impedem inconsistência e atualização perdida
-  para impedir processar vídeo de outro usuário; `version` para optimistic lock;
+- `jobs`: `video_id`, proprietário e as constraints de unicidade impedem mais de um
+  job por vídeo; `version` protege atualizações concorrentes;
 - `job_status_history`: `UNIQUE (job_id, event_id)` quando `event_id` existir;
 - `outbox_events`: `payload` textual legado e `payload_json` de transição,
   `attempts >= 0` e estado limitado a
