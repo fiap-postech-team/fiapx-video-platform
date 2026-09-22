@@ -55,7 +55,7 @@ public class JobController {
     @GetMapping("/{id}/download")
     ResponseEntity<DownloadResult.Result> download(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
         return ResponseEntity.ok().header("Cache-Control", "no-store")
-            .body(downloadResult.execute(id, identity.userId()));
+            .body(transactions.execute(() -> downloadResult.execute(id, identity.userId())));
     }
     @PostMapping
     ResponseEntity<JobResponse> create(@Valid @RequestBody CreateJobRequest request,
