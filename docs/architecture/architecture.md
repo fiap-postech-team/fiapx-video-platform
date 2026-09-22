@@ -54,17 +54,17 @@ flowchart LR
 
 | Componente            | Responsabilidades                                                       | Dados próprios                   | Não deve fazer                                             |
 |-----------------------|-------------------------------------------------------------------------|----------------------------------|------------------------------------------------------------|
-| `video-api`           | cadastro/login/sessão, validar JWT, criar/consultar jobs do proprietário e registrar outbox; resultado por listener ainda é futuro | usuários, sessões, vídeos, jobs, histórico, inbox, outbox | processar mídia ou acessar banco de notificações           |
+| `video-api`           | cadastro/login/sessão, validar JWT, criar/consultar jobs do proprietário, registrar outbox e consumir resultados idempotentemente | usuários, sessões, vídeos, jobs, histórico, inbox, outbox | processar mídia ou acessar banco de notificações           |
 | `video-processor`     | validar vídeo, extrair frames, gerar ZIP, publicar resultados           | arquivos temporários efêmeros    | atualizar tabelas da API ou transportar binários no broker |
 | `notification-worker` | consumir falhas terminais, enviar e-mail, auditar entrega               | entregas de notificação          | consultar jobs/usuários diretamente no banco da API        |
 | RabbitMQ              | filas de trabalho, fan-out lógico, retry e DLQ                          | mensagens pequenas e temporárias | armazenar vídeos ou ZIPs                                   |
 | MinIO/S3              | objetos de entrada e saída                                              | vídeo e ZIP                      | atuar como fonte de verdade do estado do job               |
 
-## Fluxo principal (alvo)
+## Fluxo principal
 
-O passo de persistência da API já existe, mas o fluxo não pode ser concluído
-pela API atual: não há endpoint para confirmar vídeo nem publisher/listener AMQP
-conectado ao broker.
+O job, seu histórico inicial e a intenção de publicação são persistidos na mesma
+transação. O publisher da outbox e o listener de resultados operam fora da
+transação HTTP.
 
 ```mermaid
 sequenceDiagram
@@ -128,15 +128,18 @@ recoverer associado à DLQ.
 stateDiagram-v2
     [*] --> PENDING: job + outbox persistidos
     PENDING --> PROCESSING: started.v1
+    PENDING --> COMPLETED: completed.v1 fora de ordem
+    PENDING --> FAILED: failed.v1
     PROCESSING --> COMPLETED: completed.v1
     PROCESSING --> FAILED: failed.v1 terminal
-    PENDING --> FAILED: falha antes do evento started
     COMPLETED --> [*]
     FAILED --> [*]
 ```
 
-Transições duplicadas precisam ser seguras, pois a entrega é pelo menos uma vez. Regressões de estado e eventos fora de
-ordem devem ser rejeitados quando a máquina de estados for endurecida.
+`PENDING` também pode ir diretamente para `COMPLETED` quando o resultado terminal
+chegar antes do evento `started`. Transições duplicadas, regressões e eventos
+após estados terminais são tratados de forma idempotente e não criam histórico
+adicional.
 
 ## Topologia RabbitMQ
 
@@ -181,10 +184,11 @@ serviços gerenciados ou operados com políticas próprias de backup, disponibil
 ## Consistência e garantias
 
 - Criar o job e registrar a intenção de publicação é atômico dentro do banco da API.
-- A API possui operações de claim/retry na outbox e persistência para inbox, mas
-  ainda não há publisher RabbitMQ nem listener de resultados configurados.
-- Quando os consumidores forem conectados, entrega pelo menos uma vez e
-  deduplicação por `eventId` continuam requisitos obrigatórios.
+- A API possui operações de claim/retry na outbox, publisher RabbitMQ com
+  confirms e persistência para inbox; a entrega continua sendo pelo menos uma
+  vez.
+- O listener de resultados registra `eventId` antes de atualizar job e histórico
+  na mesma transação; redeliveries são confirmados sem novo histórico.
 - A tabela do notification worker já possui `event_id` único. A integração de
   deduplicação do processor e do listener da API permanece no roadmap.
 - Object storage e banco têm consistência eventual: o job só deve virar `COMPLETED` depois que o upload do ZIP
@@ -211,8 +215,6 @@ profundidade das DLQs, dashboards e alertas. Consulte [quality-attributes.md](qu
 
 1. Upload/download por URL pré-assinada e confirmação de vídeo ainda não foram implementados.
 2. A API emite JWT RSA local; a migração para OIDC/JWKS está documentada no ADR 0011.
-3. Processor e API result listener ainda precisam ser conectados à inbox e à deduplicação persistente já modelada.
-4. O publisher da outbox precisa ser integrado ao RabbitMQ com confirms e recuperação explícita.
-5. Há testes unitários e de integração; os de Testcontainers exigem Docker e a cobertura atual não alcança o gate de 70%.
-6. Eventos de falha devem carregar o destinatário ou uma referência resolvível sem acesso ao banco da API.
-7. A política de retenção e limpeza de objetos temporários ainda deve ser definida.
+3. Há testes unitários e de integração; os de Testcontainers exigem Docker e a cobertura atual não alcança o gate de 70%.
+4. Eventos de falha devem carregar o destinatário ou uma referência resolvível sem acesso ao banco da API.
+5. A política de retenção e limpeza de objetos temporários ainda deve ser definida.

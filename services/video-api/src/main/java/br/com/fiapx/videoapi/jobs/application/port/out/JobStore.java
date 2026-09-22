@@ -1,6 +1,7 @@
 package br.com.fiapx.videoapi.jobs.application.port.out;
 
 import br.com.fiapx.videoapi.jobs.domain.Job;
+import br.com.fiapx.videoapi.jobs.domain.JobStatus;
 import br.com.fiapx.videoapi.inbox.domain.JobResultEvent;
 import java.util.Optional;
 import java.util.List;
@@ -15,6 +16,11 @@ public interface JobStore {
     }
     default List<Job> findOwnedPage(UUID userId, Instant createdBefore, UUID idBefore, int limit) {
         throw new UnsupportedOperationException();
+    }
+    default List<Job> findOwnedPage(UUID userId, Instant createdBefore, UUID idBefore,
+                                    JobStatus status, int limit) {
+        var page = findOwnedPage(userId, createdBefore, idBefore, limit);
+        return status == null ? page : page.stream().filter(job -> job.status() == status).toList();
     }
     default List<Job> findAwaitingLocalDemo(int limit) {
         return List.of();

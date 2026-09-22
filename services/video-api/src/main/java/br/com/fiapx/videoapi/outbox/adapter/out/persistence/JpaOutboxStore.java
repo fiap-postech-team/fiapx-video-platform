@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.time.Instant;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import br.com.fiapx.videoapi.outbox.domain.OutboxClaim;
@@ -15,13 +17,20 @@ import br.com.fiapx.videoapi.outbox.domain.OutboxClaim;
 public class JpaOutboxStore implements OutboxStore {
     private final SpringDataOutboxRepository events;
     private final ObjectMapper json;
-    public JpaOutboxStore(SpringDataOutboxRepository events, ObjectMapper json) { this.events = events; this.json = json; }
+    private final Clock clock;
+    public JpaOutboxStore(SpringDataOutboxRepository events, ObjectMapper json) {
+        this(events, json, Clock.systemUTC());
+    }
+    @Autowired
+    public JpaOutboxStore(SpringDataOutboxRepository events, ObjectMapper json, Clock clock) {
+        this.events = events; this.json = json; this.clock = clock;
+    }
     public void append(UUID eventId, UUID jobId, UUID userId, String sourceKey) {
-        append(eventId, jobId, userId, null, sourceKey, Instant.now());
+        append(eventId, jobId, userId, null, sourceKey, clock.instant());
     }
 
     public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey) {
-        append(eventId, jobId, userId, videoId, sourceKey, Instant.now());
+        append(eventId, jobId, userId, videoId, sourceKey, clock.instant());
     }
 
     public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,

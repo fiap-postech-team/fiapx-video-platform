@@ -1,6 +1,7 @@
 package br.com.fiapx.videoapi.outbox.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import br.com.fiapx.videoapi.outbox.adapter.configuration.OutboxMessagingConfiguration;
 import br.com.fiapx.videoapi.outbox.application.port.out.OutboxStore;
@@ -173,8 +174,9 @@ class OutboxRecoveryIT {
         var eventId = UUID.randomUUID();
         var jobId = UUID.randomUUID();
         outbox.append(eventId, jobId, UUID.randomUUID(), null, "users/timeout/source.mp4", Instant.now());
-        var shortWaitPublisher = new OutboxPublisher(outbox, rabbit,
-            new OutboxProperties(1, 1000, Duration.ofSeconds(30), Duration.ofNanos(1), 10, "timeout-test"),
+        var neverConfirmingRabbit = mock(RabbitTemplate.class);
+        var shortWaitPublisher = new OutboxPublisher(outbox, neverConfirmingRabbit,
+            new OutboxProperties(1, 1000, Duration.ofSeconds(30), Duration.ofMillis(50), 10, "timeout-test"),
             metrics, Clock.systemUTC());
 
         shortWaitPublisher.publishBatch();

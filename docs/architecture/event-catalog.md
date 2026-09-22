@@ -13,7 +13,9 @@ semântica, ownership e operação.
 
 O `video-api` registra a intenção de `video.job.requested.v1` na outbox quando
 cria um job. Um publisher em background envia a intenção com publisher confirms;
-quedas do broker deixam o evento pendente para retry.
+quedas do broker deixam o evento pendente para retry. A API também consome os
+eventos de resultado pela fila `video.api.results.v1`, registra o inbox e atualiza
+job e histórico de forma transacional.
 
 ## Catálogo
 

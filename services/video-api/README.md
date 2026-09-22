@@ -16,7 +16,10 @@ A biblioteca do proprietário é consultada em `GET /v1/videos` e
 Na criação do job, o estado `PENDING`, o histórico inicial e a intenção de
 publicar `video.job.requested.v1` são persistidos na mesma transação. O publisher
 RabbitMQ processa a outbox em background, com retry e publisher confirms. O
-processamento de mídia pertence ao `video-processor`, não à API.
+processamento de mídia pertence ao `video-processor`, não à API. Cada vídeo
+possui no máximo um job; uma nova `Idempotency-Key` não substitui esse bloqueio.
+Resultados `started`, `completed` e `failed` são consumidos pela fila durável
+`video.api.results.v1`, com inbox e atualização do job na mesma transação.
 
 Contratos: [OpenAPI](../../contracts/openapi.yaml) e
 [AsyncAPI](../../contracts/asyncapi.yaml).
@@ -35,6 +38,10 @@ RabbitMQ local: `amqp://fiapx:fiapx@localhost:5672`; painel de administração:
 `http://localhost:15672` (usuário e senha `fiapx`). O video-api também inicia
 quando o broker está indisponível; os eventos pendentes serão enviados após a
 recuperação.
+
+O limite máximo da listagem de jobs pode ser configurado por
+`VIDEO_API_JOBS_MAX_PAGE_SIZE` (padrão `100`). O consumidor de resultados pode
+ser desabilitado em testes com `VIDEO_API_JOBS_RESULT_LISTENER_ENABLED=false`.
 
 ### Reprocessar um evento esgotado
 

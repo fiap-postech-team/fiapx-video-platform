@@ -15,6 +15,9 @@ public class OutboxMessagingConfiguration {
     public static final String QUEUE = "video.processing.v1";
     public static final String DEAD_LETTER_QUEUE = "video.processing.dlq.v1";
     public static final String DEAD_LETTER_ROUTING_KEY = "video.processing.dlq.v1";
+    public static final String RESULT_QUEUE = "video.api.results.v1";
+    public static final String RESULT_DEAD_LETTER_QUEUE = "video.api.results.dlq.v1";
+    public static final String RESULT_DEAD_LETTER_ROUTING_KEY = "video.api.results.dlq.v1";
 
     @Bean
     Declarables videoJobTopology() {
@@ -24,8 +27,17 @@ public class OutboxMessagingConfiguration {
             .deadLetterRoutingKey(DEAD_LETTER_ROUTING_KEY)
             .build();
         var deadLetterQueue = QueueBuilder.durable(DEAD_LETTER_QUEUE).build();
-        return new Declarables(exchange, queue, deadLetterQueue,
+        var resultQueue = QueueBuilder.durable(RESULT_QUEUE)
+            .deadLetterExchange(EXCHANGE)
+            .deadLetterRoutingKey(RESULT_DEAD_LETTER_ROUTING_KEY)
+            .build();
+        var resultDeadLetterQueue = QueueBuilder.durable(RESULT_DEAD_LETTER_QUEUE).build();
+        return new Declarables(exchange, queue, deadLetterQueue, resultQueue, resultDeadLetterQueue,
             BindingBuilder.bind(queue).to(exchange).with("video.job.requested.v1"),
-            BindingBuilder.bind(deadLetterQueue).to(exchange).with(DEAD_LETTER_ROUTING_KEY));
+            BindingBuilder.bind(deadLetterQueue).to(exchange).with(DEAD_LETTER_ROUTING_KEY),
+            BindingBuilder.bind(resultQueue).to(exchange).with("video.job.started.v1"),
+            BindingBuilder.bind(resultQueue).to(exchange).with("video.job.completed.v1"),
+            BindingBuilder.bind(resultQueue).to(exchange).with("video.job.failed.v1"),
+            BindingBuilder.bind(resultDeadLetterQueue).to(exchange).with(RESULT_DEAD_LETTER_ROUTING_KEY));
     }
 }

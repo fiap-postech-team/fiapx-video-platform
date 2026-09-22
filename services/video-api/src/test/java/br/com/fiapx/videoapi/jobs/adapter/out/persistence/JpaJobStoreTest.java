@@ -70,6 +70,21 @@ class JpaJobStoreTest {
     }
 
     @Test
+    void mapsOwnedPageResultsFilteredByStatus() {
+        var repository = mock(SpringDataJobRepository.class);
+        var history = mock(JobStatusHistoryRepository.class);
+        var first = new Job(UUID.randomUUID(), UUID.randomUUID(), "uploads/failed.mp4", null,
+            JobStatus.FAILED, Instant.EPOCH);
+        when(repository.findOwnedPageByStatus(first.userId(), null, null, "FAILED", 10))
+            .thenReturn(List.of(new JobEntity(first)));
+
+        var page = new JpaJobStore(repository, history).findOwnedPage(first.userId(), null, null,
+            JobStatus.FAILED, 10);
+
+        assertThat(page).singleElement().extracting(Job::status).isEqualTo(JobStatus.FAILED);
+    }
+
+    @Test
     void appliesResultAndRecordsHistoryForNonTerminalStatusChange() {
         var repository = mock(SpringDataJobRepository.class);
         var history = mock(JobStatusHistoryRepository.class);
@@ -84,6 +99,22 @@ class JpaJobStoreTest {
         var saved = ArgumentCaptor.forClass(JobStatusHistoryEntity.class);
         verify(history).save(saved.capture());
         assertThat(ReflectionTestUtils.getField(saved.getValue(), "eventId")).isEqualTo(event.eventId());
+    }
+
+    @Test
+    void appliesTerminalResultDirectlyFromPending() {
+        var repository = mock(SpringDataJobRepository.class);
+        var history = mock(JobStatusHistoryRepository.class);
+        var existing = new JobEntity(job());
+        var event = new JobResultEvent(UUID.randomUUID(), existing.toDomain().id(), JobStatus.COMPLETED,
+            "videos/result.mp4", null, Instant.EPOCH.plusSeconds(5), "fingerprint");
+        when(repository.findById(event.jobId())).thenReturn(Optional.of(existing));
+
+        new JpaJobStore(repository, history).applyResult(event);
+
+        assertThat(existing.toDomain().status()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(existing.toDomain().resultKey()).isEqualTo("videos/result.mp4");
+        verify(history).save(any(JobStatusHistoryEntity.class));
     }
 
     @Test

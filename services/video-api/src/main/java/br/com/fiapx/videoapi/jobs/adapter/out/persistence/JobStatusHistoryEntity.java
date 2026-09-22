@@ -22,8 +22,9 @@ class JobStatusHistoryEntity {
     protected JobStatusHistoryEntity() {
     }
 
-    JobStatusHistoryEntity(UUID jobId, String status, UUID eventId, String reasonCode, Instant occurredAt) {
+    JobStatusHistoryEntity(UUID jobId, String status, UUID eventId, String reasonCode,
+                           Instant occurredAt, Instant recordedAt) {
         this.jobId = jobId; this.status = status; this.eventId = eventId; this.reasonCode = reasonCode;
-        this.occurredAt = occurredAt; recordedAt = Instant.now();
+        this.occurredAt = occurredAt; this.recordedAt = recordedAt;
     }
 }

@@ -35,5 +35,9 @@ public class JobEntity {
     Job toDomain() {
         return new Job(id, userId, videoId, sourceKind, sourceKey, resultKey, status, createdAt, videoLibraryVisible);
     }
-    void apply(Job job) { status = job.status(); resultKey = job.resultKey(); updatedAt = Instant.now(); }
+    void apply(Job job, Instant updatedAt) {
+        status = job.status();
+        resultKey = job.resultKey();
+        this.updatedAt = updatedAt;
+    }
 }
