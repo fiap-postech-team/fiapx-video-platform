@@ -2,6 +2,7 @@ package br.com.fiapx.videoapi.outbox.adapter.out.persistence;
 
 import br.com.fiapx.videoapi.outbox.application.port.out.OutboxStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.time.Instant;
 import java.util.List;
@@ -16,17 +17,33 @@ public class JpaOutboxStore implements OutboxStore {
     private final ObjectMapper json;
     public JpaOutboxStore(SpringDataOutboxRepository events, ObjectMapper json) { this.events = events; this.json = json; }
     public void append(UUID eventId, UUID jobId, UUID userId, String sourceKey) {
-        append(eventId, jobId, userId, null, sourceKey);
+        append(eventId, jobId, userId, null, sourceKey, Instant.now());
     }
 
     public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey) {
-        try { events.save(new OutboxEventEntity(eventId, jobId, json.writeValueAsString(payload(eventId, jobId, userId, videoId, sourceKey)), Instant.now())); }
+        append(eventId, jobId, userId, videoId, sourceKey, Instant.now());
+    }
+
+    public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,
+                       Instant occurredAt) {
+        var payload = payload(eventId, jobId, userId, videoId, sourceKey, occurredAt);
+        try { events.save(new OutboxEventEntity(eventId, jobId, json.writeValueAsString(payload), payload, occurredAt)); }
         catch (Exception exception) { throw new IllegalStateException("Cannot serialize job event", exception); }
     }
 
-    private Map<String, Object> payload(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey) {
-        if (videoId == null) return Map.of("eventId", eventId, "jobId", jobId, "userId", userId, "sourceKey", sourceKey);
-        return Map.of("eventId", eventId, "jobId", jobId, "userId", userId, "videoId", videoId, "sourceKey", sourceKey);
+    private Map<String, Object> payload(UUID eventId, UUID jobId, UUID userId, UUID videoId,
+                                        String sourceKey, Instant occurredAt) {
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("eventId", eventId);
+        payload.put("jobId", jobId);
+        payload.put("userId", userId);
+        if (videoId != null) payload.put("videoId", videoId);
+        payload.put("sourceKey", sourceKey);
+        payload.put("type", "video.job.requested.v1");
+        payload.put("schemaVersion", 1);
+        payload.put("occurredAt", occurredAt.toString());
+        payload.put("correlationId", jobId);
+        return payload;
     }
 
     @Transactional
@@ -36,19 +53,23 @@ public class JpaOutboxStore implements OutboxStore {
 
     @Transactional
     public boolean markPublished(UUID eventId, UUID claimToken, Instant publishedAt) {
-        return events.findById(eventId).filter(event -> event.isClaimedBy(claimToken)).map(event -> publish(event, publishedAt)).orElse(false);
+        return events.markPublished(eventId, claimToken, publishedAt) == 1;
     }
 
     @Transactional
     public boolean scheduleRetry(UUID eventId, UUID claimToken, Instant nextAttemptAt, String errorCode) {
-        return events.findById(eventId).filter(event -> event.isClaimedBy(claimToken)).map(event -> retry(event, nextAttemptAt, errorCode)).orElse(false);
+        return events.scheduleRetry(eventId, claimToken, nextAttemptAt, errorCode) == 1;
+    }
+
+    @Transactional
+    public boolean markFailed(UUID eventId, UUID claimToken, String errorCode) {
+        return events.markFailed(eventId, claimToken, errorCode) == 1;
     }
 
     private OutboxClaim claim(OutboxEventEntity event, String instance, Instant now, Instant expiresAt) {
         var view = event.claim(UUID.randomUUID(), instance, now, expiresAt);
-        return new OutboxClaim(view.id(), view.token(), view.routingKey(), view.payload(), view.occurredAt());
+        var correlationId = view.correlationId() == null ? view.jobId() : view.correlationId();
+        return new OutboxClaim(view.id(), view.jobId(), correlationId, view.token(), view.routingKey(),
+            view.payload(), view.occurredAt(), view.attempts(), view.recovered());
     }
-
-    private boolean publish(OutboxEventEntity event, Instant at) { event.publish(at); return true; }
-    private boolean retry(OutboxEventEntity event, Instant at, String code) { event.retry(at, code); return true; }
 }

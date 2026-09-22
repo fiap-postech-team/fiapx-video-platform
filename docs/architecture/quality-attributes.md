@@ -10,7 +10,7 @@ As colunas de evidência distinguem a fundação já executável das táticas qu
 
 | Atributo         | Cenário                                         | Resposta esperada                                  | Táticas                                             | Evidência atual                           |
 |------------------|-------------------------------------------------|----------------------------------------------------|-----------------------------------------------------|-------------------------------------------|
-| Disponibilidade  | RabbitMQ fica indisponível após criação do job  | job permanece recuperável e é publicado depois     | outbox transacional, polling                        | job/outbox persistidos; publisher no roadmap |
+| Disponibilidade  | RabbitMQ fica indisponível após criação do job  | job permanece recuperável e é publicado depois     | outbox transacional, polling                        | job/outbox persistidos; publisher com retry e recuperação de claims |
 | Confiabilidade   | consumer cai após executar efeito, antes do ack | redelivery não duplica efeito final                | `eventId`, unique constraints, keys determinísticas | inbox modelada; consumidores ainda não integrados |
 | Escalabilidade   | fila cresce durante pico                        | adicionar processors aumenta vazão sem escalar API | serviços stateless, work queue, S3                  | desenho e containers separados            |
 | Performance      | cliente cria job durante processamento pesado   | API mantém latência independente do FFmpeg         | processamento fora da API                           | separação implementada                    |

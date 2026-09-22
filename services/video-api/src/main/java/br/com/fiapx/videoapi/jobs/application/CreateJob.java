@@ -52,7 +52,7 @@ public final class CreateJob {
         if (idempotencyKey != null) {
             idempotency.record(userId, idempotencyKey, fingerprint, job.id());
         }
-        outbox.append(UUID.randomUUID(), job.id(), userId, video.id(), sourceKey);
+        outbox.append(UUID.randomUUID(), job.id(), userId, video.id(), sourceKey, job.createdAt());
         return job;
     }
 

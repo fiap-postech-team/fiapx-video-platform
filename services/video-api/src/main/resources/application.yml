@@ -1,6 +1,15 @@
 spring:
   application:
     name: video-api
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:fiapx}
+    password: ${RABBITMQ_PASSWORD:fiapx}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   datasource:
     url: ${DATABASE_URL}
     username: ${DATABASE_USER}
@@ -21,7 +30,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       probes:
@@ -38,6 +47,13 @@ springdoc:
     enabled: false
 
 app:
+  outbox:
+    batch-size: ${VIDEO_API_OUTBOX_BATCH_SIZE:50}
+    poll-interval-ms: ${VIDEO_API_OUTBOX_POLL_INTERVAL_MS:1000}
+    claim-timeout: ${VIDEO_API_OUTBOX_CLAIM_TIMEOUT:PT30S}
+    confirm-timeout: ${VIDEO_API_OUTBOX_CONFIRM_TIMEOUT:PT5S}
+    max-attempts: ${VIDEO_API_OUTBOX_MAX_ATTEMPTS:10}
+    instance-id: ${HOSTNAME:video-api}
   video:
     storage-mode: ${APP_VIDEO_STORAGE_MODE:s3}
     local-public-endpoint: ${APP_VIDEO_LOCAL_PUBLIC_ENDPOINT:http://localhost:8080}

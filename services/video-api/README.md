@@ -14,23 +14,42 @@ A biblioteca do proprietário é consultada em `GET /v1/videos` e
 `GET /v1/videos/{videoRef}` (Flyway `V5`).
 
 Na criação do job, o estado `PENDING`, o histórico inicial e a intenção de
-publicar `video.job.requested.v1` são persistidos na mesma transação. O schema e
-as operações de outbox/inbox existem, mas o publisher e o listener RabbitMQ
-ainda não estão integrados. O processamento de mídia pertence ao
-`video-processor`, não à API.
+publicar `video.job.requested.v1` são persistidos na mesma transação. O publisher
+RabbitMQ processa a outbox em background, com retry e publisher confirms. O
+processamento de mídia pertence ao `video-processor`, não à API.
 
 Contratos: [OpenAPI](../../contracts/openapi.yaml) e
 [AsyncAPI](../../contracts/asyncapi.yaml).
 
 ## Como executar localmente
 
-Pré-requisitos: JDK 21, Docker e portas `5432`, `8080` e `9000` livres. Na raiz
+Pré-requisitos: JDK 21, Docker e portas `5432`, `5672`, `8080` e `9000` livres. Na raiz
 do monorepo:
 
 ```bash
-docker compose up -d postgres minio minio-init
+docker compose up -d postgres rabbitmq minio minio-init
 ./mvnw -pl services/video-api -am spring-boot:run
 ```
+
+RabbitMQ local: `amqp://fiapx:fiapx@localhost:5672`; painel de administração:
+`http://localhost:15672` (usuário e senha `fiapx`). O video-api também inicia
+quando o broker está indisponível; os eventos pendentes serão enviados após a
+recuperação.
+
+### Reprocessar um evento esgotado
+
+Após corrigir a causa indicada por `eventId` e `errorCode` no log, um operador
+pode recolocar o registro `FAILED` na fila com SQL:
+
+```sql
+UPDATE outbox_events
+SET status = 'PENDING', attempts = 0, next_attempt_at = now(), last_error_code = NULL
+WHERE id = '<event-id>' AND status = 'FAILED';
+```
+
+O update deve afetar uma linha. Como a falha pode ter ocorrido após a confirmação
+do broker, o reprocessamento pode produzir duplicata; consumidores devem
+continuar idempotentes por `eventId`.
 
 O comando Maven usa o perfil `local`, com credenciais de desenvolvimento e par
 RSA efêmero. Os JWTs emitidos deixam de valer após reiniciar a API. Não use esse
@@ -42,7 +61,7 @@ HTTP está em `http://localhost:8080/openapi.yaml` e o Swagger UI local em
 os volumes:
 
 ```bash
-docker compose stop postgres minio
+docker compose stop postgres rabbitmq minio
 ```
 
 ## Banco de dados
