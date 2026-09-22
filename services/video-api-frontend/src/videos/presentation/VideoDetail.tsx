@@ -1,39 +1,53 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { copy } from '../../product-copy'
-import { formatDateTime } from '../application/format-datetime'
-import {
-  lifecycleStatus,
-  lifecycleStatusLabel,
-  previousAttempts,
-  processingStatusLabel,
-} from '../application/product-status'
-import type { Video, VideoService } from '../domain/video'
+import { lifecycleStatusLabel, lifecycleTone } from '../application/product-status'
+import { isVideoServiceError, type VideoDetail as VideoDetailModel, type VideoService } from '../domain/video'
 import { VideoTimeline } from './VideoTimeline'
 
 interface VideoDetailProps {
-  userId: string
-  videoId: string
+  videoRef: string
   videoService: VideoService
   onBack: () => void
 }
 
-export function VideoDetail({ userId, videoId, videoService, onBack }: VideoDetailProps) {
-  const [video, setVideo] = useState<Video | null | undefined>(undefined)
-  const [downloadNotice, setDownloadNotice] = useState(false)
+const DETAIL_POLL_INTERVAL_MS = 15_000
+
+export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps) {
+  const [video, setVideo] = useState<VideoDetailModel | null | undefined>(undefined)
+  const [failed, setFailed] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const shownRef = useRef<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    setVideo(undefined)
-    setDownloadNotice(false)
-    videoService.get(userId, videoId).then((result) => {
-      if (!cancelled) setVideo(result)
+    let pollTimer: ReturnType<typeof setTimeout> | undefined
+    if (shownRef.current !== videoRef) {
+      setVideo(undefined)
+      setFailed(false)
+    }
+    videoService.get(videoRef).then((result) => {
+      if (cancelled) return
+      shownRef.current = videoRef
+      setFailed(false)
+      setVideo(result)
+      if (result && (result.status === 'UPLOADED' || result.status === 'PROCESSING')) {
+        pollTimer = setTimeout(() => setReloadKey((value) => value + 1), DETAIL_POLL_INTERVAL_MS)
+      }
+    }).catch((error) => {
+      if (cancelled) return
+      if (isVideoServiceError(error)) {
+        setFailed(true)
+        return
+      }
+      setVideo(null)
     })
     return () => {
       cancelled = true
+      if (pollTimer) clearTimeout(pollTimer)
     }
-  }, [userId, videoId, videoService])
+  }, [videoRef, videoService, reloadKey])
 
-  if (video === undefined) {
+  if (video === undefined && !failed) {
     return (
       <section className="page-block">
         <p role="status">{copy.videos.loading}</p>
@@ -41,67 +55,44 @@ export function VideoDetail({ userId, videoId, videoService, onBack }: VideoDeta
     )
   }
 
-  if (video === null) {
+  if (failed) {
     return (
       <section className="page-block">
-        <p role="alert">{copy.detail.notFound}</p>
-        <button type="button" className="btn-quiet" onClick={onBack}>{copy.detail.back}</button>
+        <p role="alert">{copy.detail.unavailableLoad}</p>
+        <button type="button" className="btn-primary" onClick={() => setReloadKey((value) => value + 1)}>
+          {copy.videos.retry}
+        </button>
       </section>
     )
   }
 
-  const lifecycle = lifecycleStatus(video)
-  const history = previousAttempts(video)
+  if (!video) {
+    return (
+      <section className="page-block">
+        <p role="alert">{copy.detail.notFound}</p>
+        <div className="detail-actions">
+          <button type="button" onClick={onBack}>{copy.detail.back}</button>
+        </div>
+      </section>
+    )
+  }
+
+  const tone = lifecycleTone(video.status)
 
   return (
     <article className="page-block" aria-labelledby="video-detail-title">
       <div className="detail-header">
-        <button type="button" className="text-link" onClick={onBack}>{copy.detail.back}</button>
-        <p className={`status-badge is-${lifecycle}`}>
-          {lifecycleStatusLabel(lifecycle)}
+        <p className={`status-badge is-${tone}`}>
+          {lifecycleStatusLabel(video.status)}
         </p>
         <h1 id="video-detail-title">{video.originalFilename}</h1>
       </div>
       <VideoTimeline video={video} />
-
-      {lifecycle === 'available' && (
-        <div className="detail-actions">
-          <button type="button" onClick={() => setDownloadNotice(true)}>
-            {copy.detail.download}
-          </button>
-          {downloadNotice && (
-            <p className="notice" role="status">
-              {copy.detail.downloadDone} {copy.detail.downloadSimulated}
-            </p>
-          )}
-        </div>
-      )}
-      {lifecycle === 'expired' && <p className="page-note">{copy.detail.expiredHint}</p>}
-      {lifecycle === 'failed' && <p className="page-note">{copy.detail.failedHint}</p>}
-
-      <section className="history" aria-labelledby="history-title">
-        <h2 id="history-title">{copy.detail.history}</h2>
-        {history.length === 0 ? (
-          <p>{copy.detail.historyEmpty}</p>
-        ) : (
-          <ol>
-            {history.map((attempt) => (
-              <li key={attempt.id}>
-                <strong>{processingStatusLabel(
-                  attempt.status === 'COMPLETED'
-                    ? 'completed'
-                    : attempt.status === 'PROCESSING'
-                      ? 'processing'
-                      : attempt.status === 'PENDING'
-                        ? 'pending'
-                        : 'error',
-                )}</strong>
-                <span>{formatDateTime(attempt.createdAt)}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      {video.status === 'EXPIRED' && <p className="page-note">{copy.detail.expiredHint}</p>}
+      {video.status === 'FAILED' && <p className="page-note">{copy.detail.failedHint}</p>}
+      <div className="detail-actions">
+        <button type="button" onClick={onBack}>{copy.detail.back}</button>
+      </div>
     </article>
   )
 }

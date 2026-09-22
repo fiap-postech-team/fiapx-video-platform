@@ -6,23 +6,24 @@ Este documento cobre somente as seis telas do épico de linguagem: Entrar, Cadas
 
 | Variável | Origem | Formatação |
 | --- | --- | --- |
-| `{data}` | `uploadedAt` ISO UTC | `Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })` no fuso do navegador |
+| `{data}` | `activityAt` ISO UTC | `Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })` no fuso do navegador |
 | `{nome}` | `File.name` selecionado | texto simples |
 | `{tamanho}` | `File.size` | KB/MB em `pt-BR` |
 | `{percent}` | progresso do mock, 0 a 100 | número inteiro |
 
 ## Correspondência de estados técnicos → produto
 
-A lista e o detalhe mostram um único status de ciclo de vida, derivado no frontend a partir de `uploadStatus` e da última tentativa. Nenhum estado novo é inventado no backend.
+A lista e o detalhe mostram um único status de ciclo de vida vindo do contrato de biblioteca. Enums internos não aparecem na interface.
 
-| Origem interna (não visível) | Texto visível |
+| Status no contrato | Texto visível |
 | --- | --- |
-| `uploadStatus` `PENDING` | Pendente |
-| `uploadStatus` `REJECTED` | Rejeitado |
-| `uploadStatus` `EXPIRED` | Expirado |
-| `UPLOADED` + tentativa `PENDING`, `PROCESSING` ou ausente | Processando |
-| `UPLOADED` + última tentativa `COMPLETED` | Processado |
-| `UPLOADED` + última tentativa `FAILED` | Falha no processamento |
+| `AWAITING_UPLOAD` | Pendente |
+| `UPLOADED` | Processando |
+| `PROCESSING` | Processando |
+| `AVAILABLE` | Processado |
+| `REJECTED` | Rejeitado |
+| `EXPIRED` | Expirado |
+| `FAILED` | Falha no processamento |
 
 Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisponível`.
 
@@ -86,18 +87,15 @@ Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisp
 | videos.retry | Meus vídeos | Tentar de novo | falha recuperável | fixo |
 | videos.openDetail | Meus vídeos | Ver detalhes | item da lista | fixo |
 | videos.sentAt | Meus vídeos | Enviado em {data} | item com horário de envio | dinâmico |
-| videos.loadMore | Meus vídeos | Carregar mais | próxima página | fixo |
-| detail.back | Detalhe do vídeo | Voltar para meus vídeos | navegação interna | fixo |
+| videos.pagination | Meus vídeos | Paginação da biblioteca | navegação entre páginas | fixo |
+| detail.back | Detalhe do vídeo | Voltar para meus vídeos | botão abaixo do detalhe | fixo |
 | detail.timeline | Detalhe do vídeo | Andamento | linha do tempo | fixo |
 | detail.sent | Detalhe do vídeo | Enviado em | marco | fixo |
 | detail.processed | Detalhe do vídeo | Processado em | marco | fixo |
 | detail.available | Detalhe do vídeo | Disponível em | marco | fixo |
 | detail.awaiting | Detalhe do vídeo | Aguardando | marco futuro | fixo |
 | detail.unavailable | Detalhe do vídeo | Data indisponível | dado histórico ausente | fixo |
-| detail.history | Detalhe do vídeo | Processamentos anteriores | histórico | fixo |
-| detail.historyEmpty | Detalhe do vídeo | Este vídeo ainda não teve outros processamentos. | sem tentativas anteriores | fixo |
-| detail.download | Detalhe do vídeo | Baixar imagens | vídeo disponível | fixo |
-| detail.downloadSimulated | Detalhe do vídeo | O download é simulado neste protótipo. Nenhum arquivo é gerado. | após o CTA | fixo |
+
 | detail.notFound | Detalhe do vídeo | Não foi possível encontrar este vídeo. | vídeo inexistente para o dono | fixo |
 | upload.title | Enviar vídeo | Enviar vídeo | cabeçalho | fixo |
 | upload.lead | Enviar vídeo | Selecione um arquivo para simular o envio. Formatos aceitos: MP4, MOV, WebM e MKV. Limite de 500 MB (500.000.000 bytes). | instruções | fixo |

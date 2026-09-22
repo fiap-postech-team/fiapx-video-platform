@@ -106,9 +106,9 @@ describe('authenticated product', () => {
     expect(screen.getByRole('columnheader', { name: copy.videos.colDate })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: copy.videos.colStatus })).toBeInTheDocument()
     expect(screen.getByText('campanha.mp4')).toBeInTheDocument()
-    expect(screen.getAllByText(copy.lifecycleStatus.processing).length).toBeGreaterThan(1)
-    expect(screen.getAllByText(copy.lifecycleStatus.available).length).toBeGreaterThan(1)
-    expect(screen.queryByText(copy.videoStatus.uploaded)).not.toBeInTheDocument()
+    expect(screen.getAllByText(copy.lifecycleStatus.processing).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(copy.lifecycleStatus.available).length).toBeGreaterThan(0)
+    expect(screen.queryByText('5/8')).not.toBeInTheDocument()
     expect(screen.queryByText(copy.processingStatus.completed)).not.toBeInTheDocument()
     expect(screen.getAllByText('campanha.mp4')).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: copy.shell.navUpload }).length).toBeGreaterThan(0)
@@ -122,7 +122,7 @@ describe('authenticated product', () => {
     assertProductLanguage()
   })
 
-  it('opens a dedicated detail with history and a simulated download', async () => {
+  it('opens a dedicated detail with a single timeline and no retry or download', async () => {
     const user = userEvent.setup()
     render(
       <App
@@ -137,12 +137,9 @@ describe('authenticated product', () => {
 
     expect(await screen.findByRole('heading', { name: 'campanha.mp4' })).toBeInTheDocument()
     expect(screen.getByText(copy.detail.sent)).toBeInTheDocument()
-    expect(screen.getByText(copy.detail.history)).toBeInTheDocument()
     expect(screen.getByText(copy.lifecycleStatus.available)).toBeInTheDocument()
-    expect(screen.getByText(copy.processingStatus.error)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: copy.detail.download }))
-    expect(screen.getByRole('status')).toHaveTextContent(copy.detail.downloadSimulated)
+    expect(screen.queryByText('Processamentos anteriores')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Baixar/ })).not.toBeInTheDocument()
     assertProductLanguage()
   })
 
@@ -158,22 +155,6 @@ describe('authenticated product', () => {
     expect(await screen.findByText(copy.videos.emptyBody)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: copy.videos.emptyAction })).toBeInTheDocument()
     expect(screen.queryByText(copy.prototype.title)).not.toBeInTheDocument()
-  })
-
-  it('explains when search or status filters hide every row', async () => {
-    const user = userEvent.setup()
-    render(
-      <App
-        authenticationService={serviceReturning({ user: DEMO_USER })}
-        videoService={new MockVideoService()}
-      />,
-    )
-    await signIn(user)
-
-    await user.type(screen.getByPlaceholderText(copy.videos.searchPlaceholder), 'arquivo-inexistente')
-    expect(screen.getByText(copy.videos.filterEmpty)).toBeInTheDocument()
-    expect(screen.getByText(copy.videos.filterEmptyHint)).toBeInTheDocument()
-    expect(screen.queryByText(copy.videos.emptyBody)).not.toBeInTheDocument()
   })
 
   it('shows a recoverable load error', async () => {
@@ -209,6 +190,10 @@ describe('authenticated product', () => {
     expect(screen.getByText(/gravacao\.webm/)).toBeInTheDocument()
     expect(submitButton()).toBeEnabled()
     await user.click(submitButton()!)
+
+    expect(screen.getByRole('heading', { name: copy.upload.reviewTitle })).toBeInTheDocument()
+    expect(simulate).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: copy.upload.confirm }))
 
     expect(await screen.findByRole('heading', { name: copy.upload.successTitle }, { timeout: 4000 })).toBeInTheDocument()
     expect(screen.getByText(copy.upload.successStatus)).toBeInTheDocument()

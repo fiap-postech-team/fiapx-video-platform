@@ -12,15 +12,16 @@ semântica, ownership e operação.
 ## Estado da implementação
 
 O `video-api` registra a intenção de `video.job.requested.v1` na outbox quando
-cria um job. O publisher RabbitMQ e o listener de resultados ainda não estão
-conectados; portanto, as linhas abaixo definem o contrato e o fluxo-alvo, não
-uma integração ponta a ponta já executável.
+cria um job. Um publisher em background envia a intenção com publisher confirms;
+quedas do broker deixam o evento pendente para retry. A API também consome os
+eventos de resultado pela fila `video.api.results.v1`, registra o inbox e atualiza
+job e histórico de forma transacional.
 
 ## Catálogo
 
 | Routing key              | Produtor               | Consumidores                       | Quando ocorre              | Campos específicos                                      |
 |--------------------------|------------------------|------------------------------------|----------------------------|---------------------------------------------------------|
-| `video.job.requested.v1` | `video-api` via outbox (publisher pendente) | `video-processor` | job, histórico e outbox persistidos | `userId`, `videoId` opcional, `sourceKey`              |
+| `video.job.requested.v1` | `video-api` via outbox | `video-processor` | job, histórico e outbox persistidos | `userId`, `videoId` opcional, `sourceKey`              |
 | `video.job.started.v1`   | `video-processor`      | `video-api`                        | processor inicia trabalho  | `type=PROCESSING`                                       |
 | `video.job.completed.v1` | `video-processor`      | `video-api`                        | ZIP armazenado com sucesso | `type=COMPLETED`, `resultKey`                           |
 | `video.job.failed.v1`    | `video-processor`      | `video-api`, `notification-worker` | falha declarada terminal   | `type=FAILED`, `terminal`, `reason`, `recipient` futuro |
@@ -39,9 +40,10 @@ uma integração ponta a ponta já executável.
 ```
 
 `correlationId` é persistido nos metadados da outbox e o payload textual legado
-continua sendo usado pela implementação atual. A coluna `payload_json` já existe
-para a transição, mas o envelope JSONB versionado deve ser preenchido junto com o
-publisher RabbitMQ.
+é igual a `jobId`. O envelope de `video.job.requested.v1` também inclui `type`,
+`schemaVersion` e `occurredAt`; os campos novos são opcionais no AsyncAPI para
+compatibilidade, mas sempre enviados pelo `video-api`. O JSONB é armazenado em
+`payload_json` e a coluna textual existente é mantida durante a transição.
 
 ## Semântica por evento
 
@@ -49,7 +51,9 @@ publisher RabbitMQ.
 
 Comando durável para iniciar processamento. O processor pode recebê-lo mais de uma vez. `sourceKey` identifica um objeto
 já existente e `videoId`, quando presente, identifica os metadados confirmados. Nenhum deles deve conter URL com
-credencial. Retenção precisa cobrir a indisponibilidade máxima aceitável do processor.
+credencial. `eventId` permanece estável em retries; `type` contém a routing key,
+`schemaVersion` é `1` e `occurredAt` corresponde à criação do job. Retenção precisa
+cobrir a indisponibilidade máxima aceitável do processor.
 
 ### `video.job.started.v1`
 

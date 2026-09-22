@@ -1,9 +1,9 @@
-import { type ChangeEvent, type FormEvent, useRef, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from 'react'
 import { copy, interpolate } from '../../product-copy'
 import { formatFileSize } from '../application/format-datetime'
 import { playUploadProgress, uploadStepMs, wait } from '../application/upload-flow'
 import { validateUploadSelection } from '../application/validate-upload'
-import type { PrototypeScenario, VideoService } from '../domain/video'
+import { UploadFailure, type PrototypeScenario, type VideoService } from '../domain/video'
 
 interface UploadVideoProps {
   userId: string
@@ -12,7 +12,7 @@ interface UploadVideoProps {
   onFinished: () => void
 }
 
-type UploadPhase = 'form' | 'sending' | 'confirming' | 'success' | 'error' | 'pending'
+type UploadPhase = 'form' | 'review' | 'sending' | 'confirming' | 'processing' | 'success' | 'failed' | 'error' | 'expired' | 'pending'
 
 export function UploadVideo({ userId, videoService, scenario, onFinished }: UploadVideoProps) {
   const [file, setFile] = useState<File | null>(null)
@@ -21,8 +21,13 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
   const [phase, setPhase] = useState<UploadPhase>('form')
   const [isBusy, setIsBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const requestRef = useRef<AbortController | null>(null)
+
+  useEffect(() => () => requestRef.current?.abort(), [])
 
   function applyFile(next: File | null) {
+    requestRef.current?.abort()
+    requestRef.current = null
     setPhase('form')
     setProgress(0)
     if (!next) {
@@ -64,44 +69,54 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
     }
 
     setIsBusy(true)
-    setPhase('confirming')
-    setProgress(100)
+    const request = new AbortController()
+    requestRef.current = request
     try {
-      await wait(uploadStepMs() === 0 ? 0 : 420)
       if (scenario.kind === 'upload-error') {
         setPhase('error')
         return
       }
-      await videoService.simulateUpload(userId, validation.selection, { scenario })
-      setPhase('success')
-    } catch {
-      setPhase('error')
+      if (videoService.upload) {
+        const result = await videoService.upload(file, {
+          signal: request.signal,
+          onProgress: setProgress,
+          onPhase: setPhase,
+          onJobStatus: (status) => {
+            if (status === 'FAILED') setPhase('failed')
+            else if (status === 'COMPLETED') setPhase('success')
+            else setPhase('processing')
+          },
+        })
+        setPhase(result.status === 'FAILED' ? 'failed' : 'success')
+      } else {
+        setPhase('sending')
+        await playUploadProgress(setProgress, uploadStepMs())
+        setPhase('confirming')
+        setProgress(100)
+        await wait(uploadStepMs() === 0 ? 0 : 420)
+        await videoService.simulateUpload(userId, validation.selection, { scenario })
+        setPhase('success')
+      }
+    } catch (error) {
+      if (request.signal.aborted) return
+      if (error instanceof UploadFailure && error.code === 'UPLOAD_EXPIRED') setPhase('expired')
+      else if (error instanceof UploadFailure && error.code === 'UPLOAD_UNCERTAIN') setPhase('pending')
+      else setPhase('error')
     } finally {
+      requestRef.current = null
       setIsBusy(false)
     }
   }
 
   async function startUpload() {
     if (!file || isBusy) return
-    setIsBusy(true)
-    setPhase('sending')
-    setProgress(0)
-    try {
-      await playUploadProgress(setProgress, uploadStepMs())
-      if (scenario.kind === 'upload-pending') {
-        setPhase('pending')
-        return
-      }
-      await confirmUpload()
-    } finally {
-      setIsBusy(false)
-    }
+    setPhase('review')
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!file) return
-    if (phase === 'pending' || phase === 'error') {
+    if (phase === 'review' || phase === 'pending' || phase === 'error' || phase === 'expired') {
       await confirmUpload()
       return
     }
@@ -115,12 +130,12 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
       <h1 id="upload-title">{copy.upload.title}</h1>
       <p className="page-lead">{copy.upload.lead}</p>
 
-      {phase === 'success' ? (
+      {phase === 'success' || phase === 'failed' ? (
         <div className="result-card" role="status">
-          <span className="result-icon is-success" aria-hidden="true" />
-          <h2>{copy.upload.successTitle}</h2>
-          <p>{copy.upload.successCopy}</p>
-          <p className="status-badge is-uploaded">{copy.upload.successStatus}</p>
+          <span className={`result-icon ${phase === 'success' ? 'is-success' : 'is-error'}`} aria-hidden="true" />
+          <h2>{phase === 'success' ? copy.upload.successTitle : copy.upload.processingFailed}</h2>
+          <p>{phase === 'success' ? copy.upload.successCopy : copy.detail.failedHint}</p>
+          <p className={`status-badge ${phase === 'success' ? 'is-uploaded' : 'is-failed'}`}>{phase === 'success' ? copy.upload.successStatus : copy.lifecycleStatus.failed}</p>
           <div className="result-actions">
             <button type="button" onClick={onFinished}>{copy.upload.successAction}</button>
             <button type="button" className="ghost" onClick={clearFile}>{copy.upload.sendAnother}</button>
@@ -128,7 +143,7 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
         </div>
       ) : (
         <form className="upload-form" noValidate onSubmit={(event) => { void handleSubmit(event) }}>
-          {(phase === 'form' || phase === 'error' || phase === 'pending') && (
+          {(phase === 'form' || phase === 'review' || phase === 'error' || phase === 'expired' || phase === 'pending') && (
             <div className="field">
               <label htmlFor="video-file">{copy.upload.fileLabel}</label>
               <input
@@ -164,6 +179,17 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
             </div>
           )}
 
+          {phase === 'review' && (
+            <div className="result-card" role="dialog" aria-labelledby="upload-review-title">
+              <h2 id="upload-review-title">{copy.upload.reviewTitle}</h2>
+              <p>{copy.upload.reviewCopy}</p>
+              <div className="result-actions">
+                <button type="submit">{copy.upload.confirm}</button>
+                <button type="button" className="ghost" onClick={clearFile}>{copy.upload.cancel}</button>
+              </div>
+            </div>
+          )}
+
           {(phase === 'sending' || phase === 'confirming') && (
             <div className="progress-card" role="status">
               <h2>{phase === 'sending' ? copy.upload.sendingTitle : copy.upload.confirmingTitle}</h2>
@@ -179,6 +205,14 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
             </div>
           )}
 
+          {phase === 'processing' && (
+            <div className="result-card" role="status">
+              <p className="status-badge is-processing">{copy.processingStatus.processing}</p>
+              <h2>{copy.upload.processingTitle}</h2>
+              <p>{copy.upload.processingCopy}</p>
+            </div>
+          )}
+
           {phase === 'error' && (
             <div className="result-card is-error" role="alert">
               <span className="result-icon is-error" aria-hidden="true" />
@@ -190,8 +224,15 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
           {phase === 'pending' && (
             <div className="result-card" role="status">
               <p className="status-badge is-pending">{copy.upload.pendingStatus}</p>
-              <h2>{copy.upload.pendingCopy}</h2>
-              <p className="page-note">{copy.upload.pendingHint}</p>
+              <h2>{copy.upload.uncertainTitle}</h2>
+              <p className="page-note">{copy.upload.uncertainCopy}</p>
+            </div>
+          )}
+
+          {phase === 'expired' && (
+            <div className="result-card is-error" role="alert">
+              <h2>{copy.upload.expiredTitle}</h2>
+              <p>{copy.upload.expiredCopy}</p>
             </div>
           )}
 
@@ -200,8 +241,13 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
               {copy.upload.submit}
             </button>
           )}
-          {phase === 'sending' && (
-            <button type="button" disabled>{copy.upload.sendingTitle}</button>
+          {(phase === 'sending' || phase === 'confirming') && (
+            <button type="button" disabled>
+              {phase === 'sending' ? copy.upload.sendingTitle : copy.upload.confirmingTitle}
+            </button>
+          )}
+          {phase === 'processing' && (
+            <button type="button" onClick={onFinished}>{copy.upload.back}</button>
           )}
           {phase === 'error' && (
             <div className="result-actions">
@@ -210,7 +256,10 @@ export function UploadVideo({ userId, videoService, scenario, onFinished }: Uplo
             </div>
           )}
           {phase === 'pending' && (
-            <button type="submit">{copy.upload.confirmPending}</button>
+            <button type="submit">{copy.upload.retry}</button>
+          )}
+          {phase === 'expired' && (
+            <button type="submit">{copy.upload.retry}</button>
           )}
         </form>
       )}

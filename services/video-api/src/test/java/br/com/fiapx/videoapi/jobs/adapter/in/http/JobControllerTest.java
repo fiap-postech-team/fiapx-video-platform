@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.com.fiapx.videoapi.jobs.application.CreateJob;
 import br.com.fiapx.videoapi.jobs.application.port.out.JobStore;
 import br.com.fiapx.videoapi.jobs.domain.Job;
+import br.com.fiapx.videoapi.jobs.domain.JobStatus;
 import br.com.fiapx.videoapi.identity.domain.AuthenticatedIdentity;
 import br.com.fiapx.videoapi.identity.domain.UserRole;
 import br.com.fiapx.videoapi.outbox.application.port.out.OutboxStore;
@@ -32,6 +33,7 @@ class JobControllerTest {
         var response = controller.create(new JobController.CreateJobRequest("uploads/source.mp4"), null, jwt(userId));
 
         assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(response.getHeaders().getLocation()).hasToString("/v1/jobs/" + response.getBody().id());
         assertThat(response.getBody().userId()).isEqualTo(userId);
         assertThat(response.getBody().sourceKey()).isEqualTo("uploads/source.mp4");
     }
@@ -86,6 +88,19 @@ class JobControllerTest {
     }
 
     @Test
+    void filtersJobsByStatus() {
+        var jobs = new InMemoryJobStore();
+        var userId = UUID.randomUUID();
+        jobs.save(new Job(UUID.randomUUID(), userId, "uploads/pending.mp4", null, JobStatus.PENDING, Instant.EPOCH));
+        jobs.save(new Job(UUID.randomUUID(), userId, "uploads/failed.mp4", null, JobStatus.FAILED, Instant.EPOCH.plusSeconds(1)));
+
+        var page = controller(jobs).list(null, 20, JobStatus.FAILED, jwt(userId));
+
+        assertThat(page.items()).singleElement().extracting(JobController.JobResponse::status)
+            .isEqualTo(JobStatus.FAILED.name());
+    }
+
+    @Test
     void rejectsInvalidPageSize() {
         assertThatThrownBy(() -> controller(new InMemoryJobStore()).list(null, 0, jwt(UUID.randomUUID())))
             .isInstanceOf(IllegalArgumentException.class)
@@ -127,6 +142,9 @@ class JobControllerTest {
                 return Optional.of(new Video(UUID.randomUUID(), user, key, "source.mp4", "video/mp4", 1,
                     "a".repeat(64), VideoStatus.UPLOADED, Instant.EPOCH, Instant.EPOCH));
             }
+            public Optional<Video> lock(UUID videoId) {
+                return findConfirmed(UUID.randomUUID(), "uploads/source.mp4");
+            }
             public Video save(Video video) { return video; }
         };
     }
@@ -156,6 +174,11 @@ class JobControllerTest {
                     || (job.createdAt().equals(createdBefore) && job.id().compareTo(idBefore) < 0))
                 .limit(limit)
                 .toList();
+        }
+        public Optional<Job> findVisibleByVideoId(UUID videoId) {
+            return jobs.stream()
+                .filter(job -> videoId.equals(job.videoId()) && job.libraryVisible())
+                .findFirst();
         }
     }
 }

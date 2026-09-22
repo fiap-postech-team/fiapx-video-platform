@@ -12,6 +12,7 @@ import jakarta.persistence.LockModeType;
 
 interface SpringDataJobRepository extends JpaRepository<JobEntity, UUID> {
     Optional<JobEntity> findByIdAndUserId(UUID id, UUID userId);
+    Optional<JobEntity> findByVideoIdAndVideoLibraryVisibleIsTrue(UUID videoId);
     @Lock(LockModeType.PESSIMISTIC_WRITE) Optional<JobEntity> findById(UUID id);
     @Query(value = """
             select * from jobs
@@ -22,4 +23,16 @@ interface SpringDataJobRepository extends JpaRepository<JobEntity, UUID> {
     List<JobEntity> findOwnedPage(@Param("userId") UUID userId,
                                   @Param("createdBefore") Instant createdBefore,
                                   @Param("idBefore") UUID idBefore, @Param("limit") int limit);
+
+    @Query(value = """
+            select * from jobs
+            where user_id = :userId and status = :status
+              and (:createdBefore is null
+              or (created_at, id) < (:createdBefore, :idBefore))
+            order by created_at desc, id desc limit :limit
+            """, nativeQuery = true)
+    List<JobEntity> findOwnedPageByStatus(@Param("userId") UUID userId,
+                                          @Param("createdBefore") Instant createdBefore,
+                                          @Param("idBefore") UUID idBefore, @Param("status") String status,
+                                          @Param("limit") int limit);
 }

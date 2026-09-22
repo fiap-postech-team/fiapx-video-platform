@@ -3,8 +3,11 @@ package br.com.fiapx.videoapi.jobs.adapter.in.http;
 import br.com.fiapx.videoapi.jobs.application.CreateJob;
 import br.com.fiapx.videoapi.jobs.application.port.out.JobStore;
 import br.com.fiapx.videoapi.jobs.domain.Job;
+import br.com.fiapx.videoapi.jobs.domain.JobStatus;
+import br.com.fiapx.videoapi.jobs.adapter.configuration.JobProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.net.URI;
 import java.util.UUID;
 import java.util.List;
 import java.util.function.Supplier;
@@ -28,46 +31,58 @@ public class JobController {
     private final CreateJob createJob;
     private final JobStore jobs;
     private final JobTransactionExecutor transactions;
+    private final int maxPageSize;
     private final DownloadResult downloadResult;
 
     @Autowired
     public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
-                         DownloadResult downloadResult) {
+                         JobProperties properties, DownloadResult downloadResult) {
         this.createJob = createJob;
         this.jobs = jobs;
         this.transactions = transactions;
+        this.maxPageSize = properties.maxPageSize();
         this.downloadResult = downloadResult;
     }
 
+    public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
+                         JobProperties properties) {
+        this(createJob, jobs, transactions, properties, null);
+    }
+
     JobController(CreateJob createJob, JobStore jobs) {
-        this(createJob, jobs, Supplier::get, null);
+        this(createJob, jobs, Supplier::get, new JobProperties(100, true));
+    }
+    @GetMapping("/{id}/download")
+    DownloadResult.Result download(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
+        return downloadResult.execute(id, identity.userId());
     }
     @PostMapping
     ResponseEntity<JobResponse> create(@Valid @RequestBody CreateJobRequest request,
                                        @RequestHeader(value = "Idempotency-Key", required = false) String key,
                                        @AuthenticationPrincipal AuthenticatedIdentity identity) {
         var job = transactions.execute(() -> createJob.execute(identity.userId(), request.sourceKey(), validKey(key)));
-        return ResponseEntity.status(201).body(JobResponse.from(job));
+        return ResponseEntity.created(URI.create("/v1/jobs/" + job.id())).body(JobResponse.from(job));
     }
     @GetMapping("/{id}")
     JobResponse get(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
         return jobs.findOwned(id, identity.userId()).map(JobResponse::from).orElseThrow(JobNotFoundException::new);
     }
-    @GetMapping("/{id}/download")
-    DownloadResult.Result download(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
-        return downloadResult.execute(id, identity.userId());
-    }
     @GetMapping
     JobPage list(@RequestParam(required = false) String cursor,
                  @RequestParam(defaultValue = "20") int limit,
+                 @RequestParam(required = false) JobStatus status,
                  @AuthenticationPrincipal AuthenticatedIdentity identity) {
-        if (limit < 1 || limit > 100) {
+        if (limit < 1 || limit > maxPageSize) {
             throw new IllegalArgumentException("Invalid page size");
         }
         var after = cursor == null ? null : JobCursor.decode(cursor);
         var jobsPage = jobs.findOwnedPage(identity.userId(), after == null ? null : after.createdAt(),
-                after == null ? null : after.id(), limit);
+                after == null ? null : after.id(), status, limit);
         return JobPage.from(jobsPage, limit);
+    }
+
+    JobPage list(String cursor, int limit, AuthenticatedIdentity identity) {
+        return list(cursor, limit, null, identity);
     }
     record CreateJobRequest(@NotBlank String sourceKey) { }
     record JobResponse(UUID id, UUID userId, String sourceKey, String resultKey, String status, java.time.Instant createdAt) {

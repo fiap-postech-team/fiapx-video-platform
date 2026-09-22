@@ -1,10 +1,10 @@
 import { copy } from '../../product-copy'
-import type { Video } from '../domain/video'
 import { formatMilestone } from '../application/format-datetime'
 import { videoMilestones } from '../application/product-status'
+import type { VideoDetail } from '../domain/video'
 
 interface VideoTimelineProps {
-  video: Video
+  video: VideoDetail
 }
 
 export function VideoTimeline({ video }: VideoTimelineProps) {

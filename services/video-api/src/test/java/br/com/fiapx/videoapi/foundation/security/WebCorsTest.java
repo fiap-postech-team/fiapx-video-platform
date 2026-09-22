@@ -29,4 +29,24 @@ class WebCorsTest {
         assertThat(configuration).isNotNull();
         assertThat(configuration.getAllowedOrigins()).isEmpty();
     }
+
+    @Test
+    void localMockAllowsEachConfiguredOriginAndDropsCredentialsOnUpload() {
+        var source = WebCors.localMockSource("http://localhost:5173, http://localhost:5174");
+        var login = new MockHttpServletRequest("OPTIONS", "/v1/auth/login");
+        login.addHeader("Origin", "http://localhost:5174");
+        var api = source.getCorsConfiguration(login);
+
+        assertThat(api).isNotNull();
+        assertThat(api.getAllowedOrigins()).containsExactly("http://localhost:5173", "http://localhost:5174");
+        assertThat(api.getAllowCredentials()).isTrue();
+
+        var upload = new MockHttpServletRequest("PUT", "/_local/mock-storage/uploads/object");
+        upload.addHeader("Origin", "http://localhost:5174");
+        var storage = source.getCorsConfiguration(upload);
+
+        assertThat(storage).isNotNull();
+        assertThat(storage.getAllowCredentials()).isFalse();
+        assertThat(storage.getAllowedOrigins()).containsExactly("http://localhost:5173", "http://localhost:5174");
+    }
 }

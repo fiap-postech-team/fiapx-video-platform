@@ -47,6 +47,7 @@ abstract class VideoUploadIntegrationSupport {
         registry.add("app.video.public-endpoint", VideoUploadIntegrationSupport::minioUrl);
         registry.add("app.video.access-key", () -> USER);
         registry.add("app.video.secret-key", () -> PASSWORD);
+        registry.add("app.video.storage-mode", () -> "s3");
     }
 
     static String minioUrl() {
@@ -77,6 +78,14 @@ abstract class VideoUploadIntegrationSupport {
         headers.setBearerAuth(token);
         headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
         return client.exchange(url(path), HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+    }
+
+    ResponseEntity<Map> get(String path, String token) {
+        var headers = new HttpHeaders();
+        if (token != null) {
+            headers.setBearerAuth(token);
+        }
+        return client.exchange(url(path), HttpMethod.GET, new HttpEntity<>(headers), Map.class);
     }
 
     int put(Map<String, Object> upload, byte[] bytes) throws Exception {

@@ -12,10 +12,7 @@ final class WebCors {
     }
 
     static CorsConfigurationSource source(String allowedOrigins) {
-        var origins = Arrays.stream(allowedOrigins.split(","))
-            .map(String::trim)
-            .filter(origin -> !origin.isEmpty())
-            .toList();
+        var origins = origins(allowedOrigins);
         var configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
@@ -25,5 +22,31 @@ final class WebCors {
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    static CorsConfigurationSource localMockSource(String allowedOrigins) {
+        var api = new CorsConfiguration();
+        api.setAllowedOrigins(origins(allowedOrigins));
+        api.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        api.setAllowedHeaders(List.of("Authorization", "Content-Type", "If-None-Match",
+            "x-amz-checksum-sha256", "X-XSRF-TOKEN"));
+        api.setAllowCredentials(true);
+        api.setMaxAge(Duration.ofMinutes(10));
+        var source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/v1/**", api);
+        var upload = new CorsConfiguration(api);
+        upload.setAllowCredentials(false);
+        source.registerCorsConfiguration("/_local/mock-storage/**", upload);
+        return source;
+    }
+
+    private static List<String> origins(String allowedOrigins) {
+        if (allowedOrigins == null || allowedOrigins.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(allowedOrigins.split(","))
+            .map(String::trim)
+            .filter(origin -> !origin.isEmpty())
+            .toList();
     }
 }

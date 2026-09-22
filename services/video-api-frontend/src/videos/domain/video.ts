@@ -1,38 +1,87 @@
-export const UPLOAD_STATUSES = ['PENDING', 'UPLOADED', 'REJECTED', 'EXPIRED'] as const
-export type UploadStatus = (typeof UPLOAD_STATUSES)[number]
+export const PRODUCT_VIDEO_STATUSES = [
+  'AWAITING_UPLOAD',
+  'UPLOADED',
+  'PROCESSING',
+  'AVAILABLE',
+  'FAILED',
+  'REJECTED',
+  'EXPIRED',
+] as const
+export type ProductVideoStatus = (typeof PRODUCT_VIDEO_STATUSES)[number]
 
-export const ATTEMPT_STATUSES = ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] as const
-export type AttemptStatus = (typeof ATTEMPT_STATUSES)[number]
+export const PRODUCT_PROCESSING_STATUSES = ['QUEUED', 'PROCESSING', 'AVAILABLE', 'FAILED'] as const
+export type ProductProcessingStatus = (typeof PRODUCT_PROCESSING_STATUSES)[number]
 
-export interface ProcessingAttempt {
-  id: string
-  status: AttemptStatus
-  createdAt: string
-  processedAt: string | null
-  availableAt: string | null
-}
+export const LIFECYCLE_TONES = [
+  'pending',
+  'processing',
+  'available',
+  'rejected',
+  'expired',
+  'failed',
+] as const
+export type LifecycleTone = (typeof LIFECYCLE_TONES)[number]
 
-export interface Video {
-  id: string
-  ownerId: string
-  originalFilename: string
-  sizeBytes: number
-  contentType: string
-  uploadStatus: UploadStatus
+export interface ProcessingView {
+  status: ProductProcessingStatus
   requestedAt: string
-  uploadedAt: string | null
-  attempts: ProcessingAttempt[]
+  startedAt: string | null
+  finishedAt: string | null
 }
 
-export interface VideoPage {
-  items: Video[]
-  nextCursor: string | null
+export interface VideoLibraryItem {
+  videoRef: string
+  originalFilename: string
+  status: ProductVideoStatus
+  submittedAt: string
+  activityAt: string
+}
+
+export interface VideoLibraryPage {
+  items: VideoLibraryItem[]
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+}
+
+export interface VideoDetail {
+  videoRef: string
+  originalFilename: string
+  status: ProductVideoStatus
+  submittedAt: string
+  activityAt: string
+  uploadedAt: string | null
+  processing: ProcessingView | null
 }
 
 export interface UploadSelection {
   name: string
   sizeBytes: number
   contentType: string
+}
+
+export type UploadPhase = 'sending' | 'confirming' | 'processing'
+export type UploadJobStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+export type UploadFailureCode = 'UPLOAD_EXPIRED' | 'UPLOAD_UNCERTAIN' | 'UPLOAD_UNAVAILABLE'
+
+export interface UploadOptions {
+  signal?: AbortSignal
+  onProgress: (percent: number) => void
+  onPhase: (phase: UploadPhase) => void
+  onJobStatus: (status: UploadJobStatus) => void
+}
+
+export interface UploadResult {
+  videoId: string
+  jobId: string
+  status: UploadJobStatus
+}
+
+export class UploadFailure extends Error {
+  constructor(readonly code: UploadFailureCode) {
+    super(code)
+  }
 }
 
 export type ScenarioKind =
@@ -48,43 +97,31 @@ export interface PrototypeScenario {
   delayMs?: number
 }
 
-export type VideoServiceErrorCode = 'LIST_UNAVAILABLE' | 'UPLOAD_UNAVAILABLE'
+export type VideoServiceErrorCode = 'LIST_UNAVAILABLE' | 'UPLOAD_UNAVAILABLE' | 'DETAIL_UNAVAILABLE'
 
 export interface VideoServiceError {
   code: VideoServiceErrorCode
   message: string
 }
 
-export function isVideoServiceError(value: unknown): value is VideoServiceError {
+export function isVideoServiceError(value: unknown): boolean {
   return Boolean(
     value
       && typeof value === 'object'
       && 'code' in value
-      && (value.code === 'LIST_UNAVAILABLE' || value.code === 'UPLOAD_UNAVAILABLE'),
+      && (value.code === 'LIST_UNAVAILABLE'
+        || value.code === 'UPLOAD_UNAVAILABLE'
+        || value.code === 'DETAIL_UNAVAILABLE'),
   )
 }
 
 export interface VideoService {
-  list(
-    userId: string,
-    query?: { cursor?: string; limit?: number; scenario?: PrototypeScenario },
-  ): Promise<VideoPage>
-  get(userId: string, videoId: string): Promise<Video | null>
+  list(page?: number, options?: { scenario?: PrototypeScenario }): Promise<VideoLibraryPage>
+  get(videoRef: string): Promise<VideoDetail | null>
   simulateUpload(
     userId: string,
     selection: UploadSelection,
     options?: { scenario?: PrototypeScenario; onProgress?: (percent: number) => void },
-  ): Promise<Video>
+  ): Promise<void>
+  upload?(file: File, options: UploadOptions): Promise<UploadResult>
 }
-
-export type VideoStatusKey = 'pending' | 'uploaded' | 'rejected' | 'expired'
-export type ProcessingStatusKey = 'pending' | 'processing' | 'completed' | 'error'
-export const LIFECYCLE_STATUSES = [
-  'pending',
-  'processing',
-  'available',
-  'rejected',
-  'expired',
-  'failed',
-] as const
-export type LifecycleStatusKey = (typeof LIFECYCLE_STATUSES)[number]

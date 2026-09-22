@@ -26,5 +26,14 @@ public interface VideoStore {
     default List<UUID> expiredUncleaned(int limit) {
         throw new UnsupportedOperationException();
     }
+    default List<Video> findOwnedPage(UUID userId, int offset, int limit) {
+        throw new UnsupportedOperationException();
+    }
+    default long countOwned(UUID userId) {
+        throw new UnsupportedOperationException();
+    }
+    default Optional<Video> findOwnedById(UUID userId, UUID videoId) {
+        return Optional.empty();
+    }
     Video save(Video video);
 }

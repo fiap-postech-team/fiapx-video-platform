@@ -1,10 +1,9 @@
 import { copy } from '../../product-copy'
 import type {
-  LifecycleStatusKey,
-  ProcessingAttempt,
-  ProcessingStatusKey,
-  Video,
-  VideoStatusKey,
+  LifecycleTone,
+  ProductProcessingStatus,
+  ProductVideoStatus,
+  VideoDetail,
 } from '../domain/video'
 
 export type MilestoneKind = 'date' | 'awaiting' | 'unavailable'
@@ -14,117 +13,60 @@ export interface Milestone {
   iso?: string
 }
 
-export function compareAttempts(left: ProcessingAttempt, right: ProcessingAttempt): number {
-  return right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)
+const TONE_BY_STATUS: Record<ProductVideoStatus, LifecycleTone> = {
+  AWAITING_UPLOAD: 'pending',
+  UPLOADED: 'processing',
+  PROCESSING: 'processing',
+  AVAILABLE: 'available',
+  FAILED: 'failed',
+  REJECTED: 'rejected',
+  EXPIRED: 'expired',
 }
 
-export function latestAttempt(video: Video): ProcessingAttempt | null {
-  if (video.attempts.length === 0) {
-    return null
-  }
-  return [...video.attempts].sort(compareAttempts)[0] ?? null
+export function lifecycleTone(status: ProductVideoStatus): LifecycleTone {
+  return TONE_BY_STATUS[status]
 }
 
-export function previousAttempts(video: Video): ProcessingAttempt[] {
-  const latest = latestAttempt(video)
-  return video.attempts
-    .filter((attempt) => attempt.id !== latest?.id)
-    .sort(compareAttempts)
+export function lifecycleStatusLabel(status: ProductVideoStatus): string {
+  return copy.lifecycleStatus[TONE_BY_STATUS[status]]
 }
 
-export function videoStatus(video: Video): VideoStatusKey {
-  switch (video.uploadStatus) {
-    case 'PENDING':
-      return 'pending'
-    case 'UPLOADED':
-      return 'uploaded'
-    case 'REJECTED':
-      return 'rejected'
-    case 'EXPIRED':
-      return 'expired'
-  }
-}
-
-export function processingStatus(video: Video): ProcessingStatusKey {
-  const attempt = latestAttempt(video)
-  if (!attempt) {
-    return 'pending'
-  }
-  switch (attempt.status) {
-    case 'PENDING':
-      return 'pending'
+export function processingStatusLabel(status: ProductProcessingStatus): string {
+  switch (status) {
+    case 'QUEUED':
     case 'PROCESSING':
-      return 'processing'
-    case 'COMPLETED':
-      return 'completed'
+      return copy.processingStatus.processing
+    case 'AVAILABLE':
+      return copy.processingStatus.completed
     case 'FAILED':
-      return 'error'
+      return copy.processingStatus.error
   }
 }
 
-export function videoStatusLabel(status: VideoStatusKey): string {
-  return copy.videoStatus[status]
-}
-
-export function processingStatusLabel(status: ProcessingStatusKey): string {
-  return copy.processingStatus[status]
-}
-
-export function lifecycleStatus(video: Video): LifecycleStatusKey {
-  switch (video.uploadStatus) {
-    case 'PENDING':
-      return 'pending'
-    case 'REJECTED':
-      return 'rejected'
-    case 'EXPIRED':
-      return 'expired'
-    case 'UPLOADED': {
-      const attempt = latestAttempt(video)
-      if (attempt?.status === 'COMPLETED') {
-        return 'available'
-      }
-      if (attempt?.status === 'FAILED') {
-        return 'failed'
-      }
-      return 'processing'
-    }
-  }
-}
-
-export function lifecycleStatusLabel(status: LifecycleStatusKey): string {
-  return copy.lifecycleStatus[status]
-}
-
-export function videoMilestones(video: Video): {
+export function videoMilestones(detail: VideoDetail): {
   sent: Milestone
   processed: Milestone
   available: Milestone
 } {
-  const upload = videoStatus(video)
-  const processing = processingStatus(video)
-  const attempt = latestAttempt(video)
-
-  const sent: Milestone = video.uploadedAt
-    ? { kind: 'date', iso: video.uploadedAt }
-    : upload === 'pending'
+  const sent: Milestone = detail.uploadedAt
+    ? { kind: 'date', iso: detail.uploadedAt }
+    : detail.status === 'AWAITING_UPLOAD'
       ? { kind: 'awaiting' }
       : { kind: 'unavailable' }
 
-  const processed: Milestone = attempt?.processedAt
-    ? { kind: 'date', iso: attempt.processedAt }
-    : processing === 'error' || processing === 'completed' || upload === 'expired' || upload === 'rejected'
+  const processing = detail.processing
+  const terminal = detail.status === 'FAILED' || detail.status === 'REJECTED' || detail.status === 'EXPIRED'
+  const processed: Milestone = processing?.startedAt
+    ? { kind: 'date', iso: processing.startedAt }
+    : terminal
       ? { kind: 'unavailable' }
       : { kind: 'awaiting' }
 
-  const available: Milestone = attempt?.availableAt
-    ? { kind: 'date', iso: attempt.availableAt }
-    : processing === 'error' || processing === 'completed' || upload === 'expired' || upload === 'rejected'
+  const available: Milestone = processing?.status === 'AVAILABLE' && processing.finishedAt
+    ? { kind: 'date', iso: processing.finishedAt }
+    : terminal
       ? { kind: 'unavailable' }
       : { kind: 'awaiting' }
 
   return { sent, processed, available }
-}
-
-export function compareVideos(left: Video, right: Video): number {
-  return right.requestedAt.localeCompare(left.requestedAt) || right.id.localeCompare(left.id)
 }

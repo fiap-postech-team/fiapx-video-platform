@@ -40,14 +40,21 @@ class JobTest {
 
     @Test
     void rejectsInvalidTransitions() {
-        var pending = job(JobStatus.PENDING);
         var completed = job(JobStatus.COMPLETED);
 
-        assertThatThrownBy(() -> pending.apply(JobStatus.COMPLETED, "videos/result.mp4"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Invalid job transition");
         assertThatThrownBy(() -> completed.apply(JobStatus.FAILED, null))
-            .isInstanceOf(IllegalStateException.class);
+            .isInstanceOf(InvalidJobTransitionException.class)
+            .hasMessage("Invalid job transition");
+    }
+
+    @Test
+    void acceptsCompletionDirectlyFromPendingWhenResultArrivesOutOfOrder() {
+        var pending = job(JobStatus.PENDING);
+
+        pending.apply(JobStatus.COMPLETED, "videos/result.mp4");
+
+        assertThat(pending.status()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(pending.resultKey()).isEqualTo("videos/result.mp4");
     }
 
     @Test

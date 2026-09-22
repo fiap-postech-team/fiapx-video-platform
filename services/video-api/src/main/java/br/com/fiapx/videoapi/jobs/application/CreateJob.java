@@ -9,25 +9,37 @@ import java.time.Clock;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.UUID;
+import java.util.function.Predicate;
+import br.com.fiapx.videoapi.jobs.application.port.out.UuidGenerator;
 
 public final class CreateJob {
     private final JobStore jobs;
     private final OutboxStore outbox;
     private final VideoStore videos;
     private final JobCreationIdempotencyStore idempotency;
+    private final Predicate<UUID> activeUsers;
     private final Clock clock;
+    private final UuidGenerator ids;
 
     public CreateJob(JobStore jobs, OutboxStore outbox, VideoStore videos, Clock clock) {
-        this(jobs, outbox, videos, noIdempotency(), clock);
+        this(jobs, outbox, videos, noIdempotency(), userId -> true, clock, UUID::randomUUID);
     }
 
     public CreateJob(JobStore jobs, OutboxStore outbox, VideoStore videos,
                      JobCreationIdempotencyStore idempotency, Clock clock) {
+        this(jobs, outbox, videos, idempotency, userId -> true, clock, UUID::randomUUID);
+    }
+
+    public CreateJob(JobStore jobs, OutboxStore outbox, VideoStore videos,
+                     JobCreationIdempotencyStore idempotency, Predicate<UUID> activeUsers,
+                     Clock clock, UuidGenerator ids) {
         this.jobs = jobs;
         this.outbox = outbox;
         this.videos = videos;
         this.idempotency = idempotency;
+        this.activeUsers = activeUsers;
         this.clock = clock;
+        this.ids = ids;
     }
 
     public Job execute(UUID userId, String sourceKey) {
@@ -35,6 +47,9 @@ public final class CreateJob {
     }
 
     public Job execute(UUID userId, String sourceKey, String idempotencyKey) {
+        if (!activeUsers.test(userId)) {
+            throw new UserInactiveException();
+        }
         var fingerprint = fingerprint(sourceKey);
         var existing = existingJob(userId, idempotencyKey, fingerprint);
         if (existing != null) {
@@ -44,11 +59,18 @@ public final class CreateJob {
         if (!video.isConfirmed()) {
             throw new VideoNotConfirmedException();
         }
-        var job = jobs.save(new Job(UUID.randomUUID(), userId, video.id(), sourceKey, clock.instant()));
+        var lockedVideo = videos.lock(video.id()).orElseThrow(VideoNotFoundException::new);
+        if (!lockedVideo.isConfirmed()) {
+            throw new VideoNotConfirmedException();
+        }
+        if (jobs.findVisibleByVideoId(video.id()).isPresent()) {
+            throw new ProcessingAlreadyExistsException();
+        }
+        var job = jobs.save(new Job(ids.next(), userId, video.id(), sourceKey, clock.instant()));
         if (idempotencyKey != null) {
             idempotency.record(userId, idempotencyKey, fingerprint, job.id());
         }
-        outbox.append(UUID.randomUUID(), job.id(), userId, video.id(), sourceKey);
+        outbox.append(ids.next(), job.id(), userId, video.id(), sourceKey, job.createdAt());
         return job;
     }
 

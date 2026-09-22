@@ -24,9 +24,20 @@ public class JobEntity {
     @Enumerated(EnumType.STRING) private JobStatus status;
     private Instant createdAt;
     private Instant updatedAt;
+    private boolean videoLibraryVisible;
     @Version private long version;
     protected JobEntity() { }
-    JobEntity(Job job) { id = job.id(); userId = job.userId(); videoId = job.videoId(); sourceKind = job.sourceKind(); sourceKey = job.sourceKey(); resultKey = job.resultKey(); status = job.status(); createdAt = job.createdAt(); updatedAt = createdAt; }
-    Job toDomain() { return new Job(id, userId, videoId, sourceKind, sourceKey, resultKey, status, createdAt); }
-    void apply(Job job) { status = job.status(); resultKey = job.resultKey(); updatedAt = Instant.now(); }
+    JobEntity(Job job) {
+        id = job.id(); userId = job.userId(); videoId = job.videoId(); sourceKind = job.sourceKind();
+        sourceKey = job.sourceKey(); resultKey = job.resultKey(); status = job.status();
+        createdAt = job.createdAt(); updatedAt = createdAt; videoLibraryVisible = job.libraryVisible();
+    }
+    Job toDomain() {
+        return new Job(id, userId, videoId, sourceKind, sourceKey, resultKey, status, createdAt, videoLibraryVisible);
+    }
+    void apply(Job job, Instant updatedAt) {
+        status = job.status();
+        resultKey = job.resultKey();
+        this.updatedAt = updatedAt;
+    }
 }

@@ -42,11 +42,10 @@ class FoundationSecurityConfigurationMvcTest {
     }
 
     @Test
-    void returnsUnauthorizedProblemForAnonymousDeniedRequest() throws Exception {
+    void permitsPrometheusMetricsWithoutAuthentication() throws Exception {
         mockMvc.perform(get("/actuator/prometheus"))
-            .andExpect(status().isUnauthorized())
-            .andExpect(content().contentType("application/problem+json"))
-            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+            .andExpect(status().isOk())
+            .andExpect(content().string("outbox_backlog 0.0\n"));
     }
 
     @Test
@@ -62,6 +61,11 @@ class FoundationSecurityConfigurationMvcTest {
         @GetMapping("/actuator/health")
         HealthStatus health() {
             return new HealthStatus("UP");
+        }
+
+        @GetMapping(value = "/actuator/prometheus", produces = "text/plain")
+        String prometheus() {
+            return "outbox_backlog 0.0\n";
         }
 
         @GetMapping("/v1/jobs")

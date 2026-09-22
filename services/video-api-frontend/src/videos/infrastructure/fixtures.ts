@@ -1,136 +1,111 @@
-import { DEMO_USER } from '../../auth/infrastructure/mock-authentication-service'
-import type { Video } from '../domain/video'
+import type { VideoDetail, VideoLibraryItem } from '../domain/video'
 
-const ownerId = DEMO_USER.id
+export interface DemoVideo {
+  item: VideoLibraryItem
+  detail: VideoDetail
+}
 
-export function demoVideos(): Video[] {
+export function demoVideos(): DemoVideo[] {
   return [
-    {
-      id: 'video-pending',
-      ownerId,
-      originalFilename: 'aula-gravada.mp4',
-      sizeBytes: 42_000_000,
-      contentType: 'video/mp4',
-      uploadStatus: 'PENDING',
-      requestedAt: '2026-09-19T18:10:00Z',
-      uploadedAt: null,
-      attempts: [],
-    },
-    {
-      id: 'video-uploaded',
-      ownerId,
-      originalFilename: 'apresentacao.mp4',
-      sizeBytes: 125_829_120,
-      contentType: 'video/mp4',
-      uploadStatus: 'UPLOADED',
-      requestedAt: '2026-09-18T13:40:00Z',
-      uploadedAt: '2026-09-18T13:42:00Z',
-      attempts: [],
-    },
-    {
-      id: 'video-queued',
-      ownerId,
-      originalFilename: 'reuniao.webm',
-      sizeBytes: 73_400_320,
-      contentType: 'video/webm',
-      uploadStatus: 'UPLOADED',
-      requestedAt: '2026-09-18T11:00:00Z',
-      uploadedAt: '2026-09-18T11:02:00Z',
-      attempts: [
-        {
-          id: 'attempt-queued',
-          status: 'PENDING',
-          createdAt: '2026-09-18T11:03:00Z',
-          processedAt: null,
-          availableAt: null,
-        },
-      ],
-    },
-    {
-      id: 'video-processing',
-      ownerId,
-      originalFilename: 'treino.mov',
-      sizeBytes: 88_000_000,
-      contentType: 'video/quicktime',
-      uploadStatus: 'UPLOADED',
-      requestedAt: '2026-09-17T16:20:00Z',
-      uploadedAt: '2026-09-17T16:21:00Z',
-      attempts: [
-        {
-          id: 'attempt-processing',
-          status: 'PROCESSING',
-          createdAt: '2026-09-17T16:22:00Z',
-          processedAt: null,
-          availableAt: null,
-        },
-      ],
-    },
-    {
-      id: 'video-available',
-      ownerId,
-      originalFilename: 'campanha.mp4',
-      sizeBytes: 110_000_000,
-      contentType: 'video/mp4',
-      uploadStatus: 'UPLOADED',
-      requestedAt: '2026-09-16T14:00:00Z',
-      uploadedAt: '2026-09-16T14:02:00Z',
-      attempts: [
-        {
-          id: 'attempt-available-failed',
-          status: 'FAILED',
-          createdAt: '2026-09-16T10:00:00Z',
-          processedAt: null,
-          availableAt: null,
-        },
-        {
-          id: 'attempt-available-done',
-          status: 'COMPLETED',
-          createdAt: '2026-09-16T14:03:00Z',
-          processedAt: '2026-09-16T14:09:00Z',
-          availableAt: '2026-09-16T14:10:00Z',
-        },
-      ],
-    },
-    {
-      id: 'video-failed',
-      ownerId,
-      originalFilename: 'entrevista.mp4',
-      sizeBytes: 95_000_000,
-      contentType: 'video/mp4',
-      uploadStatus: 'UPLOADED',
-      requestedAt: '2026-09-15T12:00:00Z',
-      uploadedAt: '2026-09-15T12:01:00Z',
-      attempts: [
-        {
-          id: 'attempt-failed',
-          status: 'FAILED',
-          createdAt: '2026-09-15T12:02:00Z',
-          processedAt: null,
-          availableAt: null,
-        },
-      ],
-    },
-    {
-      id: 'video-rejected',
-      ownerId,
-      originalFilename: 'material.mp4',
-      sizeBytes: 48_000_000,
-      contentType: 'video/mp4',
-      uploadStatus: 'REJECTED',
-      requestedAt: '2026-09-14T09:30:00Z',
-      uploadedAt: '2026-09-14T09:31:00Z',
-      attempts: [],
-    },
-    {
-      id: 'video-expired',
-      ownerId,
-      originalFilename: 'rascunho.mp4',
-      sizeBytes: 21_000_000,
-      contentType: 'video/mp4',
-      uploadStatus: 'EXPIRED',
-      requestedAt: '2026-09-10T08:00:00Z',
-      uploadedAt: null,
-      attempts: [],
-    },
+    library(
+      'ref-pending',
+      'aula-gravada.mp4',
+      'AWAITING_UPLOAD',
+      '2026-09-19T18:10:00Z',
+      '2026-09-19T18:10:00Z',
+      null,
+      null,
+    ),
+    library(
+      'ref-uploaded',
+      'apresentacao.mp4',
+      'UPLOADED',
+      '2026-09-18T13:40:00Z',
+      '2026-09-18T13:42:00Z',
+      '2026-09-18T13:42:00Z',
+      null,
+    ),
+    library(
+      'ref-queued',
+      'reuniao.webm',
+      'PROCESSING',
+      '2026-09-18T11:00:00Z',
+      '2026-09-18T11:03:00Z',
+      '2026-09-18T11:02:00Z',
+      { status: 'QUEUED', requestedAt: '2026-09-18T11:03:00Z', startedAt: null, finishedAt: null },
+    ),
+    library(
+      'ref-processing',
+      'treino.mov',
+      'PROCESSING',
+      '2026-09-17T16:20:00Z',
+      '2026-09-17T16:22:00Z',
+      '2026-09-17T16:21:00Z',
+      {
+        status: 'PROCESSING',
+        requestedAt: '2026-09-17T16:22:00Z',
+        startedAt: '2026-09-17T16:22:30Z',
+        finishedAt: null,
+      },
+    ),
+    library(
+      'ref-available',
+      'campanha.mp4',
+      'AVAILABLE',
+      '2026-09-16T14:00:00Z',
+      '2026-09-16T14:10:00Z',
+      '2026-09-16T14:02:00Z',
+      {
+        status: 'AVAILABLE',
+        requestedAt: '2026-09-16T14:03:00Z',
+        startedAt: '2026-09-16T14:04:00Z',
+        finishedAt: '2026-09-16T14:10:00Z',
+      },
+    ),
+    library(
+      'ref-failed',
+      'entrevista.mp4',
+      'FAILED',
+      '2026-09-15T12:00:00Z',
+      '2026-09-15T12:02:00Z',
+      '2026-09-15T12:01:00Z',
+      {
+        status: 'FAILED',
+        requestedAt: '2026-09-15T12:02:00Z',
+        startedAt: null,
+        finishedAt: '2026-09-15T12:08:00Z',
+      },
+    ),
+    library(
+      'ref-rejected',
+      'material.mp4',
+      'REJECTED',
+      '2026-09-14T09:30:00Z',
+      '2026-09-14T09:30:00Z',
+      '2026-09-14T09:31:00Z',
+      null,
+    ),
+    library(
+      'ref-expired',
+      'rascunho.mp4',
+      'EXPIRED',
+      '2026-09-10T08:00:00Z',
+      '2026-09-10T08:00:00Z',
+      null,
+      null,
+    ),
   ]
+}
+
+function library(
+  videoRef: string,
+  originalFilename: string,
+  status: VideoLibraryItem['status'],
+  submittedAt: string,
+  activityAt: string,
+  uploadedAt: string | null,
+  processing: VideoDetail['processing'],
+): DemoVideo {
+  const item: VideoLibraryItem = { videoRef, originalFilename, status, submittedAt, activityAt }
+  return { item, detail: { ...item, uploadedAt, processing } }
 }

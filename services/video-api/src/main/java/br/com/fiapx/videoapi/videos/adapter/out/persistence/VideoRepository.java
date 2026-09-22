@@ -25,4 +25,7 @@ interface VideoRepository extends JpaRepository<VideoEntity, UUID> {
     @Query(value = "select id from videos where upload_status = 'EXPIRED' and cleanup_completed_at is null "
         + "order by expires_at, id limit :limit", nativeQuery = true)
     List<UUID> expiredUncleaned(@Param("limit") int limit);
+    @Query(value = "select * from videos where user_id = :userId order by created_at desc, id desc limit :limit offset :offset", nativeQuery = true)
+    List<VideoEntity> findOwnedPage(@Param("userId") UUID userId, @Param("offset") int offset, @Param("limit") int limit);
+    long countByUserId(UUID userId);
 }

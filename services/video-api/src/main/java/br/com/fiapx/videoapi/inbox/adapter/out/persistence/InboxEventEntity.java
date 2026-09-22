@@ -24,9 +24,9 @@ class InboxEventEntity {
     protected InboxEventEntity() {
     }
 
-    InboxEventEntity(JobResultEvent event) {
+    InboxEventEntity(JobResultEvent event, Instant receivedAt) {
         eventId = event.eventId(); jobId = event.jobId(); eventType = event.status().name(); schemaVersion = 1;
         correlationId = event.jobId(); payloadFingerprint = event.fingerprint(); status = "PROCESSED";
-        occurredAt = event.occurredAt(); receivedAt = Instant.now(); processedAt = receivedAt;
+        occurredAt = event.occurredAt(); this.receivedAt = receivedAt; processedAt = receivedAt;
     }
 }

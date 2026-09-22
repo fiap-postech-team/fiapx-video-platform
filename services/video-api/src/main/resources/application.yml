@@ -1,6 +1,15 @@
 spring:
   application:
     name: video-api
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:fiapx}
+    password: ${RABBITMQ_PASSWORD:fiapx}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   datasource:
     url: ${DATABASE_URL}
     username: ${DATABASE_USER}
@@ -21,7 +30,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       probes:
@@ -38,7 +47,21 @@ springdoc:
     enabled: false
 
 app:
+  jobs:
+    max-page-size: ${VIDEO_API_JOBS_MAX_PAGE_SIZE:100}
+    result-listener-enabled: ${VIDEO_API_JOBS_RESULT_LISTENER_ENABLED:true}
+  outbox:
+    batch-size: ${VIDEO_API_OUTBOX_BATCH_SIZE:50}
+    poll-interval-ms: ${VIDEO_API_OUTBOX_POLL_INTERVAL_MS:1000}
+    claim-timeout: ${VIDEO_API_OUTBOX_CLAIM_TIMEOUT:PT30S}
+    confirm-timeout: ${VIDEO_API_OUTBOX_CONFIRM_TIMEOUT:PT5S}
+    max-attempts: ${VIDEO_API_OUTBOX_MAX_ATTEMPTS:10}
+    instance-id: ${HOSTNAME:video-api}
   video:
+    storage-mode: ${APP_VIDEO_STORAGE_MODE:s3}
+    local-public-endpoint: ${APP_VIDEO_LOCAL_PUBLIC_ENDPOINT:http://localhost:8080}
+    local-directory: ${APP_VIDEO_LOCAL_DIRECTORY:${java.io.tmpdir}/fiapx-video-mock}
+    local-allowed-origin: ${APP_VIDEO_LOCAL_ALLOWED_ORIGIN:http://localhost:5173}
     max-size-bytes: ${APP_VIDEO_MAX_SIZE_BYTES:500000000}
     allowed-content-types: ${APP_VIDEO_ALLOWED_CONTENT_TYPES:video/mp4,video/quicktime,video/webm,video/x-matroska}
     upload-url-ttl: ${APP_VIDEO_UPLOAD_URL_TTL:PT15M}

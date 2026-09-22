@@ -2,9 +2,9 @@ export type ProductView =
   | 'videos'
   | 'upload'
   | 'profile'
-  | { kind: 'video-detail'; videoId: string }
+  | { kind: 'video-detail'; videoRef: string }
 
-export function isDetailView(view: ProductView): view is { kind: 'video-detail'; videoId: string } {
+export function isDetailView(view: ProductView): view is { kind: 'video-detail'; videoRef: string } {
   return typeof view === 'object' && view.kind === 'video-detail'
 }
 
