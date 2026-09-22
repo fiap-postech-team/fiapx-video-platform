@@ -103,6 +103,7 @@ export const copy = {
     colFile: 'Arquivo',
     colDate: 'Atualizado em',
     colStatus: 'Status',
+    colActions: 'Ações',
     pagination: 'Paginação da biblioteca',
     pagePrevious: 'Página anterior',
     pageNext: 'Próxima página',

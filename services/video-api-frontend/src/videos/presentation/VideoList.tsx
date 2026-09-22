@@ -86,23 +86,28 @@ export function VideoList({ videoService, scenario, onOpen, onUpload }: VideoLis
               <span role="columnheader">{copy.videos.colFile}</span>
               <span role="columnheader">{copy.videos.colDate}</span>
               <span role="columnheader">{copy.videos.colStatus}</span>
-              <span role="columnheader" className="video-head-action">{copy.videos.openDetail}</span>
+              <span role="columnheader" className="video-head-action">{copy.videos.colActions}</span>
             </div>
             {items.map((video) => {
               const tone = lifecycleTone(video.status)
               return (
                 <div key={video.videoRef} className="video-row" role="row">
-                  <span className="file-name" role="cell">{video.originalFilename}</span>
-                  <span className="file-date" role="cell">{formatDateTime(video.activityAt)}</span>
-                  <span role="cell">
+                  <span className="file-name" role="cell" data-label={copy.videos.colFile}>{video.originalFilename}</span>
+                  <span className="file-date" role="cell" data-label={copy.videos.colDate}>{formatDateTime(video.activityAt)}</span>
+                  <span className="status-cell" role="cell" data-label={copy.videos.colStatus}>
                     <span className={`status-badge is-${tone}`}>{lifecycleStatusLabel(video.status)}</span>
                   </span>
-                  <span role="cell" className="row-action">
+                  <span role="cell" className="row-action" data-label={copy.videos.colActions}>
                     <button type="button" className="btn-quiet" onClick={() => onOpen(video.videoRef)}>
                       {copy.videos.openDetail}
                     </button>
                     {video.status === 'AVAILABLE' && video.jobId && (
-                      <DownloadResultButton jobId={video.jobId} videoService={videoService} />
+                      <DownloadResultButton
+                        jobId={video.jobId}
+                        videoService={videoService}
+                        className="btn-icon"
+                        iconOnly
+                      />
                     )}
                   </span>
                 </div>
