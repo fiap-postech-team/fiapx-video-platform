@@ -93,9 +93,13 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
       {video.status === 'FAILED' && <p className="page-note">{copy.detail.failedHint}</p>}
       <div className="detail-actions">
         {video.status === 'AVAILABLE' && video.processing?.jobId && (
-          <DownloadResultButton jobId={video.processing.jobId} videoService={videoService} />
+          <DownloadResultButton
+            jobId={video.processing.jobId}
+            videoService={videoService}
+            className="btn-download-primary"
+          />
         )}
-        <button type="button" onClick={onBack}>{copy.detail.back}</button>
+        <button type="button" className="btn-quiet" onClick={onBack}>{copy.detail.back}</button>
       </div>
     </article>
   )
