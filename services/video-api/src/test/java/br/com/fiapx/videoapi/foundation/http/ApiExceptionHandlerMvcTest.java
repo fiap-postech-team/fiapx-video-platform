@@ -18,6 +18,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import br.com.fiapx.videoapi.jobs.domain.JobStatus;
+import br.com.fiapx.videoapi.jobs.application.JobResultNotFoundException;
+import br.com.fiapx.videoapi.jobs.application.ResultInconsistentException;
+import br.com.fiapx.videoapi.jobs.application.ResultNotReadyException;
+import br.com.fiapx.videoapi.jobs.application.ResultObjectMissingException;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -90,6 +94,22 @@ class ApiExceptionHandlerMvcTest {
             .doesNotContain("internal database failure");
     }
 
+    @Test
+    void exposesStableDownloadProblemCodes() throws Exception {
+        mockMvc.perform(get("/fixture/download-not-found"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("JOB_NOT_FOUND"));
+        mockMvc.perform(get("/fixture/download-not-ready"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("JOB_RESULT_NOT_READY"));
+        mockMvc.perform(get("/fixture/download-inconsistent"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("JOB_RESULT_INCONSISTENT"));
+        mockMvc.perform(get("/fixture/download-missing"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("JOB_RESULT_OBJECT_MISSING"));
+    }
+
     @RestController
     public static class FixtureController {
 
@@ -106,6 +126,18 @@ class ApiExceptionHandlerMvcTest {
         @GetMapping("/fixture/status")
         void status(@RequestParam JobStatus status) {
         }
+
+        @GetMapping("/fixture/download-not-found")
+        void downloadNotFound() { throw new JobResultNotFoundException(); }
+
+        @GetMapping("/fixture/download-not-ready")
+        void downloadNotReady() { throw new ResultNotReadyException(); }
+
+        @GetMapping("/fixture/download-inconsistent")
+        void downloadInconsistent() { throw new ResultInconsistentException(); }
+
+        @GetMapping("/fixture/download-missing")
+        void downloadMissing() { throw new ResultObjectMissingException(); }
     }
 
     record FixtureRequest(@NotBlank String sourceKey) {}

@@ -77,10 +77,15 @@ public final class ApiExceptionHandler {
         return response(ProblemType.INTERNAL_ERROR, request);
     }
 
-    @ExceptionHandler({JobNotFoundException.class, JobResultNotFoundException.class, VideoNotFoundException.class, VideoUploadNotFoundException.class,
+    @ExceptionHandler({JobNotFoundException.class, VideoNotFoundException.class, VideoUploadNotFoundException.class,
         VideoLibraryNotFoundException.class})
     ResponseEntity<ProblemDetail> handleNotFound(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(JobResultNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleJobResultNotFound(JobResultNotFoundException exception, HttpServletRequest request) {
+        return response(ProblemType.JOB_NOT_FOUND, request);
     }
 
     @ExceptionHandler(AuthenticationFailedException.class)
@@ -90,10 +95,24 @@ public final class ApiExceptionHandler {
 
     @ExceptionHandler({EmailAlreadyRegisteredException.class, IdempotencyConflictException.class,
         VideoNotConfirmedException.class, VideoUploadConflictException.class,
-        InvalidJobTransitionException.class, ResultNotReadyException.class,
-        ResultInconsistentException.class, ResultObjectMissingException.class})
+        InvalidJobTransitionException.class})
     ResponseEntity<ProblemDetail> handleStateConflict(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.CONFLICT, request);
+    }
+
+    @ExceptionHandler(ResultNotReadyException.class)
+    ResponseEntity<ProblemDetail> handleResultNotReady(ResultNotReadyException exception, HttpServletRequest request) {
+        return response(ProblemType.JOB_RESULT_NOT_READY, request);
+    }
+
+    @ExceptionHandler(ResultInconsistentException.class)
+    ResponseEntity<ProblemDetail> handleResultInconsistent(ResultInconsistentException exception, HttpServletRequest request) {
+        return response(ProblemType.JOB_RESULT_INCONSISTENT, request);
+    }
+
+    @ExceptionHandler(ResultObjectMissingException.class)
+    ResponseEntity<ProblemDetail> handleResultObjectMissing(ResultObjectMissingException exception, HttpServletRequest request) {
+        return response(ProblemType.JOB_RESULT_OBJECT_MISSING, request);
     }
 
     @ExceptionHandler(ProcessingAlreadyExistsException.class)
