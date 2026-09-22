@@ -15,6 +15,9 @@ import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import br.com.fiapx.videoapi.jobs.application.DownloadResult;
+import br.com.fiapx.videoapi.videos.application.port.out.VideoObjectStorage;
+import br.com.fiapx.videoapi.videos.adapter.configuration.VideoUploadProperties;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({VideoLocalDemoProperties.class, JobProperties.class})
@@ -32,4 +35,8 @@ public class JobsConfiguration {
             clock, ids);
     }
     @Bean ProcessJobResult processJobResult(InboxStore inbox, JobStore jobs) { return new ProcessJobResult(inbox, jobs); }
+    @Bean DownloadResult downloadResult(JobStore jobs, VideoStore videos, VideoObjectStorage storage,
+                                        VideoUploadProperties properties) {
+        return new DownloadResult(jobs, videos, storage, properties.resultDownloadUrlTtl(), properties.resultDownloadMockUrl());
+    }
 }

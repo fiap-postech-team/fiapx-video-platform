@@ -20,6 +20,10 @@ import br.com.fiapx.videoapi.jobs.application.VideoNotConfirmedException;
 import br.com.fiapx.videoapi.jobs.application.VideoNotFoundException;
 import br.com.fiapx.videoapi.jobs.application.UserInactiveException;
 import br.com.fiapx.videoapi.jobs.domain.InvalidJobTransitionException;
+import br.com.fiapx.videoapi.jobs.application.ResultNotReadyException;
+import br.com.fiapx.videoapi.jobs.application.ResultInconsistentException;
+import br.com.fiapx.videoapi.jobs.application.ResultObjectMissingException;
+import br.com.fiapx.videoapi.jobs.application.JobResultNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadNotFoundException;
 import br.com.fiapx.videoapi.videos.application.VideoUploadConflictException;
@@ -73,7 +77,7 @@ public final class ApiExceptionHandler {
         return response(ProblemType.INTERNAL_ERROR, request);
     }
 
-    @ExceptionHandler({JobNotFoundException.class, VideoNotFoundException.class, VideoUploadNotFoundException.class,
+    @ExceptionHandler({JobNotFoundException.class, JobResultNotFoundException.class, VideoNotFoundException.class, VideoUploadNotFoundException.class,
         VideoLibraryNotFoundException.class})
     ResponseEntity<ProblemDetail> handleNotFound(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.NOT_FOUND, request);
@@ -86,7 +90,8 @@ public final class ApiExceptionHandler {
 
     @ExceptionHandler({EmailAlreadyRegisteredException.class, IdempotencyConflictException.class,
         VideoNotConfirmedException.class, VideoUploadConflictException.class,
-        InvalidJobTransitionException.class})
+        InvalidJobTransitionException.class, ResultNotReadyException.class,
+        ResultInconsistentException.class, ResultObjectMissingException.class})
     ResponseEntity<ProblemDetail> handleStateConflict(RuntimeException exception, HttpServletRequest request) {
         return response(ProblemType.CONFLICT, request);
     }

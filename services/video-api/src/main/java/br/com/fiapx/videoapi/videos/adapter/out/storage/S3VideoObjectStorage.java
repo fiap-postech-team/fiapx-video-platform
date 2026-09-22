@@ -16,6 +16,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 public final class S3VideoObjectStorage implements VideoObjectStorage {
     private final S3Client client;
@@ -58,6 +60,19 @@ public final class S3VideoObjectStorage implements VideoObjectStorage {
                 return Optional.empty();
             }
             throw new StorageUnavailableException(exception);
+        } catch (SdkException exception) {
+            throw new StorageUnavailableException(exception);
+        }
+    }
+
+    public SignedDownload signDownload(String key, String filename, Duration ttl) {
+        try {
+            var get = GetObjectRequest.builder().bucket(bucket).key(key)
+                .responseContentDisposition("attachment; filename=\"" + filename + "\"")
+                .build();
+            var signed = presigner.presignGetObject(GetObjectPresignRequest.builder()
+                .signatureDuration(ttl).getObjectRequest(get).build());
+            return new SignedDownload(signed.url().toString(), signed.expiration());
         } catch (SdkException exception) {
             throw new StorageUnavailableException(exception);
         }

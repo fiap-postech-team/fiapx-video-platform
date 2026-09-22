@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import br.com.fiapx.videoapi.jobs.application.DownloadResult;
 
 @RestController
 @RequestMapping("/v1/jobs")
@@ -31,18 +32,29 @@ public class JobController {
     private final JobStore jobs;
     private final JobTransactionExecutor transactions;
     private final int maxPageSize;
+    private final DownloadResult downloadResult;
 
     @Autowired
     public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
-                         JobProperties properties) {
+                         JobProperties properties, DownloadResult downloadResult) {
         this.createJob = createJob;
         this.jobs = jobs;
         this.transactions = transactions;
         this.maxPageSize = properties.maxPageSize();
+        this.downloadResult = downloadResult;
+    }
+
+    public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
+                         JobProperties properties) {
+        this(createJob, jobs, transactions, properties, null);
     }
 
     JobController(CreateJob createJob, JobStore jobs) {
         this(createJob, jobs, Supplier::get, new JobProperties(100, true));
+    }
+    @GetMapping("/{id}/download")
+    DownloadResult.Result download(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
+        return downloadResult.execute(id, identity.userId());
     }
     @PostMapping
     ResponseEntity<JobResponse> create(@Valid @RequestBody CreateJobRequest request,

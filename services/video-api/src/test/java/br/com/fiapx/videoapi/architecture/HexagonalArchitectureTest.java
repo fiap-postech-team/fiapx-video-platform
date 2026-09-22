@@ -53,7 +53,7 @@ class HexagonalArchitectureTest {
         return packageName.equals(ROOT)
             || packageName.startsWith(ROOT + ".foundation.")
             || packageName.matches(
-                ROOT + "\\.(identity|videos|jobs|outbox|inbox)\\.(domain|application|adapter)(\\..+)?"
+                ROOT + "\\.(identity|videos|jobs|outbox|inbox|admin)\\.(domain|application|adapter)(\\..+)?"
             );
     }
 }
