@@ -59,6 +59,11 @@ A fixture cria ou reutiliza `demo-processado.mp4`, um job `COMPLETED` e o ZIP
 `APP_VIDEO_DOWNLOAD_FIXTURE_VIDEO_ID` e `APP_VIDEO_DOWNLOAD_FIXTURE_JOB_ID`;
 execuções repetidas são idempotentes.
 
+Para simular outro proprietário, informe o e-mail e o UUID do vídeo nas mesmas
+variáveis. Se já existir um job visível para esse vídeo, a fixture reutiliza o
+`resultKey` persistido e materializa o ZIP nesse caminho; assim, o job não precisa
+ser recriado.
+
 ### Reprocessar um evento esgotado
 
 Após corrigir a causa indicada por `eventId` e `errorCode` no log, um operador
