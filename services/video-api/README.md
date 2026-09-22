@@ -43,6 +43,22 @@ O limite máximo da listagem de jobs pode ser configurado por
 `VIDEO_API_JOBS_MAX_PAGE_SIZE` (padrão `100`). O consumidor de resultados pode
 ser desabilitado em testes com `VIDEO_API_JOBS_RESULT_LISTENER_ENABLED=false`.
 
+Para preparar uma fixture local de download, habilite-a com credenciais
+exclusivas do ambiente local:
+
+```bash
+export APP_VIDEO_DOWNLOAD_FIXTURE_ENABLED=true
+export APP_VIDEO_DOWNLOAD_FIXTURE_EMAIL=download-demo@fiapx.local
+export APP_VIDEO_DOWNLOAD_FIXTURE_PASSWORD='SenhaLocalSegura123'
+./mvnw -pl services/video-api -am spring-boot:run
+```
+
+A fixture cria ou reutiliza `demo-processado.mp4`, um job `COMPLETED` e o ZIP
+`results/<job-id>/frames.zip`. No profile `local`, o frontend recebe
+`https://shorturl.at/JpxZS`. Os UUIDs podem ser controlados por
+`APP_VIDEO_DOWNLOAD_FIXTURE_VIDEO_ID` e `APP_VIDEO_DOWNLOAD_FIXTURE_JOB_ID`;
+execuções repetidas são idempotentes.
+
 ### Reprocessar um evento esgotado
 
 Após corrigir a causa indicada por `eventId` e `errorCode` no log, um operador

@@ -8,7 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
-public final class DownloadResult {
+public class DownloadResult {
     private final JobStore jobs;
     private final VideoStore videos;
     private final VideoObjectStorage storage;

@@ -20,6 +20,7 @@ public interface VideoLibraryReader {
         String originalFilename,
         VideoStatus uploadStatus,
         Instant submittedAt,
+        UUID jobId,
         JobStatus jobStatus,
         Instant jobCreatedAt,
         Instant jobUpdatedAt

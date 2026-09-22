@@ -66,10 +66,31 @@ describe('VideoHttpService', () => {
       videoRef: 't7nsTQEuS4KPGL-Cz5DZaw',
       originalFilename: 'aula-01.mp4',
       status: 'AVAILABLE',
+      jobId: null,
       submittedAt: '2026-09-20T14:10:00Z',
       activityAt: '2026-09-20T14:16:42Z',
     })
     expect(JSON.stringify(page)).not.toMatch(/sourceKey|resultKey|userId/)
+  })
+
+  it('requests a fresh temporary download URL and maps stable result errors', async () => {
+    const authorizedFetch = vi.fn()
+      .mockResolvedValueOnce(json(200, {
+        downloadUrl: 'https://shorturl.at/JpxZS',
+        expiresAt: '2099-09-21T02:15:00Z',
+        filename: 'campanha-job-1.zip',
+        contentType: 'application/zip',
+        sizeBytes: 128,
+      }))
+      .mockResolvedValueOnce(json(409, { code: 'JOB_RESULT_NOT_READY' }))
+    const service = new VideoHttpService(authorizedFetch, 'http://localhost:8080')
+
+    await expect(service.download('job-1')).resolves.toMatchObject({
+      downloadUrl: 'https://shorturl.at/JpxZS',
+      filename: 'campanha-job-1.zip',
+    })
+    await expect(service.download('job-2')).rejects.toMatchObject({ code: 'DOWNLOAD_NOT_READY' })
+    expect(authorizedFetch).toHaveBeenNthCalledWith(1, 'http://localhost:8080/v1/jobs/job-1/download')
   })
 
   it('normalizes a missing processing object and treats 404 as not found', async () => {

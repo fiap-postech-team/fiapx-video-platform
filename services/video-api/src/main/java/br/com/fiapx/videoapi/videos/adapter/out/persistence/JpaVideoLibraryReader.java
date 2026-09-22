@@ -32,6 +32,7 @@ public final class JpaVideoLibraryReader implements VideoLibraryReader {
             query.getOriginalFilename(),
             VideoStatus.valueOf(query.getUploadStatus()),
             query.getSubmittedAt(),
+            query.getJobId(),
             jobStatus(query.getJobStatus()),
             query.getJobCreatedAt(),
             query.getJobUpdatedAt()

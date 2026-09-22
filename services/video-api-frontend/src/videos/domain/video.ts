@@ -23,6 +23,7 @@ export const LIFECYCLE_TONES = [
 export type LifecycleTone = (typeof LIFECYCLE_TONES)[number]
 
 export interface ProcessingView {
+  jobId: string
   status: ProductProcessingStatus
   requestedAt: string
   startedAt: string | null
@@ -33,6 +34,7 @@ export interface VideoLibraryItem {
   videoRef: string
   originalFilename: string
   status: ProductVideoStatus
+  jobId: string | null
   submittedAt: string
   activityAt: string
 }
@@ -53,6 +55,14 @@ export interface VideoDetail {
   activityAt: string
   uploadedAt: string | null
   processing: ProcessingView | null
+}
+
+export interface DownloadResult {
+  downloadUrl: string
+  expiresAt: string
+  filename: string
+  contentType: string
+  sizeBytes: number
 }
 
 export interface UploadSelection {
@@ -97,27 +107,41 @@ export interface PrototypeScenario {
   delayMs?: number
 }
 
-export type VideoServiceErrorCode = 'LIST_UNAVAILABLE' | 'UPLOAD_UNAVAILABLE' | 'DETAIL_UNAVAILABLE'
+export type VideoServiceErrorCode =
+  | 'LIST_UNAVAILABLE'
+  | 'UPLOAD_UNAVAILABLE'
+  | 'DETAIL_UNAVAILABLE'
+  | 'DOWNLOAD_NOT_READY'
+  | 'DOWNLOAD_INCONSISTENT'
+  | 'DOWNLOAD_OBJECT_MISSING'
+  | 'DOWNLOAD_STORAGE_UNAVAILABLE'
+  | 'DOWNLOAD_NOT_FOUND'
 
 export interface VideoServiceError {
   code: VideoServiceErrorCode
   message: string
 }
 
-export function isVideoServiceError(value: unknown): boolean {
+export function isVideoServiceError(value: unknown): value is VideoServiceError {
   return Boolean(
     value
       && typeof value === 'object'
       && 'code' in value
       && (value.code === 'LIST_UNAVAILABLE'
         || value.code === 'UPLOAD_UNAVAILABLE'
-        || value.code === 'DETAIL_UNAVAILABLE'),
+        || value.code === 'DETAIL_UNAVAILABLE'
+        || value.code === 'DOWNLOAD_NOT_READY'
+        || value.code === 'DOWNLOAD_INCONSISTENT'
+        || value.code === 'DOWNLOAD_OBJECT_MISSING'
+        || value.code === 'DOWNLOAD_STORAGE_UNAVAILABLE'
+        || value.code === 'DOWNLOAD_NOT_FOUND'),
   )
 }
 
 export interface VideoService {
   list(page?: number, options?: { scenario?: PrototypeScenario }): Promise<VideoLibraryPage>
   get(videoRef: string): Promise<VideoDetail | null>
+  download(jobId: string): Promise<DownloadResult>
   simulateUpload(
     userId: string,
     selection: UploadSelection,

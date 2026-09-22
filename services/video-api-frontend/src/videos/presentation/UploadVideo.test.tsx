@@ -9,6 +9,7 @@ function serviceWithUpload(upload: NonNullable<VideoService['upload']>): VideoSe
   return {
     list: vi.fn(),
     get: vi.fn(),
+    download: vi.fn(),
     simulateUpload: vi.fn(),
     upload,
   }

@@ -53,8 +53,9 @@ public class JobController {
         this(createJob, jobs, Supplier::get, new JobProperties(100, true));
     }
     @GetMapping("/{id}/download")
-    DownloadResult.Result download(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
-        return downloadResult.execute(id, identity.userId());
+    ResponseEntity<DownloadResult.Result> download(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+            .body(transactions.execute(() -> downloadResult.execute(id, identity.userId())));
     }
     @PostMapping
     ResponseEntity<JobResponse> create(@Valid @RequestBody CreateJobRequest request,

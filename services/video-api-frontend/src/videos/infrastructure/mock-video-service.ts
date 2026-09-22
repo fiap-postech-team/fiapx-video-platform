@@ -1,5 +1,6 @@
 import type {
   PrototypeScenario,
+  DownloadResult,
   UploadSelection,
   VideoDetail,
   VideoLibraryItem,
@@ -69,6 +70,20 @@ export class MockVideoService implements VideoService {
     return video ? clone(video).detail : null
   }
 
+  async download(jobId: string): Promise<DownloadResult> {
+    const video = this.videos.find((item) => item.item.jobId === jobId)
+    if (!video || video.item.status !== 'AVAILABLE') {
+      throw { code: 'DOWNLOAD_NOT_READY', message: 'mock result is not ready' }
+    }
+    return {
+      downloadUrl: 'https://shorturl.at/JpxZS',
+      expiresAt: '2099-01-01T00:00:00Z',
+      filename: `${video.item.originalFilename.replace(/\.[^.]+$/, '')}-${jobId}.zip`,
+      contentType: 'application/zip',
+      sizeBytes: 128,
+    }
+  }
+
   async simulateUpload(
     _userId: string,
     selection: UploadSelection,
@@ -91,6 +106,7 @@ export class MockVideoService implements VideoService {
         videoRef,
         originalFilename: selection.name,
         status: 'UPLOADED',
+        jobId: null,
         submittedAt: now,
         activityAt: now,
       },

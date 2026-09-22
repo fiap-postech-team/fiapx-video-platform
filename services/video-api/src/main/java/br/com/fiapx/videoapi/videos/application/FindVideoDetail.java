@@ -28,6 +28,7 @@ public final class FindVideoDetail {
             return null;
         }
         return new VideoLibraryDetail.ProcessingView(
+            row.jobId(),
             ProductStatusMapper.processingStatus(row.jobStatus()),
             row.jobCreatedAt(),
             row.startedAt(),

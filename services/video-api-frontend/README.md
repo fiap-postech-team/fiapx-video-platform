@@ -17,7 +17,7 @@ A linguagem visível está em português do Brasil e documentada em [docs/protot
 
 Depois de entrar, o menu leva a Meus vídeos, Enviar vídeo, Meu perfil e Sair. No celular o menu é recolhível.
 
-A lista mostra um status de produto por arquivo (Pendente, Processando, Processado, Rejeitado, Expirado, Falha no processamento), com 5 itens por página. O detalhe repete esse status e a linha do tempo do envio e do processamento único.
+A lista mostra um status de produto por arquivo (Pendente, Processando, Processado, Rejeitado, Expirado, Falha no processamento), com 5 itens por página. Para vídeos Processados, a lista e o detalhe exibem `Baixar resultado`; a API emite uma URL temporária e a interface a abre em nova aba sem persistir a URL.
 
 ## Tecnologias
 
