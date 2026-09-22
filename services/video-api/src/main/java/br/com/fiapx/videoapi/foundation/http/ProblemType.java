@@ -34,7 +34,14 @@ public enum ProblemType {
         "Você não possui permissão para acessar este recurso."
     ),
     NOT_FOUND("not-found", "Não encontrado", 404, "Recurso não encontrado."),
+    JOB_NOT_FOUND("job-not-found", "Resultado não encontrado", 404, "Não foi possível localizar este resultado."),
     CONFLICT("conflict", "Conflito", 409, "O recurso informado já existe."),
+    JOB_RESULT_NOT_READY("job-result-not-ready", "Resultado não disponível", 409,
+        "O resultado deste processamento ainda não está pronto."),
+    JOB_RESULT_INCONSISTENT("job-result-inconsistent", "Resultado inconsistente", 409,
+        "O resultado deste processamento está inconsistente."),
+    JOB_RESULT_OBJECT_MISSING("job-result-object-missing", "Resultado não encontrado", 409,
+        "O arquivo de resultado não está disponível."),
     PROCESSING_ALREADY_EXISTS(
         "processing-already-exists",
         "Conflito",
