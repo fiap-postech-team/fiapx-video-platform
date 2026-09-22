@@ -133,7 +133,7 @@ export const copy = {
     reviewTitle: 'Confirmar envio',
     reviewCopy: 'Você quer mesmo enviar este vídeo?',
     confirm: 'Sim, enviar vídeo',
-    cancel: 'Desistir',
+    cancel: 'Cancelar',
     sendingTitle: 'Enviando seu vídeo',
     sendingCopy: 'Mantenha esta página aberta até a conclusão do envio.',
     confirmingTitle: 'Confirmando envio',
