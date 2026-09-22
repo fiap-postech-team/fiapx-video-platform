@@ -53,7 +53,7 @@ public class LocalDownloadFixture {
         var jobId = properties.jobId() == null ? UUID.fromString("00000000-0000-4000-8000-000000000102") : properties.jobId();
         var sourceKey = "users/" + user.id() + "/videos/" + videoId + "/source";
         var resultKey = "results/" + jobId + "/frames.zip";
-        transactions.executeWithoutResult(status -> {
+        var seededResultKey = transactions.execute(status -> {
             if (videos.findOwnedById(user.id(), videoId).isEmpty()) {
                 videos.save(new Video(videoId, user.id(), sourceKey, "demo-processado.mp4", "video/mp4", 1,
                     null, VideoStatus.UPLOADED, now.minus(Duration.ofMinutes(2)), now.minus(Duration.ofMinutes(1)),
@@ -63,12 +63,16 @@ public class LocalDownloadFixture {
             if (existing.isEmpty()) {
                 jobs.save(new Job(jobId, user.id(), videoId, JobSourceKind.VIDEO, sourceKey, resultKey,
                     JobStatus.COMPLETED, now.minus(Duration.ofMinutes(1)), true));
+                return resultKey;
             } else if (existing.get().status() == JobStatus.PENDING || existing.get().status() == JobStatus.PROCESSING) {
                 existing.get().apply(JobStatus.COMPLETED, resultKey);
                 jobs.save(existing.get());
+                return resultKey;
             }
+            return existing.get().resultKey() == null || existing.get().resultKey().isBlank()
+                ? resultKey : existing.get().resultKey();
         });
-        storage.seed(resultKey, zipBytes(), "application/zip");
+        storage.seed(seededResultKey, zipBytes(), "application/zip");
     }
 
     private byte[] zipBytes() {

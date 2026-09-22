@@ -20,25 +20,14 @@ export function DownloadResultButton({
 
   async function handleDownload() {
     if (pending) return
+    const popup = openPendingTab()
     setPending(true)
     setError(null)
     try {
       const result = await videoService.download(jobId)
-      let opened = false
-      try {
-        opened = Boolean(window.open(result.downloadUrl, '_blank', 'noopener,noreferrer'))
-      } catch {
-        opened = false
-      }
-      if (!opened) {
-        const anchor = document.createElement('a')
-        anchor.href = result.downloadUrl
-        anchor.target = '_blank'
-        anchor.rel = 'noopener noreferrer'
-        anchor.download = result.filename
-        anchor.click()
-      }
+      navigateToDownload(popup, result.downloadUrl, result.filename)
     } catch (cause) {
+      popup?.close()
       setError(downloadMessage(cause))
     } finally {
       setPending(false)
@@ -69,12 +58,31 @@ export function DownloadResultButton({
   )
 }
 
-function DownloadIcon() {
-  return (
-    <svg className="download-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3" />
-    </svg>
-  )
+function openPendingTab(): Window | null {
+  try {
+    const popup = window.open('', '_blank')
+    if (popup) popup.opener = null
+    return popup
+  } catch {
+    return null
+  }
+}
+
+function navigateToDownload(popup: Window | null, url: string, filename: string): void {
+  if (popup) {
+    try {
+      popup.location.replace(url)
+      return
+    } catch {
+      popup.close()
+    }
+  }
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.target = '_blank'
+  anchor.rel = 'noopener noreferrer'
+  anchor.download = filename
+  anchor.click()
 }
 
 function downloadMessage(cause: unknown): string {
