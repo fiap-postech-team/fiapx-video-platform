@@ -7,9 +7,12 @@ import br.com.fiapx.videoapi.outbox.application.port.out.OutboxStore;
 import br.com.fiapx.videoapi.videos.application.port.out.VideoStore;
 import br.com.fiapx.videoapi.inbox.application.ProcessJobResult;
 import br.com.fiapx.videoapi.inbox.application.port.out.InboxStore;
+import br.com.fiapx.videoapi.jobs.application.DownloadResult;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import br.com.fiapx.videoapi.videos.application.port.out.VideoObjectStorage;
+import br.com.fiapx.videoapi.videos.adapter.configuration.VideoUploadProperties;
 
 @Configuration(proxyBeanMethods = false)
 public class JobsConfiguration {
@@ -22,4 +25,8 @@ public class JobsConfiguration {
         return new CreateJob(jobs, outbox, videos, idempotency, clock);
     }
     @Bean ProcessJobResult processJobResult(InboxStore inbox, JobStore jobs) { return new ProcessJobResult(inbox, jobs); }
+    @Bean DownloadResult downloadResult(JobStore jobs, VideoStore videos, VideoObjectStorage storage,
+                                        VideoUploadProperties properties) {
+        return new DownloadResult(jobs, videos, storage, properties.resultDownloadUrlTtl(), properties.resultDownloadMockUrl());
+    }
 }

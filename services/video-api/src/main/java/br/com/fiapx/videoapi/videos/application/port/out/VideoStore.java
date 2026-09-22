@@ -17,6 +17,9 @@ public interface VideoStore {
     default Optional<Video> lock(UUID videoId) {
         throw new UnsupportedOperationException();
     }
+    default Optional<Video> findByJobOwner(UUID videoId, UUID userId) {
+        return lockOwned(userId, videoId);
+    }
     default List<UUID> pendingExpired(Instant now, int limit) {
         throw new UnsupportedOperationException();
     }

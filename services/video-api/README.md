@@ -16,8 +16,9 @@ PostgreSQL. O contrato HTTP canônico é o
 | Persistência | Flyway executa as migrations `V1` a `V4`; Hibernate apenas valida o schema |
 | Swagger | Disponível somente com o perfil `local` |
 | Upload de vídeo | URL temporária para PUT direto no MinIO/S3, confirmação por HEAD e expiração de pendências |
-| Download de vídeo | Ainda não há endpoint HTTP |
-| Publicação/consumo RabbitMQ | Schema, outbox, inbox e operações de claim existem; publisher e listener integrados ao broker ainda não estão disponíveis |
+| Download de resultado | `GET /v1/jobs/{id}/download` para o proprietário; URL S3 temporária ou mock local |
+| Consultas administrativas | `GET /v1/admin/users`, `/videos` e `/jobs`, protegidas por `ADMIN` |
+| Publicação/consumo RabbitMQ | Fila `video.api.results.v1` atualiza jobs com inbox idempotente |
 
 ## Pré-requisitos
 
@@ -193,9 +194,23 @@ origem autorizada.
 | `APP_VIDEO_MAX_SIZE_BYTES`, `APP_VIDEO_ALLOWED_CONTENT_TYPES` | `500000000`, quatro tipos acima | Política de mídia declarada |
 | `APP_VIDEO_UPLOAD_URL_TTL`, `APP_VIDEO_PENDING_TTL` | `PT15M`, `PT24H` | Duração da URL e da pendência; a pendência deve durar mais |
 | `APP_VIDEO_CLEANUP_INTERVAL`, `APP_VIDEO_CLEANUP_BATCH_SIZE` | `PT5M`, `100` | Agendamento e tamanho máximo de cada rodada |
+| `APP_RESULT_DOWNLOAD_URL_TTL` | `PT5M` | Validade da URL GET assinada |
+| `APP_RESULT_DOWNLOAD_MOCK_URL` | `https://shorturl.at/JpxZS` | Apenas local; substitui a assinatura mantendo HEAD/ownership |
 
 Fora do perfil `local`, inicialização sem banco ou configuração de autenticação
 completa falha antes de expor a aplicação.
+
+Para simular uma conclusão local, publique na fila `video.api.results.v1` (com
+um job existente e o objeto no bucket `videos`):
+
+```json
+{"eventId":"<uuid-novo>","jobId":"<uuid-do-job>","type":"COMPLETED","occurredAt":"<timestamp-UTC>","correlationId":"<uuid-do-job>","resultKey":"results/<uuid-do-job>/frames.zip"}
+```
+
+No perfil `local`, o download do proprietário devolve
+`https://shorturl.at/JpxZS`; a API ainda confirma o objeto por HEAD antes de
+responder.
+
 Em produção, use credenciais exclusivas da API com `PutObject`, `GetObject`
 (HEAD) e `DeleteObject` restritos ao prefixo `users/*/videos/*/source`, mais
 `ListBucket` restrito ao prefixo de entrada para distinguir objeto ausente.

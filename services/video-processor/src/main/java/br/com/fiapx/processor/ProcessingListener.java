@@ -32,7 +32,7 @@ public class ProcessingListener {
         JsonNode event = json.readTree(body);
         String jobId = event.required("jobId").asText();
         String sourceKey = event.required("sourceKey").asText();
-        publish("video.job.started.v1", Map.of("eventId", UUID.randomUUID(), "jobId", jobId, "type", "PROCESSING"));
+        publish("video.job.started.v1", Map.of("eventId", UUID.randomUUID(), "jobId", jobId, "type", "PROCESSING", "occurredAt", java.time.Instant.now().toString(), "correlationId", jobId));
         Path work = Files.createTempDirectory("fiapx-" + jobId + "-");
         try {
             Path video = work.resolve("input");
@@ -44,9 +44,9 @@ public class ProcessingListener {
             zip(frames, zip);
             String result = "results/" + jobId + "/frames.zip";
             minio.uploadObject(UploadObjectArgs.builder().bucket(bucket).object(result).filename(zip.toString()).contentType("application/zip").build());
-            publish("video.job.completed.v1", Map.of("eventId", UUID.randomUUID(), "jobId", jobId, "type", "COMPLETED", "resultKey", result));
+            publish("video.job.completed.v1", Map.of("eventId", UUID.randomUUID(), "jobId", jobId, "type", "COMPLETED", "resultKey", result, "occurredAt", java.time.Instant.now().toString(), "correlationId", jobId));
         } catch (Exception ex) {
-            publish("video.job.failed.v1", Map.of("eventId", UUID.randomUUID(), "jobId", jobId, "type", "FAILED", "terminal", true, "reason", safe(ex.getMessage())));
+            publish("video.job.failed.v1", Map.of("eventId", UUID.randomUUID(), "jobId", jobId, "type", "FAILED", "terminal", true, "reason", safe(ex.getMessage()), "occurredAt", java.time.Instant.now().toString(), "correlationId", jobId));
             throw ex;
         } finally {
             delete(work);

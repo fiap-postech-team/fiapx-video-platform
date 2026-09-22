@@ -97,6 +97,30 @@ paths:
       security: [ { bearerAuth: [ ] } ]
       parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
       responses: { '200': { description: Estado atual, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /v1/jobs/{id}/download:
+    get:
+      summary: Obtém acesso temporário ao resultado do proprietário
+      security: [ { bearerAuth: [ ] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses: { '200': { description: URL temporária, content: { application/json: { schema: { $ref: '#/components/schemas/DownloadResult' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '503': { $ref: '#/components/responses/StorageUnavailable' } }
+  /v1/admin/users:
+    get:
+      summary: Lista usuários para operação administrativa
+      security: [ { bearerAuth: [ ] } ]
+      parameters: [ { name: status, in: query, schema: { type: string } }, { name: cursor, in: query, schema: { type: string } }, { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } } ]
+      responses: { '200': { description: Página administrativa }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/AccessDenied' } }
+  /v1/admin/videos:
+    get:
+      summary: Lista vídeos para operação administrativa
+      security: [ { bearerAuth: [ ] } ]
+      parameters: [ { name: lifecycle, in: query, schema: { type: string } }, { name: ownerId, in: query, schema: { type: string, format: uuid } }, { name: cursor, in: query, schema: { type: string } }, { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } } ]
+      responses: { '200': { description: Página administrativa }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/AccessDenied' } }
+  /v1/admin/jobs:
+    get:
+      summary: Lista jobs para operação administrativa
+      security: [ { bearerAuth: [ ] } ]
+      parameters: [ { name: status, in: query, schema: { type: string } }, { name: ownerId, in: query, schema: { type: string, format: uuid } }, { name: createdFrom, in: query, schema: { type: string, format: date-time } }, { name: createdTo, in: query, schema: { type: string, format: date-time } }, { name: cursor, in: query, schema: { type: string } }, { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } } ]
+      responses: { '200': { description: Página administrativa }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/AccessDenied' } }
 components:
   securitySchemes: { bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT } }
   headers:
@@ -143,3 +167,4 @@ components:
     Problem: { type: object, properties: { type: { type: string }, title: { type: string }, status: { type: integer }, detail: { type: string }, instance: { type: string }, code: { type: string } } }
     Job: { type: object, properties: { id: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string }, resultKey: { type: [ string, 'null' ] }, status: { enum: [ PENDING, PROCESSING, COMPLETED, FAILED ] }, createdAt: { type: string, format: date-time } } }
     JobPage: { type: object, required: [ items ], properties: { items: { type: array, items: { $ref: '#/components/schemas/Job' } }, nextCursor: { type: [ string, 'null' ] } } }
+    DownloadResult: { type: object, required: [ downloadUrl, expiresAt, filename, contentType, sizeBytes ], properties: { downloadUrl: { type: string, format: uri }, expiresAt: { type: string, format: date-time }, filename: { type: string }, contentType: { type: string }, sizeBytes: { type: integer } } }

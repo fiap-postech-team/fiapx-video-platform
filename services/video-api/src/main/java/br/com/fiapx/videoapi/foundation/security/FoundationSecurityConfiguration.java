@@ -88,6 +88,7 @@ public final class FoundationSecurityConfiguration {
         Environment environment
     ) {
         authorize.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
+        authorize.requestMatchers("/v1/admin/**").hasRole("ADMIN");
         authorize.requestMatchers("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout").permitAll();
         if (environment.matchesProfiles("local")) {
             authorize.requestMatchers(

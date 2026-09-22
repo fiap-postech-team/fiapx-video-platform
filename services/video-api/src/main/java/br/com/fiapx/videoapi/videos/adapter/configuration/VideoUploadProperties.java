@@ -8,7 +8,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record VideoUploadProperties(long maxSizeBytes, Set<String> allowedContentTypes,
                                     Duration uploadUrlTtl, Duration pendingTtl, int cleanupBatchSize,
                                     String bucket, String internalEndpoint, String publicEndpoint,
-                                    String region, String accessKey, String secretKey) {
+                                    String region, String accessKey, String secretKey,
+                                    Duration resultDownloadUrlTtl, String resultDownloadMockUrl) {
+    public VideoUploadProperties(long maxSizeBytes, Set<String> allowedContentTypes, Duration uploadUrlTtl,
+                                 Duration pendingTtl, int cleanupBatchSize, String bucket, String internalEndpoint,
+                                 String publicEndpoint, String region, String accessKey, String secretKey) {
+        this(maxSizeBytes, allowedContentTypes, uploadUrlTtl, pendingTtl, cleanupBatchSize, bucket,
+            internalEndpoint, publicEndpoint, region, accessKey, secretKey, Duration.ofMinutes(5), "");
+    }
     public VideoUploadProperties {
         if (bucket == null || bucket.isBlank() || region == null || region.isBlank()
             || (hasText(accessKey) != hasText(secretKey))) {

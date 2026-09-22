@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import br.com.fiapx.videoapi.jobs.application.DownloadResult;
 
 @RestController
 @RequestMapping("/v1/jobs")
@@ -27,16 +28,19 @@ public class JobController {
     private final CreateJob createJob;
     private final JobStore jobs;
     private final JobTransactionExecutor transactions;
+    private final DownloadResult downloadResult;
 
     @Autowired
-    public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions) {
+    public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
+                         DownloadResult downloadResult) {
         this.createJob = createJob;
         this.jobs = jobs;
         this.transactions = transactions;
+        this.downloadResult = downloadResult;
     }
 
     JobController(CreateJob createJob, JobStore jobs) {
-        this(createJob, jobs, Supplier::get);
+        this(createJob, jobs, Supplier::get, null);
     }
     @PostMapping
     ResponseEntity<JobResponse> create(@Valid @RequestBody CreateJobRequest request,
@@ -48,6 +52,10 @@ public class JobController {
     @GetMapping("/{id}")
     JobResponse get(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
         return jobs.findOwned(id, identity.userId()).map(JobResponse::from).orElseThrow(JobNotFoundException::new);
+    }
+    @GetMapping("/{id}/download")
+    DownloadResult.Result download(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {
+        return downloadResult.execute(id, identity.userId());
     }
     @GetMapping
     JobPage list(@RequestParam(required = false) String cursor,
