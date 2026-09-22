@@ -3,6 +3,7 @@ import { copy, interpolate } from '../../product-copy'
 import { formatDateTime } from '../application/format-datetime'
 import { lifecycleStatusLabel, lifecycleTone } from '../application/product-status'
 import type { PrototypeScenario, VideoLibraryItem, VideoService } from '../domain/video'
+import { DownloadResultButton } from './DownloadResultButton'
 
 interface VideoListProps {
   videoService: VideoService
@@ -100,6 +101,9 @@ export function VideoList({ videoService, scenario, onOpen, onUpload }: VideoLis
                     <button type="button" className="btn-quiet" onClick={() => onOpen(video.videoRef)}>
                       {copy.videos.openDetail}
                     </button>
+                    {video.status === 'AVAILABLE' && video.jobId && (
+                      <DownloadResultButton jobId={video.jobId} videoService={videoService} />
+                    )}
                   </span>
                 </div>
               )

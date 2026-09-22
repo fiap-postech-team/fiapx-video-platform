@@ -108,6 +108,7 @@ describe('authenticated product', () => {
     expect(screen.getByText('campanha.mp4')).toBeInTheDocument()
     expect(screen.getAllByText(copy.lifecycleStatus.processing).length).toBeGreaterThan(0)
     expect(screen.getAllByText(copy.lifecycleStatus.available).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: copy.videos.download })).toBeInTheDocument()
     expect(screen.queryByText('5/8')).not.toBeInTheDocument()
     expect(screen.queryByText(copy.processingStatus.completed)).not.toBeInTheDocument()
     expect(screen.getAllByText('campanha.mp4')).toHaveLength(1)
@@ -122,7 +123,7 @@ describe('authenticated product', () => {
     assertProductLanguage()
   })
 
-  it('opens a dedicated detail with a single timeline and no retry or download', async () => {
+  it('opens a dedicated detail with a single timeline and a download action', async () => {
     const user = userEvent.setup()
     render(
       <App
@@ -139,7 +140,7 @@ describe('authenticated product', () => {
     expect(screen.getByText(copy.detail.sent)).toBeInTheDocument()
     expect(screen.getByText(copy.lifecycleStatus.available)).toBeInTheDocument()
     expect(screen.queryByText('Processamentos anteriores')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Baixar/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: copy.detail.download })).toBeInTheDocument()
     assertProductLanguage()
   })
 
@@ -165,6 +166,7 @@ describe('authenticated product', () => {
         videoService={{
           list: vi.fn().mockRejectedValue({ code: 'LIST_UNAVAILABLE', message: 'mock' }),
           get: vi.fn(),
+          download: vi.fn(),
           simulateUpload: vi.fn(),
         }}
       />,

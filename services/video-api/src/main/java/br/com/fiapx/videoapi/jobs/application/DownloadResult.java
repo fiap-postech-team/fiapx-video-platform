@@ -7,8 +7,9 @@ import br.com.fiapx.videoapi.videos.application.port.out.VideoStore;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
-public final class DownloadResult {
+public class DownloadResult {
     private final JobStore jobs;
     private final VideoStore videos;
     private final VideoObjectStorage storage;
@@ -21,6 +22,7 @@ public final class DownloadResult {
         this.ttl = ttl; this.mockUrl = mockUrl;
     }
 
+    @Transactional
     public Result execute(UUID jobId, UUID ownerId) {
         var job = jobs.findOwned(jobId, ownerId).orElseThrow(JobResultNotFoundException::new);
         if (job.status() != JobStatus.COMPLETED) throw new ResultNotReadyException();

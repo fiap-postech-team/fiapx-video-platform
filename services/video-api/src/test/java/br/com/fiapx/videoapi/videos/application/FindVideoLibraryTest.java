@@ -29,9 +29,9 @@ class FindVideoLibraryTest {
         var reader = new VideoLibraryReader() {
             public Page findPage(UUID ownerId, int pageNumber, int pageSize) {
                 return new Page(List.of(
-                    new Row(withJob, "aula.mp4", VideoStatus.UPLOADED, submitted, JobStatus.COMPLETED,
+                    new Row(withJob, "aula.mp4", VideoStatus.UPLOADED, submitted, UUID.randomUUID(), JobStatus.COMPLETED,
                         submitted, activity),
-                    new Row(withoutJob, "rascunho.mp4", VideoStatus.PENDING, submitted, null, null, null)
+                    new Row(withoutJob, "rascunho.mp4", VideoStatus.PENDING, submitted, null, null, null, null)
                 ), 2);
             }
             public Optional<DetailRow> findDetail(UUID ownerId, UUID videoId) {

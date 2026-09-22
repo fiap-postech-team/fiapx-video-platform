@@ -84,6 +84,17 @@ public final class LocalMockVideoObjectStorage implements VideoObjectStorage {
 
     @Override public Optional<StoredObject> stat(String key) { return Optional.ofNullable(objects.get(key)); }
 
+    public void seed(String key, byte[] content, String contentType) {
+        var target = pathFor(key);
+        try {
+            Files.createDirectories(target.getParent());
+            Files.write(target, content);
+            objects.put(key, new StoredObject(content.length, contentType, null));
+        } catch (IOException exception) {
+            throw new StorageUnavailableException(exception);
+        }
+    }
+
     @Override public void delete(String key) {
         objects.remove(key);
         try { Files.deleteIfExists(pathFor(key)); } catch (IOException exception) { throw new StorageUnavailableException(exception); }

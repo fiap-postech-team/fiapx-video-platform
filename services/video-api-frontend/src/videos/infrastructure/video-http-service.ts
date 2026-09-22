@@ -3,6 +3,7 @@ import { validateUploadSelection } from '../application/validate-upload'
 import {
   PRODUCT_PROCESSING_STATUSES,
   PRODUCT_VIDEO_STATUSES,
+  type DownloadResult,
   type ProductProcessingStatus,
   type ProductVideoStatus,
   UploadFailure,
@@ -13,6 +14,7 @@ import {
   type VideoLibraryItem,
   type VideoLibraryPage,
   type VideoService,
+  type VideoServiceError,
 } from '../domain/video'
 
 export type AuthorizedFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -58,6 +60,14 @@ export class VideoHttpService implements VideoService {
       throw { code: 'DETAIL_UNAVAILABLE', message: 'detail unavailable' }
     }
     return readDetail(asRecord(await response.json()))
+  }
+
+  async download(jobId: string): Promise<DownloadResult> {
+    const response = await this.authorizedFetch(`${this.baseUrl}/v1/jobs/${encodeURIComponent(jobId)}/download`)
+    if (!response.ok) {
+      throw readDownloadError(response.status, await readProblem(response))
+    }
+    return readDownload(asRecord(await response.json()))
   }
 
   async simulateUpload(): Promise<void> {
@@ -191,6 +201,7 @@ function readItem(value: unknown): VideoLibraryItem {
     videoRef: asString(record.videoRef),
     originalFilename: asString(record.originalFilename),
     status: asVideoStatus(record.status),
+    jobId: record.jobId == null ? null : asString(record.jobId),
     submittedAt: asString(record.submittedAt),
     activityAt: asString(record.activityAt),
   }
@@ -211,6 +222,42 @@ function readDetail(record: Record<string, unknown>): VideoDetail {
   }
 }
 
+function readDownload(value: Record<string, unknown>): DownloadResult {
+  const sizeBytes = value.sizeBytes
+  if (typeof sizeBytes !== 'number' || !Number.isFinite(sizeBytes) || sizeBytes < 0) {
+    throw { code: 'DOWNLOAD_INCONSISTENT', message: 'invalid download payload' }
+  }
+  return {
+    downloadUrl: asString(value.downloadUrl),
+    expiresAt: asString(value.expiresAt),
+    filename: asString(value.filename),
+    contentType: asString(value.contentType),
+    sizeBytes,
+  }
+}
+
+async function readProblem(response: Response): Promise<Record<string, unknown> | null> {
+  try {
+    const body: unknown = await response.json()
+    return body && typeof body === 'object' && !Array.isArray(body)
+      ? body as Record<string, unknown>
+      : null
+  } catch {
+    return null
+  }
+}
+
+function readDownloadError(status: number, problem: Record<string, unknown> | null): VideoServiceError {
+  const code = typeof problem?.code === 'string' ? problem.code : ''
+  const mapped = code === 'JOB_RESULT_NOT_READY' ? 'DOWNLOAD_NOT_READY'
+    : code === 'JOB_RESULT_INCONSISTENT' ? 'DOWNLOAD_INCONSISTENT'
+      : code === 'JOB_RESULT_OBJECT_MISSING' ? 'DOWNLOAD_OBJECT_MISSING'
+        : code === 'STORAGE_UNAVAILABLE' || status === 503 ? 'DOWNLOAD_STORAGE_UNAVAILABLE'
+          : code === 'JOB_NOT_FOUND' || status === 404 ? 'DOWNLOAD_NOT_FOUND'
+            : 'DOWNLOAD_INCONSISTENT'
+  return { code: mapped, message: 'download unavailable' }
+}
+
 function activityAt(
   value: unknown,
   processing: VideoDetail['processing'],
@@ -229,6 +276,7 @@ function readProcessing(value: unknown): VideoDetail['processing'] {
   }
   const record = asRecord(value)
   return {
+    jobId: record.jobId == null ? '' : asString(record.jobId),
     status: asProcessingStatus(record.status),
     requestedAt: asString(record.requestedAt),
     startedAt: record.startedAt === null ? null : asString(record.startedAt),

@@ -57,6 +57,7 @@ class VideoLibraryIT extends VideoUploadIntegrationSupport {
         assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(detail.getBody().get("originalFilename")).isEqualTo("pronto.mp4");
         var processing = (Map<String, Object>) detail.getBody().get("processing");
+        assertThat(processing.get("jobId")).isEqualTo(jobId.toString());
         assertThat(processing.get("status")).isEqualTo("AVAILABLE");
         assertThat(processing.get("startedAt")).asString().contains("12:00:05");
         assertThat(get("/v1/videos/" + videoRef, other).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);

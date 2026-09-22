@@ -32,7 +32,7 @@ export function demoVideos(): DemoVideo[] {
       '2026-09-18T11:00:00Z',
       '2026-09-18T11:03:00Z',
       '2026-09-18T11:02:00Z',
-      { status: 'QUEUED', requestedAt: '2026-09-18T11:03:00Z', startedAt: null, finishedAt: null },
+      { jobId: 'job-ref-queued', status: 'QUEUED', requestedAt: '2026-09-18T11:03:00Z', startedAt: null, finishedAt: null },
     ),
     library(
       'ref-processing',
@@ -42,6 +42,7 @@ export function demoVideos(): DemoVideo[] {
       '2026-09-17T16:22:00Z',
       '2026-09-17T16:21:00Z',
       {
+        jobId: 'job-ref-processing',
         status: 'PROCESSING',
         requestedAt: '2026-09-17T16:22:00Z',
         startedAt: '2026-09-17T16:22:30Z',
@@ -56,6 +57,7 @@ export function demoVideos(): DemoVideo[] {
       '2026-09-16T14:10:00Z',
       '2026-09-16T14:02:00Z',
       {
+        jobId: 'job-ref-available',
         status: 'AVAILABLE',
         requestedAt: '2026-09-16T14:03:00Z',
         startedAt: '2026-09-16T14:04:00Z',
@@ -70,6 +72,7 @@ export function demoVideos(): DemoVideo[] {
       '2026-09-15T12:02:00Z',
       '2026-09-15T12:01:00Z',
       {
+        jobId: 'job-ref-failed',
         status: 'FAILED',
         requestedAt: '2026-09-15T12:02:00Z',
         startedAt: null,
@@ -106,6 +109,8 @@ function library(
   uploadedAt: string | null,
   processing: VideoDetail['processing'],
 ): DemoVideo {
-  const item: VideoLibraryItem = { videoRef, originalFilename, status, submittedAt, activityAt }
-  return { item, detail: { ...item, uploadedAt, processing } }
+  const jobId = processing ? `job-${videoRef}` : ''
+  const normalizedProcessing = processing ? { ...processing, jobId } : null
+  const item: VideoLibraryItem = { videoRef, originalFilename, status, jobId: jobId || null, submittedAt, activityAt }
+  return { item, detail: { ...item, uploadedAt, processing: normalizedProcessing } }
 }

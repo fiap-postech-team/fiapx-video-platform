@@ -107,6 +107,13 @@ export const copy = {
     pagePrevious: 'Página anterior',
     pageNext: 'Próxima página',
     pageLabel: 'Página {n}',
+    download: 'Baixar resultado',
+    downloadPending: 'Preparando download…',
+    downloadNotReady: 'O resultado ainda não está pronto.',
+    downloadInconsistent: 'Não foi possível localizar um resultado válido.',
+    downloadMissing: 'O arquivo de resultado não está disponível.',
+    downloadStorageUnavailable: 'O armazenamento está indisponível. Tente novamente.',
+    downloadNotFound: 'Não foi possível localizar este resultado.',
   },
   detail: {
     back: 'Voltar para meus vídeos',
@@ -120,6 +127,7 @@ export const copy = {
     notFound: 'Não foi possível encontrar este vídeo.',
     expiredHint: 'O prazo para enviar este arquivo acabou. Envie o vídeo novamente.',
     failedHint: 'Não foi possível extrair as imagens deste envio.',
+    download: 'Baixar resultado',
   },
   upload: {
     title: 'Enviar vídeo',

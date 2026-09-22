@@ -141,6 +141,18 @@ paths:
       security: [ { bearerAuth: [ ] } ]
       parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
       responses: { '200': { description: Estado atual, content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/jobs/{id}/download:
+    get:
+      summary: Solicita acesso temporário ao ZIP processado do proprietário
+      description: Confirma ownership, estado e existência do objeto antes de emitir uma URL temporária. A URL não é persistida.
+      security: [ { bearerAuth: [ ] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '200': { description: URL temporária do resultado, headers: { Cache-Control: { schema: { type: string, example: no-store } } }, content: { application/json: { schema: { $ref: '#/components/schemas/DownloadResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/StorageUnavailable' }
 components:
   securitySchemes: { bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT } }
   headers:
@@ -192,11 +204,12 @@ components:
     VideoProcessingStatus: { type: string, enum: [ QUEUED, PROCESSING, AVAILABLE, FAILED ] }
     VideoLibraryItem:
       type: object
-      required: [ videoRef, originalFilename, status, submittedAt, activityAt ]
+      required: [ videoRef, originalFilename, status, jobId, submittedAt, activityAt ]
       properties:
         videoRef: { type: string }
         originalFilename: { type: string }
         status: { $ref: '#/components/schemas/VideoLibraryStatus' }
+        jobId: { type: [ string, 'null' ], format: uuid, description: Identificador opaco do processamento associado }
         submittedAt: { type: string, format: date-time }
         activityAt: { type: string, format: date-time }
     VideoLibraryPage:
@@ -210,8 +223,9 @@ components:
         totalPages: { type: integer, minimum: 0 }
     ProcessingView:
       type: object
-      required: [ status, requestedAt, startedAt, finishedAt ]
+      required: [ jobId, status, requestedAt, startedAt, finishedAt ]
       properties:
+        jobId: { type: string, format: uuid }
         status: { $ref: '#/components/schemas/VideoProcessingStatus' }
         requestedAt: { type: string, format: date-time }
         startedAt: { type: [ string, 'null' ], format: date-time }
@@ -226,3 +240,12 @@ components:
         submittedAt: { type: string, format: date-time }
         uploadedAt: { type: [ string, 'null' ], format: date-time }
         processing: { anyOf: [ { $ref: '#/components/schemas/ProcessingView' }, { type: 'null' } ] }
+    DownloadResult:
+      type: object
+      required: [ downloadUrl, expiresAt, filename, contentType, sizeBytes ]
+      properties:
+        downloadUrl: { type: string, format: uri, description: URL temporária; não persistir nem registrar }
+        expiresAt: { type: string, format: date-time }
+        filename: { type: string }
+        contentType: { type: string, example: application/zip }
+        sizeBytes: { type: integer, format: int64, minimum: 0 }

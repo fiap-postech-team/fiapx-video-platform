@@ -3,6 +3,7 @@ import { copy } from '../../product-copy'
 import { lifecycleStatusLabel, lifecycleTone } from '../application/product-status'
 import { isVideoServiceError, type VideoDetail as VideoDetailModel, type VideoService } from '../domain/video'
 import { VideoTimeline } from './VideoTimeline'
+import { DownloadResultButton } from './DownloadResultButton'
 
 interface VideoDetailProps {
   videoRef: string
@@ -91,6 +92,9 @@ export function VideoDetail({ videoRef, videoService, onBack }: VideoDetailProps
       {video.status === 'EXPIRED' && <p className="page-note">{copy.detail.expiredHint}</p>}
       {video.status === 'FAILED' && <p className="page-note">{copy.detail.failedHint}</p>}
       <div className="detail-actions">
+        {video.status === 'AVAILABLE' && video.processing?.jobId && (
+          <DownloadResultButton jobId={video.processing.jobId} videoService={videoService} />
+        )}
         <button type="button" onClick={onBack}>{copy.detail.back}</button>
       </div>
     </article>

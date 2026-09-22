@@ -22,6 +22,7 @@ public final class FindVideoLibrary {
             VideoRef.encode(row.videoId()),
             row.originalFilename(),
             ProductStatusMapper.videoStatus(row.uploadStatus(), row.jobStatus()),
+            row.jobId(),
             row.submittedAt(),
             activityAt(row)
         )).toList();

@@ -439,8 +439,10 @@ button:disabled { cursor: not-allowed; opacity: .38; }
 .video-row > :nth-child(3) {
   justify-self: start;
 }
-.row-action { justify-self: end; }
+.row-action { align-items: center; display: flex; gap: .5rem; justify-self: end; }
 .row-action .btn-quiet { white-space: nowrap; }
+.download-action { align-items: center; display: inline-flex; gap: .5rem; }
+.download-error { color: var(--danger, #a33); font-size: .8rem; max-width: 14rem; }
 .video-head-action {
   color: transparent;
   justify-self: end;

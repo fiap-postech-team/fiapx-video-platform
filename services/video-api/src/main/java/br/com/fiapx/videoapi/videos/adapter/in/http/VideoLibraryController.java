@@ -9,6 +9,7 @@ import br.com.fiapx.videoapi.videos.application.VideoLibraryDetail;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryPage;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,10 +50,11 @@ public class VideoLibraryController {
     }
 
     record LibraryItemResponse(String videoRef, String originalFilename, ProductVideoStatus status,
+                               UUID jobId,
                                Instant submittedAt, Instant activityAt) {
         static LibraryItemResponse from(VideoLibraryPage.VideoLibraryItem item) {
             return new LibraryItemResponse(item.videoRef(), item.originalFilename(), item.status(),
-                item.submittedAt(), item.activityAt());
+                item.jobId(), item.submittedAt(), item.activityAt());
         }
     }
 
@@ -64,11 +66,11 @@ public class VideoLibraryController {
         }
     }
 
-    record ProcessingResponse(ProductProcessingStatus status, Instant requestedAt,
+    record ProcessingResponse(UUID jobId, ProductProcessingStatus status, Instant requestedAt,
                               Instant startedAt, Instant finishedAt) {
         static ProcessingResponse from(VideoLibraryDetail.ProcessingView processing) {
             return processing == null ? null
-                : new ProcessingResponse(processing.status(), processing.requestedAt(),
+                : new ProcessingResponse(processing.jobId(), processing.status(), processing.requestedAt(),
                     processing.startedAt(), processing.finishedAt());
         }
     }
