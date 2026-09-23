@@ -66,7 +66,8 @@ export function DownloadResultButton({
         </span>
       )}
       {success && (
-        <span className="download-success" role="status">
+        <span className="download-notification download-notification-success" role="status">
+          <span className="download-notification-mark" aria-hidden="true" />
           {copy.videos.downloadSuccess}
         </span>
       )}
