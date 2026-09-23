@@ -4,7 +4,7 @@
 
 O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs assíncronos, extrai frames com FFmpeg, gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
 
-> Estado da fundação: os serviços, contratos, migrations, imagens e ambiente local compilam e estão estruturados. Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e testes de integração são evoluções registradas, não funcionalidades concluídas.
+> Estado atual: o `video-processor` está implementado, com testes unitários. O `video-api` e o `notification-worker` seguem como fundação — contratos, migrations, imagens e ambiente local estruturados, sem código de aplicação. Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e testes de integração são evoluções registradas, não funcionalidades concluídas.
 
 ## Visão geral
 
@@ -104,9 +104,11 @@ Credenciais locais vêm do `.env`; os valores de `.env.example` destinam-se some
 
 ## Build e verificação
 
-Nesta entrega de fundação, o `spring-boot:repackage` está desabilitado porque os
-fontes Java serão adicionados em uma etapa posterior. Ao incluir as classes de
-aplicação, remova a propriedade `spring-boot.repackage.skip` do `pom.xml` raiz.
+O `spring-boot:repackage` continua desabilitado no `pom.xml` raiz porque
+`video-api` e `notification-worker` ainda não possuem classe principal. Cada
+módulo reativa o repackage sobrescrevendo `spring-boot.repackage.skip` quando
+ganha sua aplicação, como já faz o `video-processor`. Quando os três módulos
+tiverem código, remova a propriedade da raiz.
 
 ```bash
 ./mvnw clean verify
@@ -149,9 +151,9 @@ O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa em pus
 
 - Upload/download por URLs pré-assinadas e bucket policies;
 - autenticação completa e autorização de propriedade do job;
-- deduplicação persistente no processor e no consumidor de resultados;
+- deduplicação no consumidor de resultados da API (o processor já deduplica pelo `resultKey` determinístico);
 - claim concorrente e confirmação robusta da outbox;
-- testes unitários, de integração com Testcontainers e end-to-end;
+- testes de integração com Testcontainers e end-to-end;
 - logs JSON, tracing, dashboards, alertas e runbooks;
 - build/push de imagens, SBOM, scan e promoção entre ambientes.
 

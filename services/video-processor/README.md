@@ -7,6 +7,7 @@ Worker assíncrono responsável pelo trabalho pesado de mídia. Consome solicita
 ## Responsabilidades de negócio
 
 - consumir `video.job.requested.v1`;
+- ignorar reprocessamento de um job cujo resultado já está armazenado;
 - validar se o objeto é uma mídia legível;
 - extrair frames com padrão determinístico;
 - produzir um ZIP por job;
@@ -18,15 +19,20 @@ Worker assíncrono responsável pelo trabalho pesado de mídia. Consome solicita
 
 ```mermaid
 flowchart LR
-    MSG[requested.v1] --> GET[Download sourceKey]
+    MSG[requested.v1] --> GUARD{resultKey ja existe?}
+    GUARD -->|sim| DONE[completed.v1]
+    GUARD -->|nao| STARTED[started.v1]
+    STARTED --> GET[Download sourceKey]
     GET --> PROBE[FFprobe]
     PROBE --> FFMPEG[FFmpeg fps=1]
     FFMPEG --> ZIP[frames.zip]
     ZIP --> PUT[Upload resultKey]
-    PUT --> EVENT[completed.v1]
-    PROBE -. falha .-> FAILED[failed.v1]
-    FFMPEG -. falha .-> FAILED
-    PUT -. falha .-> FAILED
+    PUT --> DONE
+    PROBE -. falha terminal .-> FAILED[failed.v1]
+    FFMPEG -. falha terminal .-> FAILED
+    GET -. falha transiente .-> RETRY[retry e DLQ]
+    PUT -. falha transiente .-> RETRY
+    RETRY -. tentativas esgotadas .-> FAILED
 ```
 
 ## Ferramentas
@@ -38,13 +44,55 @@ flowchart LR
 - `java.util.zip` para compactação;
 - Actuator, Micrometer e Prometheus.
 
+## Organização do código
+
+O módulo segue arquitetura limpa dentro da capability `processing`:
+
+```text
+br.com.fiapx.videoprocessor.processing
+├── domain/           VideoJob, ResultLocation, JobEvent, MediaMetadata, TerminalProcessingException
+├── application/      ProcessVideoJobService e as portas de entrada/saída
+└── infrastructure/   messaging (RabbitMQ), storage (MinIO), media (FFprobe/FFmpeg/ZIP), workspace, config
+```
+
+O domínio e a aplicação não conhecem Spring, AMQP nem MinIO. As implementações
+das portas vivem em `infrastructure`, e o caso de uso é instanciado por
+`ProcessingConfig`, o que mantém a camada de aplicação livre de anotações de
+framework.
+
 ## Eventos e entrega
 
-- Consome da fila `video.processing.v1`, binding `video.job.requested.v1`.
-- Produz `video.job.started.v1`, `video.job.completed.v1` e `video.job.failed.v1`.
-- Após quatro tentativas com backoff, a mensagem rejeitada segue para `video.processing.dlq.v1`.
+- Consome da fila `video.processing.v1`, binding `video.job.requested.v1` no exchange `video.events`.
+- Produz `video.job.started.v1` (`type=PROCESSING`), `video.job.completed.v1` e `video.job.failed.v1`.
+- Todo evento publicado carrega `eventId`, `jobId`, `type`, `schemaVersion`, `occurredAt` e `correlationId`.
+- Após quatro tentativas com backoff, a mensagem rejeitada segue para `video.processing.dlq.v1` pelo exchange `video.events.dlx`.
 
-O `resultKey` é determinístico, o que torna uploads repetidos substituíveis. Ainda é necessária uma inbox persistente ou estratégia equivalente para impedir processamento duplicado caro.
+O worker não publica `recipient`: a requisição só traz `userId`, e resolver o
+endereço é responsabilidade do `notification-worker`.
+
+### Idempotência
+
+O `resultKey` é determinístico (`results/{jobId}/frames.zip`), então o próprio
+objeto armazenado é o registro de deduplicação. Antes de qualquer trabalho caro
+o worker verifica se o ZIP já existe; se existir, republica
+`video.job.completed.v1` e confirma a mensagem sem baixar nem reprocessar o
+vídeo. Isso torna a redistribuição segura sem introduzir banco de dados no
+serviço.
+
+Como o worker não possui banco, não há transação de estado a coordenar com o
+broker, e por isso ele não usa outbox: a publicação acontece depois do upload
+íntegro do ZIP, e uma eventual duplicata é absorvida pelo guard determinístico.
+
+### Falhas transientes e terminais
+
+| Situação | Tratamento |
+|---|---|
+| Mídia ilegível, sem stream de vídeo, indecodificável, longa demais ou sem frames | `video.job.failed.v1` com `terminal=true` e ack; a mensagem não vai para a DLQ porque a falha já está registrada no fluxo de eventos |
+| Falha de rede, storage ou I/O | A exceção escapa, o container repete com backoff e, ao esgotar as tentativas, `FailedEventMessageRecoverer` publica `video.job.failed.v1 terminal=true` antes de enviar a mensagem para a DLQ |
+| Payload malformado ou sem campo obrigatório | Rejeitado sem retry e enviado direto para a DLQ |
+
+O `reason` publicado é sempre uma mensagem segura para exibição: nunca contém
+stack trace, linha de comando, object key interna ou credencial.
 
 ## Configuração
 
@@ -54,10 +102,23 @@ O `resultKey` é determinístico, o que torna uploads repetidos substituíveis. 
 | `RABBITMQ_HOST` | `localhost` | host do broker |
 | `RABBITMQ_USER` | `fiapx` | usuário do broker |
 | `RABBITMQ_PASSWORD` | `fiapx` | senha do broker |
+| `RABBITMQ_EXCHANGE` | `video.events` | exchange topic dos eventos |
+| `RABBITMQ_QUEUE` | `video.processing.v1` | fila de trabalho |
+| `RABBITMQ_DLX` | `video.events.dlx` | exchange de dead-letter |
+| `RABBITMQ_DLQ` | `video.processing.dlq.v1` | fila de dead-letter |
+| `RABBITMQ_PREFETCH` | `1` | mensagens em voo por consumidor |
+| `RABBITMQ_CONCURRENCY` | `1` | consumidores mínimos |
+| `RABBITMQ_MAX_CONCURRENCY` | `2` | consumidores máximos |
 | `S3_ENDPOINT` | `http://localhost:9000` | endpoint S3-compatible |
 | `S3_ACCESS_KEY` | `fiapx` | access key |
 | `S3_SECRET_KEY` | `fiapx-secret` | secret key |
 | `S3_BUCKET` | `videos` | bucket de entrada/saída |
+| `FFMPEG_PATH` | `ffmpeg` | executável do FFmpeg |
+| `FFPROBE_PATH` | `ffprobe` | executável do FFprobe |
+| `FRAMES_PER_SECOND` | `1` | frames extraídos por segundo de vídeo |
+| `MEDIA_MAX_DURATION` | `30m` | duração máxima aceita |
+| `MEDIA_COMMAND_TIMEOUT` | `5m` | timeout por invocação de FFprobe/FFmpeg |
+| `WORKSPACE_ROOT` | diretório temporário do sistema | raiz das áreas de trabalho por job |
 
 ## Executar e testar
 
@@ -67,6 +128,10 @@ FFmpeg e FFprobe precisam estar no `PATH` para execução fora do container.
 ./mvnw -pl services/video-processor -am clean verify
 ./mvnw -pl services/video-processor -am spring-boot:run
 ```
+
+Os testes unitários não exigem FFmpeg, RabbitMQ nem MinIO: os adapters de mídia
+recebem um `CommandRunner` falso que registra a lista de argumentos, e as portas
+de storage e messaging são simuladas.
 
 O Dockerfile instala FFmpeg e executa a aplicação como usuário sem privilégios.
 
@@ -88,9 +153,7 @@ O CI raiz compila o módulo. A entrega deve construir o Dockerfile específico, 
 
 ## Próximos passos
 
-- classificar falhas transitórias e terminais;
-- só emitir falha terminal depois de esgotar retry;
-- timeout e cancelamento dos processos de mídia;
-- inbox/deduplicação persistente;
-- limites de mídia e proteção de disco;
-- testes com vídeos válidos, corrompidos e formatos variados.
+- limite de tamanho do objeto de entrada e quota do disco temporário;
+- métricas por etapa do pipeline e correlação nos logs estruturados;
+- testes de integração com Testcontainers (RabbitMQ e MinIO) e vídeos reais, válidos e corrompidos;
+- ajuste de prefetch e concorrência a partir de medição de CPU, memória e disco.
