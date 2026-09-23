@@ -22,13 +22,14 @@ O contrato executável está em [`../../contracts/asyncapi.yaml`](../../contract
   "eventId": "bbf73e16-ab32-441b-9020-adf2fc6b4425",
   "jobId": "a96aa430-b106-4dcc-b340-03adfc1cb51b",
   "type": "COMPLETED",
+  "schemaVersion": "1.0",
   "occurredAt": "2026-08-30T20:00:00Z",
   "correlationId": "a96aa430-b106-4dcc-b340-03adfc1cb51b",
   "resultKey": "results/a96aa430-b106-4dcc-b340-03adfc1cb51b/frames.zip"
 }
 ```
 
-`occurredAt` e `correlationId` são recomendados para a próxima revisão do schema; não estão presentes em todos os eventos da implementação inicial.
+`occurredAt`, `correlationId` e `schemaVersion` são opcionais no schema `v1` e já são publicados pelo `video-processor`. Quando o produtor não envia `correlationId`, o consumidor deve correlacionar pelo `jobId`. Consumidores existentes continuam válidos porque os campos foram adicionados de forma aditiva.
 
 ## Semântica por evento
 
