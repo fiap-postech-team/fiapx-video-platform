@@ -532,10 +532,12 @@ button:disabled { cursor: not-allowed; opacity: .38; }
   margin-top: .3rem;
   width: .55rem;
 }
-.download-success {
-  color: var(--success, #287a45);
-  font-size: .875rem;
-  white-space: nowrap;
+.download-notification-success {
+  background: #edf6e5;
+  color: #326523;
+}
+.download-notification-success .download-notification-mark {
+  background: #5d963f;
 }
 .video-head-action {
   justify-self: stretch;
