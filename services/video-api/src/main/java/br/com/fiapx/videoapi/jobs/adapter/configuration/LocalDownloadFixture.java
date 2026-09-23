@@ -17,6 +17,7 @@ import java.util.zip.ZipOutputStream;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,12 +32,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 @EnableConfigurationProperties(DownloadFixtureProperties.class)
 public class LocalDownloadFixture {
     @Bean
-    @ConditionalOnProperty(prefix = "app.video.download-fixture", name = "enabled", havingValue = "true")
     ApplicationRunner downloadFixtureRunner(DownloadFixtureProperties properties, IdentityStore identities,
                                            RegisterUser registerUser, VideoStore videos, JobStore jobs,
                                            LocalMockVideoObjectStorage storage, Clock clock,
-                                           TransactionTemplate transactions) {
-        return arguments -> seed(properties, identities, registerUser, videos, jobs, storage, clock, transactions);
+                                           TransactionTemplate transactions, JdbcTemplate jdbc) {
+        return arguments -> {
+            if (properties.enabled()) {
+                seed(properties, identities, registerUser, videos, jobs, storage, clock, transactions);
+            }
+            if (properties.seedAllCompletedResults()) {
+                seedAllCompletedResults(jdbc, storage);
+            }
+        };
     }
 
     private void seed(DownloadFixtureProperties properties, IdentityStore identities, RegisterUser registerUser,
@@ -73,6 +80,14 @@ public class LocalDownloadFixture {
                 ? resultKey : existing.get().resultKey();
         });
         storage.seed(seededResultKey, zipBytes(), "application/zip");
+    }
+
+    private void seedAllCompletedResults(JdbcTemplate jdbc, LocalMockVideoObjectStorage storage) {
+        var resultKeys = jdbc.queryForList(
+            "select result_key from jobs where status = 'COMPLETED' and result_key is not null and trim(result_key) <> ''",
+            String.class);
+        var zip = zipBytes();
+        resultKeys.forEach(resultKey -> storage.seed(resultKey, zip, "application/zip"));
     }
 
     private byte[] zipBytes() {

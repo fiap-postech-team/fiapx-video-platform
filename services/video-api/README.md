@@ -43,8 +43,12 @@ O limite máximo da listagem de jobs pode ser configurado por
 `VIDEO_API_JOBS_MAX_PAGE_SIZE` (padrão `100`). O consumidor de resultados pode
 ser desabilitado em testes com `VIDEO_API_JOBS_RESULT_LISTENER_ENABLED=false`.
 
-Para preparar uma fixture local de download, habilite-a com credenciais
-exclusivas do ambiente local:
+No profile `local`, jobs `COMPLETED` com `resultKey` presente têm um ZIP pequeno
+materializado automaticamente no storage mockado para permitir testes com
+qualquer proprietário. Essa preparação não exige variáveis de ambiente.
+
+Para criar ou reutilizar também um usuário e vídeo de demonstração, habilite a
+fixture com credenciais exclusivas do ambiente local:
 
 ```bash
 export APP_VIDEO_DOWNLOAD_FIXTURE_ENABLED=true

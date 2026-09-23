@@ -38,6 +38,7 @@ app:
       password: ${APP_VIDEO_DOWNLOAD_FIXTURE_PASSWORD:}
       video-id: ${APP_VIDEO_DOWNLOAD_FIXTURE_VIDEO_ID:00000000-0000-4000-8000-000000000101}
       job-id: ${APP_VIDEO_DOWNLOAD_FIXTURE_JOB_ID:00000000-0000-4000-8000-000000000102}
+      seed-all-completed-results: ${APP_VIDEO_DOWNLOAD_FIXTURE_SEED_ALL_COMPLETED:true}
   auth:
     issuer: http://localhost:8080
     audience: fiapx-video-api
