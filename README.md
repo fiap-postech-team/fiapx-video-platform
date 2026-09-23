@@ -2,11 +2,23 @@
 
 ## Summary
 
-O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs assíncronos, extrai frames com FFmpeg, gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
+O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs assíncronos, extrai frames com FFmpeg,
+gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações
+Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
 
-> Estado atual: o `video-processor` está implementado, com testes unitários. O `video-api` e o `notification-worker` seguem como fundação — contratos, migrations, imagens e ambiente local estruturados, sem código de aplicação. Upload/download por URL pré-assinada, emissão de tokens, autorização por proprietário e testes de integração são evoluções registradas, não funcionalidades concluídas.
+> Estado atual: o `video-processor` está implementado, com testes unitários.
+> Estado atual: o `video-api` cadastra usuários, mantém sessões locais RSA/JWT,
+> aplica autorização de proprietário aos jobs e valida o schema PostgreSQL pelo
+> Hibernate. O modelo persistente inclui identidade, sessões rotativas, vídeos,
+> jobs, histórico, inbox, outbox e idempotência. Upload/confirmação de vídeo e
+> a integração efetiva entre outbox, RabbitMQ e processor ainda não estão
+> expostos pelo backend.
 
 ## Visão geral
+
+O diagrama representa a arquitetura-alvo; os limites entre API, broker,
+processor e notificações já estão definidos, mas a publicação e o consumo
+efetivos de eventos ainda não foram integrados ao `video-api`.
 
 ```mermaid
 flowchart LR
@@ -22,17 +34,20 @@ flowchart LR
     NOTIF -->|e-mail| SMTP[MailHog / SMTP]
 ```
 
-Veja a [arquitetura detalhada](docs/architecture/architecture.md), o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arquiteturais](docs/adr/README.md).
+Veja a [arquitetura detalhada](docs/architecture/architecture.md),
+o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arquiteturais](docs/adr/README.md).
 
 ## Aplicações
 
-| Aplicação | Responsabilidade | Porta | Documentação |
-|---|---|---:|---|
-| `video-api` | Autorização JWT, jobs, outbox e aplicação dos resultados | 8080 | [README](services/video-api/README.md) |
-| `video-processor` | FFprobe, FFmpeg, ZIP e object storage | 8081 | [README](services/video-processor/README.md) |
-| `notification-worker` | Notificação de falhas terminais e auditoria | 8082 | [README](services/notification-worker/README.md) |
+| Aplicação             | Responsabilidade                                         | Porta | Documentação                                     |
+|-----------------------|----------------------------------------------------------|------:|--------------------------------------------------|
+| `video-api`           | Cadastro/login local, JWT, jobs persistentes, health e Swagger no perfil `local` |  8080 | [README](services/video-api/README.md)           |
+| `video-api-frontend`  | Protótipo de cadastro, vídeos e extração de imagens |  5173 | [README](services/video-api-frontend/README.md) |
+| `video-processor`     | FFprobe, FFmpeg, ZIP e object storage                    |  8081 | [README](services/video-processor/README.md)     |
+| `notification-worker` | Notificação de falhas terminais e auditoria              |  8082 | [README](services/notification-worker/README.md) |
 
-Os módulos não dependem uns dos outros no Maven. Cada aplicação possui configuração, Dockerfile, health check e ciclo de execução próprios.
+Os módulos não dependem uns dos outros no Maven. Cada aplicação possui configuração, Dockerfile, health check e ciclo de
+execução próprios.
 
 ## Stack
 
@@ -57,6 +72,7 @@ Os módulos não dependem uns dos outros no Maven. Cada aplicação possui confi
 ├── infra/postgres/            # bootstrap do banco local
 ├── services/
 │   ├── video-api/
+│   ├── video-api-frontend/
 │   ├── video-processor/
 │   └── notification-worker/
 ├── .github/workflows/ci.yml
@@ -64,7 +80,11 @@ Os módulos não dependem uns dos outros no Maven. Cada aplicação possui confi
 └── pom.xml
 ```
 
-## Fluxo de negócio
+## Fluxo-alvo de negócio
+
+O fluxo a seguir descreve a arquitetura pretendida. Hoje o `video-api` já
+persiste jobs e a intenção na outbox, mas não publica no RabbitMQ nem oferece o
+ciclo HTTP de upload/confirmação de vídeo.
 
 1. O cliente envia à API a `sourceKey` de um vídeo previamente armazenado.
 2. A API persiste o job `PENDING` e o evento de outbox na mesma transação.
@@ -92,23 +112,20 @@ docker compose up --build
 
 ### Endpoints locais
 
-| Recurso | URL |
-|---|---|
-| Video API | `http://localhost:8080` |
-| Health da API | `http://localhost:8080/actuator/health` |
-| RabbitMQ Management | `http://localhost:15672` |
-| MinIO Console | `http://localhost:9001` |
-| MailHog | `http://localhost:8025` |
+| Recurso             | URL                                     |
+|---------------------|-----------------------------------------|
+| Video API           | `http://localhost:8080`                 |
+| Health da API       | `http://localhost:8080/actuator/health` |
+| RabbitMQ Management | `http://localhost:15672`                |
+| MinIO Console       | `http://localhost:9001`                 |
+| MailHog             | `http://localhost:8025`                 |
 
 Credenciais locais vêm do `.env`; os valores de `.env.example` destinam-se somente a desenvolvimento.
 
 ## Build e verificação
 
-O `spring-boot:repackage` continua desabilitado no `pom.xml` raiz porque
-`video-api` e `notification-worker` ainda não possuem classe principal. Cada
-módulo reativa o repackage sobrescrevendo `spring-boot.repackage.skip` quando
-ganha sua aplicação, como já faz o `video-processor`. Quando os três módulos
-tiverem código, remova a propriedade da raiz.
+O `services/video-api` já produz um JAR executável. Use os comandos abaixo para validar a fundação e os serviços
+conforme forem sendo implementados.
 
 ```bash
 ./mvnw clean verify
@@ -120,24 +137,32 @@ docker compose config --quiet
 
 ## Contratos
 
-- [OpenAPI](contracts/openapi.yaml): endpoints HTTP atuais para criação e consulta de jobs.
-- [AsyncAPI](contracts/asyncapi.yaml): canais e schemas dos eventos versionados.
+- [OpenAPI](contracts/openapi.yaml): contrato canônico da API HTTP; a UI local consome a cópia empacotada.
+- [AsyncAPI](contracts/asyncapi.yaml): contrato canônico dos eventos; permanece como fonte de verdade mesmo antes dos consumidores estarem completos.
 
-O routing key inclui a versão (`.v1`). Mudanças incompatíveis exigem uma nova versão do contrato e uma estratégia de convivência entre produtores e consumidores.
+O routing key inclui a versão (`.v1`). Mudanças incompatíveis exigem uma nova versão do contrato e uma estratégia de
+convivência entre produtores e consumidores.
 
 ## Configuração e segurança
 
-Configuração é externalizada por variáveis de ambiente. Nunca use os segredos padrão fora do ambiente local. A API valida JWT HMAC, mas esta fundação não emite tokens. Em ambientes reais, prefira um provedor OIDC, chaves assimétricas, rotação de credenciais, TLS e secret manager.
+Configuração é externalizada por variáveis de ambiente. Nunca use os segredos
+padrão fora do ambiente local. O `video-api` emite JWT RSA no MVP e preserva
+portas de identidade para a futura troca por OIDC/JWKS; veja o ADR 0011.
 
-Payloads binários não passam pelo RabbitMQ ou PostgreSQL. Vídeos e ZIPs ficam no object storage; mensagens carregam apenas IDs, object keys e metadados pequenos.
+Payloads binários não passam pelo RabbitMQ ou PostgreSQL. Vídeos e ZIPs ficam no object storage; mensagens carregam
+apenas IDs, object keys e metadados pequenos.
 
 ## Observabilidade
 
-Cada aplicação expõe liveness/readiness pelo Actuator e métricas em `/actuator/prometheus`. Logs estruturados, tracing distribuído, dashboards e alertas são próximos passos documentados em [atributos de qualidade](docs/architecture/quality-attributes.md).
+A fundação expõe health e Swagger local no `video-api`; métricas de negócio, tracing distribuído, dashboards e alertas
+permanecem nos próximos épicos e nos [atributos de qualidade](docs/architecture/quality-attributes.md).
 
 ## CI/CD
 
-O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa em pushes e pull requests, prepara Java 21, usa cache Maven, roda `clean verify` e valida o Compose. O pipeline atual é de CI: publicação de imagens, análise de vulnerabilidades, assinatura de artefatos e deploy ainda devem ser adicionados conforme o registry e o ambiente alvo forem definidos.
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa em pushes e pull requests, prepara Java 21,
+usa cache Maven, roda `clean verify` e valida o Compose. O pipeline atual é de CI: publicação de imagens, análise de
+vulnerabilidades, assinatura de artefatos e deploy ainda devem ser adicionados conforme o registry e o ambiente alvo
+forem definidos.
 
 ## Decisões e limites
 
@@ -150,10 +175,10 @@ O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executa em pus
 ## Roadmap
 
 - Upload/download por URLs pré-assinadas e bucket policies;
-- autenticação completa e autorização de propriedade do job;
+- publisher RabbitMQ com confirms e listener de resultados;
 - deduplicação no consumidor de resultados da API (o processor já deduplica pelo `resultKey` determinístico);
-- claim concorrente e confirmação robusta da outbox;
-- testes de integração com Testcontainers e end-to-end;
+- recuperação de outbox, métricas e alertas de negócio;
+- execução dos testes de integração com Testcontainers e cobertura mínima estável;
 - logs JSON, tracing, dashboards, alertas e runbooks;
 - build/push de imagens, SBOM, scan e promoção entre ambientes.
 

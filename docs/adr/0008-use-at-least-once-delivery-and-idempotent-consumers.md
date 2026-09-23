@@ -5,7 +5,9 @@
 
 ## Contexto
 
-Falhas podem ocorrer depois de um consumer concluir o efeito e antes do acknowledgment, ou depois de o publisher enviar e antes de marcar a outbox. “Exactly once” entre banco, broker, storage e SMTP não é uma garantia realista sem coordenação cara e restritiva.
+Falhas podem ocorrer depois de um consumer concluir o efeito e antes do acknowledgment, ou depois de o publisher enviar
+e antes de marcar a outbox. “Exactly once” entre banco, broker, storage e SMTP não é uma garantia realista sem
+coordenação cara e restritiva.
 
 ## Alternativas consideradas
 
@@ -15,7 +17,9 @@ Falhas podem ocorrer depois de um consumer concluir o efeito e antes do acknowle
 
 ## Decisão
 
-Cada evento recebe `eventId` imutável. Consumers devem persistir uma inbox ou chave de negócio única na mesma transação de seu efeito local. Operações de storage devem usar keys determinísticas. Retry será exponencial, limitado e diferenciará falhas transitórias de terminais; ao esgotar, a mensagem seguirá para DLQ.
+Cada evento recebe `eventId` imutável. Consumers devem persistir uma inbox ou chave de negócio única na mesma transação
+de seu efeito local. Operações de storage devem usar keys determinísticas. Retry será exponencial, limitado e
+diferenciará falhas transitórias de terminais; ao esgotar, a mensagem seguirá para DLQ.
 
 ## Consequências positivas
 
@@ -31,4 +35,6 @@ Cada evento recebe `eventId` imutável. Consumers devem persistir uma inbox ou c
 
 ## Mitigações e revisão
 
-Usar unique constraint por `eventId`, state machine monotônica, `jobId` nos logs e runbook de DLQ. No e-mail, persistir intenção antes do envio e usar chave idempotente se o provedor suportar. A fundação atual implementa unicidade no worker; processor e API ainda precisam completar essa decisão.
+Usar unique constraint por `eventId`, state machine monotônica, `jobId` nos logs e runbook de DLQ. No e-mail, persistir
+intenção antes do envio e usar chave idempotente se o provedor suportar. A fundação atual implementa unicidade no
+worker; processor e API ainda precisam completar essa decisão.

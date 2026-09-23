@@ -1,0 +1,44 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fiapx
+    username: fiapx
+    password: fiapx
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    url: /openapi.yaml
+    try-it-out-enabled: false
+
+app:
+  web:
+    allowed-origins: ${APP_WEB_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
+  video:
+    local-allowed-origin: ${APP_VIDEO_LOCAL_ALLOWED_ORIGIN:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
+    storage-mode: ${APP_VIDEO_STORAGE_MODE:mock}
+    # Demonstrative local lifecycle only; no media processing is performed.
+    local-result-simulator-enabled: ${APP_VIDEO_LOCAL_RESULT_SIMULATOR_ENABLED:true}
+    local-result-simulator-result: ${APP_VIDEO_LOCAL_RESULT_SIMULATOR_RESULT:COMPLETED}
+    internal-endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:fiapx-video-api}
+    secret-key: ${S3_SECRET_KEY:fiapx-video-api-secret}
+    result-download-mock-url: ${APP_RESULT_DOWNLOAD_MOCK_URL:https://shorturl.at/JpxZS}
+    download-fixture:
+      enabled: ${APP_VIDEO_DOWNLOAD_FIXTURE_ENABLED:false}
+      email: ${APP_VIDEO_DOWNLOAD_FIXTURE_EMAIL:}
+      password: ${APP_VIDEO_DOWNLOAD_FIXTURE_PASSWORD:}
+      video-id: ${APP_VIDEO_DOWNLOAD_FIXTURE_VIDEO_ID:00000000-0000-4000-8000-000000000101}
+      job-id: ${APP_VIDEO_DOWNLOAD_FIXTURE_JOB_ID:00000000-0000-4000-8000-000000000102}
+  auth:
+    issuer: http://localhost:8080
+    audience: fiapx-video-api
+    key-id: local-development

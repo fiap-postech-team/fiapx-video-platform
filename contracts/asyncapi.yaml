@@ -8,7 +8,23 @@ channels:
 operations:
   requestProcessing: { action: send, channel: { $ref: '#/channels/jobRequested' } }
   consumeRequested: { action: receive, channel: { $ref: '#/channels/jobRequested' } }
+  consumeStarted: { action: receive, channel: { $ref: '#/channels/jobStarted' } }
+  consumeCompleted: { action: receive, channel: { $ref: '#/channels/jobCompleted' } }
+  consumeFailed: { action: receive, channel: { $ref: '#/channels/jobFailed' } }
 components:
   messages:
-    JobRequested: { payload: { type: object, required: [eventId, jobId, userId, sourceKey], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, userId: { type: string, format: uuid }, sourceKey: { type: string }, occurredAt: { type: string, format: date-time }, correlationId: { type: string, format: uuid }, schemaVersion: { type: string } } } }
-    JobResult: { payload: { type: object, required: [eventId, jobId, type], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, type: { enum: [PROCESSING, COMPLETED, FAILED] }, occurredAt: { type: string, format: date-time }, correlationId: { type: string, format: uuid }, schemaVersion: { type: string }, resultKey: { type: string }, terminal: { type: boolean }, reason: { type: string }, recipient: { type: string, format: email } } } }
+    JobRequested:
+      payload:
+        type: object
+        required: [ eventId, jobId, userId, sourceKey ]
+        properties:
+          eventId: { type: string, format: uuid }
+          jobId: { type: string, format: uuid }
+          userId: { type: string, format: uuid }
+          videoId: { type: string, format: uuid }
+          sourceKey: { type: string }
+          type: { type: string, enum: [ video.job.requested.v1 ] }
+          schemaVersion: { type: integer, enum: [ 1 ] }
+          occurredAt: { type: string, format: date-time }
+          correlationId: { type: string, format: uuid }
+    JobResult: { payload: { type: object, required: [ eventId, jobId, type ], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, type: { enum: [ PROCESSING, COMPLETED, FAILED ] }, schemaVersion: { type: string }, occurredAt: { type: string, format: date-time }, correlationId: { type: string, format: uuid }, resultKey: { type: string }, terminal: { type: boolean }, reason: { type: string }, recipient: { type: string, format: email } } } }

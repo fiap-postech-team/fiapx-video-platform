@@ -2,7 +2,9 @@
 
 ## Summary
 
-Worker assíncrono responsável pelo trabalho pesado de mídia. Consome solicitações, baixa o vídeo do object storage, valida com FFprobe, extrai um frame por segundo com FFmpeg, compacta os frames e envia o ZIP de volta ao storage. Comunica o resultado apenas por eventos; não acessa o banco da API.
+Worker assíncrono responsável pelo trabalho pesado de mídia. Consome solicitações, baixa o vídeo do object storage,
+valida com FFprobe, extrai um frame por segundo com FFmpeg, compacta os frames e envia o ZIP de volta ao storage.
+Comunica o resultado apenas por eventos; não acessa o banco da API.
 
 ## Responsabilidades de negócio
 
@@ -137,19 +139,26 @@ O Dockerfile instala FFmpeg e executa a aplicação como usuário sem privilégi
 
 ## Recursos e escala
 
-O worker é CPU/I/O intensive. Concorrência deve ser limitada por capacidade real de CPU, memória e disco temporário, não apenas pela profundidade da fila. Configure prefetch e consumidores concorrentes depois de medir tamanho e duração dos vídeos. O diretório temporário deve possuir quota; arquivos devem ter limites de tamanho, duração e formato.
+O worker é CPU/I/O intensive. Concorrência deve ser limitada por capacidade real de CPU, memória e disco temporário, não
+apenas pela profundidade da fila. Configure prefetch e consumidores concorrentes depois de medir tamanho e duração dos
+vídeos. O diretório temporário deve possuir quota; arquivos devem ter limites de tamanho, duração e formato.
 
 ## Segurança
 
-Em produção, use credenciais exclusivas com permissão somente para ler o prefixo de entrada e gravar o prefixo de resultados. Valide MIME real, duração, dimensões e tamanho; aplique timeout aos subprocessos; nunca construa comandos via shell. A implementação usa `ProcessBuilder` com lista de argumentos, reduzindo risco de command injection.
+Em produção, use credenciais exclusivas com permissão somente para ler o prefixo de entrada e gravar o prefixo de
+resultados. Valide MIME real, duração, dimensões e tamanho; aplique timeout aos subprocessos; nunca construa comandos
+via shell. A implementação usa `ProcessBuilder` com lista de argumentos, reduzindo risco de command injection.
 
 ## Observabilidade
 
-Além das métricas Actuator, monitore tempo de download, FFprobe, FFmpeg, compactação e upload; bytes processados; frames por job; disco temporário; retries; profundidade da fila e DLQ. Logs devem incluir `jobId`, `eventId` e etapa.
+Além das métricas Actuator, monitore tempo de download, FFprobe, FFmpeg, compactação e upload; bytes processados; frames
+por job; disco temporário; retries; profundidade da fila e DLQ. Logs devem incluir `jobId`, `eventId` e etapa.
 
 ## CI/CD
 
-O CI raiz compila o módulo. A entrega deve construir o Dockerfile específico, verificar a versão e vulnerabilidades do FFmpeg, gerar SBOM, publicar imagem imutável e executar smoke test com um vídeo curto. Rollout e autoscaling devem respeitar drain de consumers para não interromper jobs no meio.
+O CI raiz compila o módulo. A entrega deve construir o Dockerfile específico, verificar a versão e vulnerabilidades do
+FFmpeg, gerar SBOM, publicar imagem imutável e executar smoke test com um vídeo curto. Rollout e autoscaling devem
+respeitar drain de consumers para não interromper jobs no meio.
 
 ## Próximos passos
 

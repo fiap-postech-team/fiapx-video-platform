@@ -6,7 +6,9 @@
 
 ## Contexto
 
-As três aplicações precisam de uma base consistente para HTTP, segurança, persistência, mensageria, configuração, métricas e testes. O runtime deve ser estável, ter suporte amplo no ecossistema e funcionar bem em containers. A premissa do projeto exige Java 21 e Spring Boot 3.x.
+As três aplicações precisam de uma base consistente para HTTP, segurança, persistência, mensageria, configuração,
+métricas e testes. O runtime deve ser estável, ter suporte amplo no ecossistema e funcionar bem em containers. A
+premissa do projeto exige Java 21 e Spring Boot 3.x.
 
 ## Forças de decisão
 
@@ -17,13 +19,17 @@ As três aplicações precisam de uma base consistente para HTTP, segurança, pe
 
 ## Alternativas consideradas
 
-1. **Java 21 com Spring Boot 3:** integração consistente e grande ecossistema, com custo de memória e startup maior que stacks nativas.
-2. **Quarkus ou Micronaut:** menor consumo e startup rápido, mas acrescentaria curva de aprendizado e divergiria da premissa.
-3. **Implementação sem framework:** máximo controle, porém custo desproporcional para segurança, configuração, observabilidade e integrações.
+1. **Java 21 com Spring Boot 3:** integração consistente e grande ecossistema, com custo de memória e startup maior que
+   stacks nativas.
+2. **Quarkus ou Micronaut:** menor consumo e startup rápido, mas acrescentaria curva de aprendizado e divergiria da
+   premissa.
+3. **Implementação sem framework:** máximo controle, porém custo desproporcional para segurança, configuração,
+   observabilidade e integrações.
 
 ## Decisão
 
-Usar Java 21 e a linha estável 3.5.x do Spring Boot. Versões serão centralizadas no POM raiz e atualizadas de forma coordenada, após `clean verify` e validação das imagens.
+Usar Java 21 e a linha estável 3.5.x do Spring Boot. Versões serão centralizadas no POM raiz e atualizadas de forma
+coordenada, após `clean verify` e validação das imagens.
 
 ## Consequências positivas
 
@@ -39,4 +45,5 @@ Usar Java 21 e a linha estável 3.5.x do Spring Boot. Versões serão centraliza
 
 ## Mitigações e revisão
 
-Fixar versões, usar Maven Wrapper, executar testes e análise de dependências no CI. Rever se metas mensuráveis de memória, startup ou custo não forem atendidas; considerar CDS/AOT antes de trocar o framework.
+Fixar versões, usar Maven Wrapper, executar testes e análise de dependências no CI. Rever se metas mensuráveis de
+memória, startup ou custo não forem atendidas; considerar CDS/AOT antes de trocar o framework.

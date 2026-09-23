@@ -1,15 +1,94 @@
-server.port: ${SERVER_PORT:8080}
 spring:
-  application.name: video-api
-  datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fiapx}
-    username: ${DATABASE_USER:fiapx}
-    password: ${DATABASE_PASSWORD:fiapx}
-  jpa.hibernate.ddl-auto: validate
+  application:
+    name: video-api
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:fiapx}
     password: ${RABBITMQ_PASSWORD:fiapx}
-app.security.jwt-secret: ${JWT_SECRET:change-me-with-at-least-32-characters}
-management.endpoints.web.exposure.include: health,info,prometheus
-management.endpoint.health.probes.enabled: true
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    rabbit:
+      enabled: false
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jobs:
+    max-page-size: ${VIDEO_API_JOBS_MAX_PAGE_SIZE:100}
+    result-listener-enabled: ${VIDEO_API_JOBS_RESULT_LISTENER_ENABLED:true}
+  outbox:
+    batch-size: ${VIDEO_API_OUTBOX_BATCH_SIZE:50}
+    poll-interval-ms: ${VIDEO_API_OUTBOX_POLL_INTERVAL_MS:1000}
+    claim-timeout: ${VIDEO_API_OUTBOX_CLAIM_TIMEOUT:PT30S}
+    confirm-timeout: ${VIDEO_API_OUTBOX_CONFIRM_TIMEOUT:PT5S}
+    max-attempts: ${VIDEO_API_OUTBOX_MAX_ATTEMPTS:10}
+    instance-id: ${HOSTNAME:video-api}
+  video:
+    storage-mode: ${APP_VIDEO_STORAGE_MODE:s3}
+    local-public-endpoint: ${APP_VIDEO_LOCAL_PUBLIC_ENDPOINT:http://localhost:8080}
+    local-directory: ${APP_VIDEO_LOCAL_DIRECTORY:${java.io.tmpdir}/fiapx-video-mock}
+    local-allowed-origin: ${APP_VIDEO_LOCAL_ALLOWED_ORIGIN:http://localhost:5173}
+    max-size-bytes: ${APP_VIDEO_MAX_SIZE_BYTES:500000000}
+    allowed-content-types: ${APP_VIDEO_ALLOWED_CONTENT_TYPES:video/mp4,video/quicktime,video/webm,video/x-matroska}
+    upload-url-ttl: ${APP_VIDEO_UPLOAD_URL_TTL:PT15M}
+    pending-ttl: ${APP_VIDEO_PENDING_TTL:PT24H}
+    cleanup-batch-size: ${APP_VIDEO_CLEANUP_BATCH_SIZE:100}
+    cleanup-interval: ${APP_VIDEO_CLEANUP_INTERVAL:PT5M}
+    bucket: ${S3_BUCKET:videos}
+    internal-endpoint: ${S3_ENDPOINT:}
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    result-download-url-ttl: ${APP_RESULT_DOWNLOAD_URL_TTL:PT5M}
+    result-download-mock-url: ${APP_RESULT_DOWNLOAD_MOCK_URL:}
+  web:
+    allowed-origins: ${APP_WEB_ALLOWED_ORIGINS:}
+  auth:
+    issuer: ${APP_AUTH_ISSUER:}
+    audience: ${APP_AUTH_AUDIENCE:}
+    key-id: ${APP_AUTH_KEY_ID:}
+    private-key-base64: ${APP_AUTH_PRIVATE_KEY_BASE64:}
+    public-key-base64: ${APP_AUTH_PUBLIC_KEY_BASE64:}
+    access-token-ttl: ${APP_AUTH_ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${APP_AUTH_REFRESH_TOKEN_TTL:7d}
+    lock-duration: ${APP_AUTH_LOCK_DURATION:15m}
+    max-failures: ${APP_AUTH_MAX_FAILURES:5}
+    bootstrap:
+      enabled: ${APP_AUTH_BOOTSTRAP_ENABLED:false}
+      email: ${APP_AUTH_BOOTSTRAP_EMAIL:}
+      password: ${APP_AUTH_BOOTSTRAP_PASSWORD:}
