@@ -17,6 +17,23 @@ public final class ProcessJobResult {
         if (!inbox.register(event)) {
             return;
         }
-        jobs.applyResult(event);
+        var found = jobs.findForResult(event.jobId());
+        if (found.isEmpty()) {
+            // The concrete store raises a not-found exception here; retaining this
+            // fallback keeps the port compatible with lightweight adapters/tests.
+            jobs.applyResult(event);
+            inbox.complete(event, null);
+            return;
+        }
+        var job = found.get();
+        String ignored = null;
+        if (job.status().isTerminal()) {
+            ignored = job.status() == event.status() ? "ALREADY_APPLIED" : "TERMINAL_CONFLICT";
+        } else if (job.status() == event.status()) {
+            ignored = "ALREADY_APPLIED";
+        } else {
+            jobs.applyResult(event);
+        }
+        inbox.complete(event, ignored);
     }
 }

@@ -23,7 +23,11 @@ public final class JpaInboxStore implements InboxStore {
 
     public boolean register(JobResultEvent event) {
         var now = clock.instant();
-        return events.insertIfAbsent(event.eventId(), event.jobId(), event.status().name(), event.jobId(),
-                event.fingerprint(), event.occurredAt(), now) == 1;
+        return events.insertIfAbsent(event.eventId(), event.jobId(), event.routingKey(), event.correlationId(),
+                event.fingerprint(), event.schemaVersion(), event.occurredAt(), now) == 1;
+    }
+
+    public void complete(JobResultEvent event, String reason) {
+        events.complete(event.eventId(), reason == null ? "PROCESSED" : "IGNORED", reason, clock.instant());
     }
 }

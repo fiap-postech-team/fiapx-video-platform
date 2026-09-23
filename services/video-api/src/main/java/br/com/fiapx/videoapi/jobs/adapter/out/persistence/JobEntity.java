@@ -24,20 +24,26 @@ public class JobEntity {
     @Enumerated(EnumType.STRING) private JobStatus status;
     private Instant createdAt;
     private Instant updatedAt;
+    private String failureCode;
+    private Instant completedAt;
     private boolean videoLibraryVisible;
     @Version private long version;
     protected JobEntity() { }
     JobEntity(Job job) {
         id = job.id(); userId = job.userId(); videoId = job.videoId(); sourceKind = job.sourceKind();
         sourceKey = job.sourceKey(); resultKey = job.resultKey(); status = job.status();
+        failureCode = job.failureCode(); completedAt = job.completedAt();
         createdAt = job.createdAt(); updatedAt = createdAt; videoLibraryVisible = job.libraryVisible();
     }
     Job toDomain() {
-        return new Job(id, userId, videoId, sourceKind, sourceKey, resultKey, status, createdAt, videoLibraryVisible);
+        return new Job(id, userId, videoId, sourceKind, sourceKey, resultKey, status, createdAt,
+            videoLibraryVisible, failureCode, completedAt);
     }
     void apply(Job job, Instant updatedAt) {
         status = job.status();
         resultKey = job.resultKey();
+        failureCode = job.failureCode();
+        completedAt = job.completedAt();
         this.updatedAt = updatedAt;
     }
 }

@@ -28,6 +28,7 @@ public interface JobStore {
     default void applyResult(JobResultEvent event) {
         throw new UnsupportedOperationException();
     }
+    default Optional<Job> findForResult(UUID id) { return Optional.empty(); }
 
     default Optional<Job> findVisibleByVideoId(UUID videoId) {
         throw new UnsupportedOperationException();

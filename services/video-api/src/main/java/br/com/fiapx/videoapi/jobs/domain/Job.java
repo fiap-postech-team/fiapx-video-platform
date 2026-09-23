@@ -13,6 +13,8 @@ public final class Job {
     private final boolean libraryVisible;
     private JobStatus status;
     private String resultKey;
+    private String failureCode;
+    private Instant completedAt;
 
     public Job(UUID id, UUID userId, String sourceKey, Instant createdAt) {
         this(id, userId, null, JobSourceKind.LEGACY_KEY, sourceKey, null, JobStatus.PENDING, createdAt);
@@ -34,15 +36,28 @@ public final class Job {
 
     public Job(UUID id, UUID userId, UUID videoId, JobSourceKind sourceKind, String sourceKey,
                String resultKey, JobStatus status, Instant createdAt, boolean libraryVisible) {
+        this(id, userId, videoId, sourceKind, sourceKey, resultKey, status, createdAt, libraryVisible, null, null);
+    }
+
+    public Job(UUID id, UUID userId, UUID videoId, JobSourceKind sourceKind, String sourceKey,
+               String resultKey, JobStatus status, Instant createdAt, boolean libraryVisible,
+               String failureCode, Instant completedAt) {
         this.id = id; this.userId = userId; this.videoId = videoId; this.sourceKind = sourceKind;
         this.sourceKey = sourceKey; this.resultKey = resultKey; this.status = status;
         this.createdAt = createdAt; this.libraryVisible = libraryVisible;
+        this.failureCode = failureCode; this.completedAt = completedAt;
     }
 
     public void apply(JobStatus nextStatus, String nextResultKey) {
         if (!accepts(nextStatus)) throw new InvalidJobTransitionException(status, nextStatus);
         status = nextStatus;
         resultKey = nextResultKey;
+    }
+
+    public void applyResult(JobStatus nextStatus, String nextResultKey, String nextFailureCode, Instant finishedAt) {
+        apply(nextStatus, nextResultKey);
+        failureCode = nextStatus == JobStatus.FAILED ? nextFailureCode : null;
+        completedAt = nextStatus.isTerminal() ? finishedAt : null;
     }
 
     private boolean accepts(JobStatus nextStatus) {
@@ -60,4 +75,6 @@ public final class Job {
     public JobStatus status() { return status; }
     public Instant createdAt() { return createdAt; }
     public boolean libraryVisible() { return libraryVisible; }
+    public String failureCode() { return failureCode; }
+    public Instant completedAt() { return completedAt; }
 }
