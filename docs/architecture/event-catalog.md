@@ -33,17 +33,14 @@ job e histórico de forma transacional.
   "eventId": "bbf73e16-ab32-441b-9020-adf2fc6b4425",
   "jobId": "a96aa430-b106-4dcc-b340-03adfc1cb51b",
   "type": "COMPLETED",
+  "schemaVersion": "1.0",
   "occurredAt": "2026-08-30T20:00:00Z",
   "correlationId": "a96aa430-b106-4dcc-b340-03adfc1cb51b",
   "resultKey": "results/a96aa430-b106-4dcc-b340-03adfc1cb51b/frames.zip"
 }
 ```
 
-`correlationId` é persistido nos metadados da outbox e o payload textual legado
-é igual a `jobId`. O envelope de `video.job.requested.v1` também inclui `type`,
-`schemaVersion` e `occurredAt`; os campos novos são opcionais no AsyncAPI para
-compatibilidade, mas sempre enviados pelo `video-api`. O JSONB é armazenado em
-`payload_json` e a coluna textual existente é mantida durante a transição.
+`occurredAt`, `correlationId` e `schemaVersion` são opcionais no schema `v1` e já são publicados pelo `video-processor`. Quando o produtor não envia `correlationId`, o consumidor deve correlacionar pelo `jobId`. Consumidores existentes continuam válidos porque os campos foram adicionados de forma aditiva.
 
 ## Semântica por evento
 

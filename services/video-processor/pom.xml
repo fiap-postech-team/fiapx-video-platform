@@ -8,10 +8,19 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
     <artifactId>video-processor</artifactId>
+    <properties>
+        <!-- This module has a Spring Boot main class, so it overrides the root skip. -->
+        <spring-boot.repackage.skip>false</spring-boot.repackage.skip>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <!-- The worker serves no business endpoint; the web starter only gives Actuator a server so the health probes and Prometheus scrape declared in application.yml are reachable on SERVER_PORT. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -27,8 +36,17 @@
             <version>8.5.17</version>
         </dependency>
         <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
