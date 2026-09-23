@@ -7,16 +7,37 @@ spring:
     password: ${RABBITMQ_PASSWORD:fiapx}
     listener.simple:
       acknowledge-mode: auto
+      prefetch: ${RABBITMQ_PREFETCH:1}
+      concurrency: ${RABBITMQ_CONCURRENCY:1}
+      max-concurrency: ${RABBITMQ_MAX_CONCURRENCY:2}
       retry.enabled: true
       retry.initial-interval: 2s
       retry.multiplier: 2
       retry.max-interval: 30s
       retry.max-attempts: 4
       default-requeue-rejected: false
+app.messaging:
+  exchange: ${RABBITMQ_EXCHANGE:video.events}
+  queue: ${RABBITMQ_QUEUE:video.processing.v1}
+  dead-letter-exchange: ${RABBITMQ_DLX:video.events.dlx}
+  dead-letter-queue: ${RABBITMQ_DLQ:video.processing.dlq.v1}
+  routing-keys:
+    requested: video.job.requested.v1
+    started: video.job.started.v1
+    completed: video.job.completed.v1
+    failed: video.job.failed.v1
 app.storage:
   endpoint: ${S3_ENDPOINT:http://localhost:9000}
   access-key: ${S3_ACCESS_KEY:fiapx}
   secret-key: ${S3_SECRET_KEY:fiapx-secret}
   bucket: ${S3_BUCKET:videos}
+app.media:
+  ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
+  ffprobe-path: ${FFPROBE_PATH:ffprobe}
+  frames-per-second: ${FRAMES_PER_SECOND:1}
+  max-duration: ${MEDIA_MAX_DURATION:30m}
+  command-timeout: ${MEDIA_COMMAND_TIMEOUT:5m}
+app.workspace:
+  root: ${WORKSPACE_ROOT:${java.io.tmpdir}}
 management.endpoints.web.exposure.include: health,info,prometheus
 management.endpoint.health.probes.enabled: true

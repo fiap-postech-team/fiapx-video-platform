@@ -41,7 +41,7 @@ services:
     depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy }, minio-init: { condition: service_completed_successfully } }
   video-processor:
     build: { context: ., dockerfile: services/video-processor/Dockerfile }
-    environment: { RABBITMQ_HOST: rabbitmq, S3_ENDPOINT: "http://minio:9000" }
+    environment: { RABBITMQ_HOST: rabbitmq, S3_ENDPOINT: "http://minio:9000", S3_ACCESS_KEY: "${MINIO_ROOT_USER:-fiapx}", S3_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-fiapx-secret}", S3_BUCKET: "${S3_BUCKET:-videos}" }
     ports: [ "8081:8081" ]
     depends_on: { rabbitmq: { condition: service_healthy }, minio-init: { condition: service_completed_successfully } }
   notification-worker:

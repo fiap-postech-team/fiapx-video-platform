@@ -6,6 +6,7 @@ O FIAP X recebe referências de vídeos armazenados em object storage, cria jobs
 gera um ZIP e registra o resultado para consulta. A solução foi organizada como um monorepo Maven com três aplicações
 Spring Boot independentes, comunicação por eventos e propriedade de dados bem definida.
 
+> Estado atual: o `video-processor` está implementado, com testes unitários.
 > Estado atual: o `video-api` cadastra usuários, mantém sessões locais RSA/JWT,
 > aplica autorização de proprietário aos jobs e valida o schema PostgreSQL pelo
 > Hibernate. O modelo persistente inclui identidade, sessões rotativas, vídeos,
@@ -173,9 +174,9 @@ forem definidos.
 
 ## Roadmap
 
-- upload, confirmação de vídeo e URLs pré-assinadas;
+- Upload/download por URLs pré-assinadas e bucket policies;
 - publisher RabbitMQ com confirms e listener de resultados;
-- deduplicação persistente no processor e integração da inbox de resultados;
+- deduplicação no consumidor de resultados da API (o processor já deduplica pelo `resultKey` determinístico);
 - recuperação de outbox, métricas e alertas de negócio;
 - execução dos testes de integração com Testcontainers e cobertura mínima estável;
 - logs JSON, tracing, dashboards, alertas e runbooks;
