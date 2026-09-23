@@ -9,6 +9,14 @@ interface DownloadResultButtonProps {
   iconOnly?: boolean
 }
 
+function DownloadIcon() {
+  return (
+    <svg className="download-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 19h14" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
 export function DownloadResultButton({
   jobId,
   videoService,
@@ -17,15 +25,18 @@ export function DownloadResultButton({
 }: DownloadResultButtonProps) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   async function handleDownload() {
     if (pending) return
     const popup = openPendingTab()
     setPending(true)
     setError(null)
+    setSuccess(false)
     try {
       const result = await videoService.download(jobId)
       navigateToDownload(popup, result.downloadUrl, result.filename)
+      setSuccess(true)
     } catch (cause) {
       popup?.close()
       setError(downloadMessage(cause))
@@ -52,6 +63,11 @@ export function DownloadResultButton({
         <span className="download-notification" role="alert">
           <span className="download-notification-mark" aria-hidden="true" />
           {error}
+        </span>
+      )}
+      {success && (
+        <span className="download-success" role="status">
+          {copy.videos.downloadSuccess}
         </span>
       )}
     </span>

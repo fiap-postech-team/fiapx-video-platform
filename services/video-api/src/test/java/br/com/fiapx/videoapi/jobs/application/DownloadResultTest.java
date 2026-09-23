@@ -38,4 +38,17 @@ class DownloadResultTest {
             .isInstanceOf(ResultNotReadyException.class);
         verifyNoInteractions(storage);
     }
+
+    @Test void localMockDownloadSucceedsWithoutAStoredObject() {
+        var job = new Job(jobId, owner, "users/a/input.mp4", "results/a.zip", JobStatus.COMPLETED, Instant.now());
+        when(jobs.findOwned(jobId, owner)).thenReturn(Optional.of(job));
+
+        var result = new DownloadResult(jobs, videos, storage, Duration.ofMinutes(5), "https://shorturl.at/JpxZS")
+            .execute(jobId, owner);
+
+        assertThat(result.downloadUrl()).isEqualTo("https://shorturl.at/JpxZS");
+        assertThat(result.contentType()).isEqualTo("application/zip");
+        assertThat(result.sizeBytes()).isZero();
+        verifyNoInteractions(storage);
+    }
 }

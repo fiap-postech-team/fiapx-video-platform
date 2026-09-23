@@ -25,10 +25,13 @@ public class DownloadResult {
         var job = jobs.findOwned(jobId, ownerId).orElseThrow(JobResultNotFoundException::new);
         if (job.status() != JobStatus.COMPLETED) throw new ResultNotReadyException();
         if (job.resultKey() == null || job.resultKey().isBlank()) throw new ResultInconsistentException();
-        var object = storage.stat(job.resultKey()).orElseThrow(ResultObjectMissingException::new);
+        var mockDownload = mockUrl != null && !mockUrl.isBlank();
+        var object = mockDownload
+            ? new VideoObjectStorage.StoredObject(0, "application/zip", null)
+            : storage.stat(job.resultKey()).orElseThrow(ResultObjectMissingException::new);
         var filename = filename(job, ownerId);
         var expires = Instant.now().plus(ttl);
-        var url = mockUrl == null || mockUrl.isBlank()
+        var url = !mockDownload
             ? storage.signDownload(job.resultKey(), filename, ttl).url() : mockUrl;
         return new Result(url, expires, filename, object.contentType(), object.sizeBytes());
     }

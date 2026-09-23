@@ -42,6 +42,7 @@ describe('DownloadResultButton', () => {
     expect(open).toHaveBeenCalledWith('', '_blank')
     expect(popup.opener).toBeNull()
     expect(replace).toHaveBeenCalledWith('https://shorturl.at/JpxZS')
+    expect(await screen.findByRole('status')).toHaveTextContent(copy.videos.downloadSuccess)
     open.mockRestore()
   })
 
