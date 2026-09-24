@@ -38,13 +38,14 @@ class RunningBootJarIT {
         } finally {
             stop(process);
         }
-        assertThat(availableBackendPort()).isEqualTo(port);
+        assertThat(awaitReleased(port)).isTrue();
     }
 
     private Process startJar(int port) throws Exception {
         return new ProcessBuilder(
             PathSupport.javaExecutable(), "-jar", packagedJar().toString(),
             "--spring.profiles.active=local", "--server.port=" + port,
+            "--server.shutdown=immediate",
             "--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
             "--spring.datasource.username=" + POSTGRES.getUsername(),
             "--spring.datasource.password=" + POSTGRES.getPassword()
@@ -68,6 +69,17 @@ class RunningBootJarIT {
         throw new IllegalStateException("Application did not expose " + path + " before timeout");
     }
 
+    private boolean awaitReleased(int port) throws InterruptedException, java.io.IOException {
+        var deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        while (System.nanoTime() < deadline) {
+            if (availableBackendPort() == port) {
+                return true;
+            }
+            LockSupport.parkNanos(Duration.ofMillis(200).toNanos());
+        }
+        return availableBackendPort() == port;
+    }
+
     private int availableBackendPort() throws java.io.IOException {
         for (var port = 3000; port <= 3099; port++) {
             try (var socket = new ServerSocket(port)) {
@@ -83,6 +95,9 @@ class RunningBootJarIT {
         process.destroy();
         if (!process.waitFor(20, TimeUnit.SECONDS)) {
             process.destroyForcibly();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Packaged application did not exit");
+            }
         }
     }
 
