@@ -28,7 +28,7 @@ abstract class VideoUploadIntegrationSupport {
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
     @Container
-    static final GenericContainer<?> MINIO = new GenericContainer<>("quay.io/minio/minio:RELEASE.2025-02-07T23-21-09Z")
+    static final GenericContainer<?> MINIO = new GenericContainer<>("pgsty/minio:RELEASE.2026-08-04T00-00-00Z")
         .withEnv("MINIO_ROOT_USER", USER).withEnv("MINIO_ROOT_PASSWORD", PASSWORD)
         .withCommand("server", "/data").withExposedPorts(9000);
 
