@@ -35,13 +35,19 @@ public class JpaOutboxStore implements OutboxStore {
 
     public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,
                        Instant occurredAt) {
-        var payload = payload(eventId, jobId, userId, videoId, sourceKey, occurredAt);
-        try { events.save(new OutboxEventEntity(eventId, jobId, json.writeValueAsString(payload), payload, occurredAt)); }
+        append(eventId, jobId, userId, videoId, sourceKey, occurredAt, jobId);
+    }
+
+    public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,
+                       Instant occurredAt, UUID correlationId) {
+        var effectiveCorrelationId = correlationId == null ? jobId : correlationId;
+        var payload = payload(eventId, jobId, userId, videoId, sourceKey, occurredAt, effectiveCorrelationId);
+        try { events.save(new OutboxEventEntity(eventId, jobId, json.writeValueAsString(payload), payload, occurredAt, effectiveCorrelationId)); }
         catch (Exception exception) { throw new IllegalStateException("Cannot serialize job event", exception); }
     }
 
     private Map<String, Object> payload(UUID eventId, UUID jobId, UUID userId, UUID videoId,
-                                        String sourceKey, Instant occurredAt) {
+                                        String sourceKey, Instant occurredAt, UUID correlationId) {
         var payload = new LinkedHashMap<String, Object>();
         payload.put("eventId", eventId);
         payload.put("jobId", jobId);
@@ -51,7 +57,7 @@ public class JpaOutboxStore implements OutboxStore {
         payload.put("type", "video.job.requested.v1");
         payload.put("schemaVersion", 1);
         payload.put("occurredAt", occurredAt.toString());
-        payload.put("correlationId", jobId);
+        payload.put("correlationId", correlationId);
         return payload;
     }
 

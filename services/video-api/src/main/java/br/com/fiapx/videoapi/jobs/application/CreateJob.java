@@ -47,13 +47,22 @@ public final class CreateJob {
     }
 
     public Job execute(UUID userId, String sourceKey, String idempotencyKey) {
+        return execute(userId, sourceKey, idempotencyKey, null);
+    }
+
+    public Job execute(UUID userId, String sourceKey, String idempotencyKey, UUID correlationId) {
+        return executeWithOutcome(userId, sourceKey, idempotencyKey, correlationId).job();
+    }
+
+    public CreationOutcome executeWithOutcome(UUID userId, String sourceKey, String idempotencyKey,
+                                               UUID correlationId) {
         if (!activeUsers.test(userId)) {
             throw new UserInactiveException();
         }
         var fingerprint = fingerprint(sourceKey);
         var existing = existingJob(userId, idempotencyKey, fingerprint);
         if (existing != null) {
-            return existing;
+            return new CreationOutcome(existing, false);
         }
         var video = videos.findOwned(userId, sourceKey).orElseThrow(VideoNotFoundException::new);
         if (!video.isConfirmed()) {
@@ -70,8 +79,8 @@ public final class CreateJob {
         if (idempotencyKey != null) {
             idempotency.record(userId, idempotencyKey, fingerprint, job.id());
         }
-        outbox.append(ids.next(), job.id(), userId, video.id(), sourceKey, job.createdAt());
-        return job;
+        outbox.append(ids.next(), job.id(), userId, video.id(), sourceKey, job.createdAt(), correlationId);
+        return new CreationOutcome(job, true);
     }
 
     private Job existingJob(UUID userId, String key, String fingerprint) {
@@ -111,4 +120,6 @@ public final class CreateJob {
             }
         };
     }
+
+    public record CreationOutcome(Job job, boolean created) { }
 }

@@ -24,6 +24,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import br.com.fiapx.videoapi.jobs.application.DownloadResult;
+import org.slf4j.MDC;
+import jakarta.servlet.http.HttpServletRequest;
+import br.com.fiapx.videoapi.foundation.observability.BusinessMetrics;
 
 @RestController
 @RequestMapping("/v1/jobs")
@@ -33,15 +36,22 @@ public class JobController {
     private final JobTransactionExecutor transactions;
     private final int maxPageSize;
     private final DownloadResult downloadResult;
+    private final BusinessMetrics metrics;
 
     @Autowired
     public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
-                         JobProperties properties, DownloadResult downloadResult) {
+                         JobProperties properties, DownloadResult downloadResult, BusinessMetrics metrics) {
         this.createJob = createJob;
         this.jobs = jobs;
         this.transactions = transactions;
         this.maxPageSize = properties.maxPageSize();
         this.downloadResult = downloadResult;
+        this.metrics = metrics;
+    }
+
+    public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
+                         JobProperties properties, DownloadResult downloadResult) {
+        this(createJob, jobs, transactions, properties, downloadResult, null);
     }
 
     public JobController(CreateJob createJob, JobStore jobs, JobTransactionExecutor transactions,
@@ -60,9 +70,18 @@ public class JobController {
     @PostMapping
     ResponseEntity<JobResponse> create(@Valid @RequestBody CreateJobRequest request,
                                        @RequestHeader(value = "Idempotency-Key", required = false) String key,
-                                       @AuthenticationPrincipal AuthenticatedIdentity identity) {
-        var job = transactions.execute(() -> createJob.execute(identity.userId(), request.sourceKey(), validKey(key)));
+                                       @AuthenticationPrincipal AuthenticatedIdentity identity,
+                                       HttpServletRequest httpRequest) {
+        var correlationId = MDC.get("correlationId");
+        var outcome = transactions.execute(() -> createJob.executeWithOutcome(identity.userId(), request.sourceKey(),
+            validKey(key), correlationId == null ? null : UUID.fromString(correlationId)));
+        if (outcome.created() && metrics != null) metrics.jobCreated();
+        var job = outcome.job();
+        if (httpRequest != null) httpRequest.setAttribute("fiapx.jobId", job.id().toString());
         return ResponseEntity.created(URI.create("/v1/jobs/" + job.id())).body(JobResponse.from(job));
+    }
+    ResponseEntity<JobResponse> create(CreateJobRequest request, String key, AuthenticatedIdentity identity) {
+        return create(request, key, identity, null);
     }
     @GetMapping("/{id}")
     JobResponse get(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedIdentity identity) {

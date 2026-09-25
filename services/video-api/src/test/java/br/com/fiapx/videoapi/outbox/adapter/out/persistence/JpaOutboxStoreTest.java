@@ -27,10 +27,11 @@ class JpaOutboxStoreTest {
         var jobId = UUID.randomUUID();
         var userId = UUID.randomUUID();
         var videoId = UUID.randomUUID();
+        var correlationId = UUID.randomUUID();
         var occurredAt = Instant.parse("2026-09-22T12:00:00Z");
 
         new JpaOutboxStore(repository, new ObjectMapper()).append(eventId, jobId, userId, videoId,
-            "uploads/source.mp4", occurredAt);
+            "uploads/source.mp4", occurredAt, correlationId);
 
         var event = ArgumentCaptor.forClass(OutboxEventEntity.class);
         verify(repository).save(event.capture());
@@ -41,7 +42,7 @@ class JpaOutboxStoreTest {
         assertThat((Map<String, Object>) ReflectionTestUtils.getField(event.getValue(), "payloadJson"))
             .containsEntry("type", "video.job.requested.v1")
             .containsEntry("schemaVersion", 1)
-            .containsEntry("correlationId", jobId)
+            .containsEntry("correlationId", correlationId)
             .containsEntry("occurredAt", occurredAt.toString());
     }
 

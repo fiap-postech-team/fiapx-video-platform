@@ -5,6 +5,7 @@ import br.com.fiapx.videoapi.videos.application.port.out.VideoStore;
 import br.com.fiapx.videoapi.videos.application.port.out.VideoTransactions;
 import br.com.fiapx.videoapi.videos.domain.Video;
 import br.com.fiapx.videoapi.videos.domain.VideoStatus;
+import br.com.fiapx.videoapi.foundation.observability.BusinessMetrics;
 import java.time.Clock;
 import java.util.Locale;
 import java.util.UUID;
@@ -15,14 +16,21 @@ public final class CreateVideoUpload {
     private final VideoTransactions transactions;
     private final VideoUploadPolicy policy;
     private final Clock clock;
+    private final BusinessMetrics metrics;
 
     public CreateVideoUpload(VideoStore videos, VideoObjectStorage storage, VideoTransactions transactions,
                              VideoUploadPolicy policy, Clock clock) {
+        this(videos, storage, transactions, policy, clock, null);
+    }
+
+    public CreateVideoUpload(VideoStore videos, VideoObjectStorage storage, VideoTransactions transactions,
+                             VideoUploadPolicy policy, Clock clock, BusinessMetrics metrics) {
         this.videos = videos;
         this.storage = storage;
         this.transactions = transactions;
         this.policy = policy;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     public CreatedUpload execute(UUID userId, String filename, String contentType,
@@ -36,6 +44,7 @@ public final class CreateVideoUpload {
         var video = new Video(videoId, userId, key, filename, contentType, sizeBytes, checksum,
             VideoStatus.PENDING, now, now, now.plus(policy.pendingTtl()), null, null);
         transactions.execute(() -> videos.save(video));
+        if (metrics != null) metrics.uploadCreated();
         return new CreatedUpload(videoId, key, signed);
     }
 

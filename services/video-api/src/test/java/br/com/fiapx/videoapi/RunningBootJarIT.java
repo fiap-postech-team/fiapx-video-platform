@@ -29,10 +29,15 @@ class RunningBootJarIT {
 
         try {
             var health = awaitOk(port, "/actuator/health");
+            var prometheus = awaitOk(port, "/actuator/prometheus");
             var openApi = awaitOk(port, "/openapi.yaml");
             var swagger = awaitOk(port, "/swagger-ui.html");
 
             assertThat(health.body()).contains("\"status\":\"UP\"");
+            assertThat(prometheus.body())
+                .contains("http_server_requests_seconds_count")
+                .contains("fiapx_jobs_created_events_total")
+                .contains("outbox_backlog");
             assertThat(openApi.body()).contains("openapi: 3.1.0");
             assertThat(swagger.body()).contains("swagger-initializer.js");
         } finally {

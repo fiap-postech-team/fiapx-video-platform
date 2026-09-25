@@ -36,6 +36,7 @@ flowchart LR
 
 Veja a [arquitetura detalhada](docs/architecture/architecture.md),
 o [catálogo de eventos](docs/architecture/event-catalog.md) e as [decisões arquiteturais](docs/adr/README.md).
+As instruções de [logs, métricas e Prometheus local](docs/observability.md) estão disponíveis na documentação.
 
 ## Aplicações
 

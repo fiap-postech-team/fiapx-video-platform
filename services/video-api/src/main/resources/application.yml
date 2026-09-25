@@ -23,6 +23,11 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 20s
 
+logging:
+  structured:
+    format:
+      console: logstash
+
 server:
   shutdown: graceful
 

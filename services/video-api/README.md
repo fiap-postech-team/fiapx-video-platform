@@ -92,6 +92,9 @@ os volumes:
 docker compose stop postgres rabbitmq minio
 ```
 
+As métricas, logs estruturados e consultas locais com Prometheus estão descritos em
+[Observabilidade](../../docs/observability.md).
+
 ## Banco de dados
 
 PostgreSQL é a fonte de verdade dos metadados. O Flyway aplica as migrations em
