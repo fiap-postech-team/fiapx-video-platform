@@ -1,0 +1,7 @@
+root_domain                     = "example.com"
+alert_email                     = "platform-ops@example.com"
+default_notification_recipient = "support@example.com"
+api_image                       = "123456789012.dkr.ecr.us-east-1.amazonaws.com/fiapx-video-platform/video-api@sha256:replace"
+processor_image                 = "123456789012.dkr.ecr.us-east-1.amazonaws.com/fiapx-video-platform/video-processor@sha256:replace"
+notification_image              = "123456789012.dkr.ecr.us-east-1.amazonaws.com/fiapx-video-platform/notification-worker@sha256:replace"
+collector_image                 = "123456789012.dkr.ecr.us-east-1.amazonaws.com/fiapx-video-platform/adot-collector@sha256:replace"

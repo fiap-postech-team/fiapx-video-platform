@@ -112,8 +112,9 @@ stack trace, linha de comando, object key interna ou credencial.
 | `RABBITMQ_CONCURRENCY` | `1` | consumidores mínimos |
 | `RABBITMQ_MAX_CONCURRENCY` | `2` | consumidores máximos |
 | `S3_ENDPOINT` | `http://localhost:9000` | endpoint S3-compatible |
-| `S3_ACCESS_KEY` | `fiapx` | access key |
-| `S3_SECRET_KEY` | `fiapx-secret` | secret key |
+| `AWS_ACCESS_KEY_ID` | credencial local | access key local para MinIO |
+| `AWS_SECRET_ACCESS_KEY` | credencial local | secret key local para MinIO |
+| `AWS_REGION` | `us-east-1` | região do bucket |
 | `S3_BUCKET` | `videos` | bucket de entrada/saída |
 | `FFMPEG_PATH` | `ffmpeg` | executável do FFmpeg |
 | `FFPROBE_PATH` | `ffprobe` | executável do FFprobe |

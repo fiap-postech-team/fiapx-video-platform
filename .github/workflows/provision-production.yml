@@ -1,0 +1,85 @@
+name: provision-production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: fiapx-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_BOOTSTRAP_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Create or initialize remote state backend
+        working-directory: infra/aws/terraform/bootstrap
+        env:
+          STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+        run: |
+          set -euo pipefail
+          if aws s3api head-object --bucket "$STATE_BUCKET" --key fiapx-video-platform/bootstrap/terraform.tfstate >/dev/null 2>&1; then
+            terraform init -backend-config="bucket=$STATE_BUCKET" -backend-config="key=fiapx-video-platform/bootstrap/terraform.tfstate" -backend-config=region=us-east-1 -backend-config=encrypt=true -backend-config=use_lockfile=true
+          else
+            terraform init -backend=false
+            terraform apply -auto-approve -var="state_bucket_name=$STATE_BUCKET"
+            terraform init -migrate-state -backend-config="bucket=$STATE_BUCKET" -backend-config="key=fiapx-video-platform/bootstrap/terraform.tfstate" -backend-config=region=us-east-1 -backend-config=encrypt=true -backend-config=use_lockfile=true
+          fi
+
+      - name: Initialize production state
+        working-directory: infra/aws/terraform/environments/production
+        env:
+          STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+        run: terraform init -backend-config="bucket=$STATE_BUCKET" -backend-config=key=fiapx-video-platform/production/terraform.tfstate -backend-config=region=us-east-1 -backend-config=encrypt=true -backend-config=use_lockfile=true
+
+      - name: Plan base infrastructure
+        working-directory: infra/aws/terraform/environments/production
+        env:
+          TF_VAR_terraform_state_bucket_name: ${{ vars.TERRAFORM_STATE_BUCKET }}
+          TF_VAR_root_domain: ${{ vars.ROOT_DOMAIN }}
+          TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          TF_VAR_default_notification_recipient: ${{ vars.DEFAULT_NOTIFICATION_RECIPIENT }}
+          TF_VAR_jwt_private_key_base64: ${{ secrets.JWT_PRIVATE_KEY_BASE64 }}
+          TF_VAR_jwt_public_key_base64: ${{ secrets.JWT_PUBLIC_KEY_BASE64 }}
+          TF_VAR_ses_smtp_username: ${{ secrets.SES_SMTP_USERNAME }}
+          TF_VAR_ses_smtp_password: ${{ secrets.SES_SMTP_PASSWORD }}
+          TF_VAR_api_image: public.ecr.aws/docker/library/busybox:latest
+          TF_VAR_processor_image: public.ecr.aws/docker/library/busybox:latest
+          TF_VAR_notification_image: public.ecr.aws/docker/library/busybox:latest
+          TF_VAR_collector_image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+          TF_VAR_api_desired_count: 0
+          TF_VAR_processor_desired_count: 0
+          TF_VAR_notification_desired_count: 0
+        run: terraform plan -out=tfplan
+
+      - name: Apply base infrastructure
+        working-directory: infra/aws/terraform/environments/production
+        run: terraform apply -auto-approve tfplan
+
+      - name: Bootstrap application databases
+        working-directory: infra/aws/terraform/environments/production
+        run: |
+          set -euo pipefail
+          cluster="$(terraform output -raw ecs_cluster_name)"
+          subnets="$(terraform output -json ecs_application_subnet_ids | jq -r 'join(",")')"
+          task_definition="$(terraform output -raw ecs_database_bootstrap_task_definition)"
+          security_group="$(terraform output -raw ecs_security_group_id)"
+          task_arn="$(aws ecs run-task --cluster "$cluster" --launch-type FARGATE --task-definition "$task_definition" --network-configuration "awsvpcConfiguration={subnets=[$subnets],securityGroups=[$security_group],assignPublicIp=DISABLED}" --query 'tasks[0].taskArn' --output text)"
+          aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$task_arn"
+          exit_code="$(aws ecs describe-tasks --cluster "$cluster" --tasks "$task_arn" --query 'tasks[0].containers[0].exitCode' --output text)"
+          test "$exit_code" = "0"
+          echo "Initial AWS deploy role: $(terraform output -raw github_deploy_role_arn)"
+          echo "AWS plan role: $(terraform output -raw github_plan_role_arn)"
