@@ -190,3 +190,8 @@ forem definidos.
 - [Atributos de qualidade](docs/architecture/quality-attributes.md)
 - [Justificativa do monorepo](docs/architecture/monorepo-justification.md)
 - [Índice de ADRs](docs/adr/README.md)
+- [Documentação detalhada da infraestrutura AWS](docs/infrastructure.md)
+
+## Infraestrutura AWS
+
+Consulte a [documentação detalhada da infraestrutura AWS](docs/infrastructure.md).

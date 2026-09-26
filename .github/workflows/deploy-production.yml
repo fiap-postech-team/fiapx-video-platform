@@ -1,0 +1,113 @@
+name: deploy-production
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: fiapx-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/master' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/video-api-frontend/package-lock.json
+      - name: Verify services
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+      - name: Verify frontend
+        working-directory: services/video-api-frontend
+        run: npm ci && npm run lint && npm test && npm run build
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Resolve AWS account
+        id: aws-account
+        run: echo "id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and publish immutable service images
+        id: images
+        env:
+          REGISTRY: ${{ steps.aws-account.outputs.id }}.dkr.ecr.us-east-1.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for service in video-api video-processor notification-worker; do
+            if ! digest="$(aws ecr describe-images --repository-name "fiapx-video-platform/${service}" --image-ids imageTag="${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null)" || [[ "$digest" == "None" ]]; then
+              docker build --file "services/${service}/Dockerfile" --tag "${REGISTRY}/fiapx-video-platform/${service}:${IMAGE_TAG}" .
+              docker push "${REGISTRY}/fiapx-video-platform/${service}:${IMAGE_TAG}"
+              digest="$(aws ecr describe-images --repository-name "fiapx-video-platform/${service}" --image-ids imageTag="${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
+            fi
+            echo "${service//-/_}_image=${REGISTRY}/fiapx-video-platform/${service}@${digest}" >> "$GITHUB_OUTPUT"
+            echo "Published ${service} image digest: ${digest}"
+          done
+          if ! digest="$(aws ecr describe-images --repository-name fiapx-video-platform/adot-collector --image-ids imageTag="${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null)" || [[ "$digest" == "None" ]]; then
+            docker build --file infra/aws/terraform/observability/Dockerfile --tag "${REGISTRY}/fiapx-video-platform/adot-collector:${IMAGE_TAG}" infra/aws/terraform/observability
+            docker push "${REGISTRY}/fiapx-video-platform/adot-collector:${IMAGE_TAG}"
+            digest="$(aws ecr describe-images --repository-name fiapx-video-platform/adot-collector --image-ids imageTag="${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
+          fi
+          echo "collector_image=${REGISTRY}/fiapx-video-platform/adot-collector@${digest}" >> "$GITHUB_OUTPUT"
+          echo "Published adot-collector image digest: ${digest}"
+      - name: Terraform init
+        working-directory: infra/aws/terraform/environments/production
+        run: terraform init -backend-config="bucket=${{ vars.TERRAFORM_STATE_BUCKET }}" -backend-config="key=fiapx-video-platform/production/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="encrypt=true" -backend-config="use_lockfile=true"
+      - name: Terraform plan
+        working-directory: infra/aws/terraform/environments/production
+        env:
+          TF_VAR_terraform_state_bucket_name: ${{ vars.TERRAFORM_STATE_BUCKET }}
+          TF_VAR_root_domain: ${{ vars.ROOT_DOMAIN }}
+          TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          TF_VAR_default_notification_recipient: ${{ vars.DEFAULT_NOTIFICATION_RECIPIENT }}
+          TF_VAR_jwt_private_key_base64: ${{ secrets.JWT_PRIVATE_KEY_BASE64 }}
+          TF_VAR_jwt_public_key_base64: ${{ secrets.JWT_PUBLIC_KEY_BASE64 }}
+          TF_VAR_ses_smtp_username: ${{ secrets.SES_SMTP_USERNAME }}
+          TF_VAR_ses_smtp_password: ${{ secrets.SES_SMTP_PASSWORD }}
+          TF_VAR_api_image: ${{ steps.images.outputs.video_api_image }}
+          TF_VAR_processor_image: ${{ steps.images.outputs.video_processor_image }}
+          TF_VAR_notification_image: ${{ steps.images.outputs.notification_worker_image }}
+          TF_VAR_collector_image: ${{ steps.images.outputs.collector_image }}
+          TF_VAR_frontend_commit: ${{ github.sha }}
+          TF_VAR_api_desired_count: 1
+          TF_VAR_processor_desired_count: 1
+          TF_VAR_notification_desired_count: 1
+        run: terraform plan -out=tfplan
+      - name: Apply infrastructure and service release
+        id: infrastructure
+        working-directory: infra/aws/terraform/environments/production
+        run: |
+          terraform apply -auto-approve tfplan
+          echo "frontend_bucket=$(terraform output -raw frontend_bucket)" >> "$GITHUB_OUTPUT"
+          echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
+      - name: Publish SPA
+        working-directory: services/video-api-frontend
+        env:
+          VITE_VIDEO_API_BASE_URL: https://app.${{ vars.ROOT_DOMAIN }}
+          FRONTEND_BUCKET: ${{ steps.infrastructure.outputs.frontend_bucket }}
+          CLOUDFRONT_DISTRIBUTION_ID: ${{ steps.infrastructure.outputs.cloudfront_distribution_id }}
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          aws s3 sync dist/ "s3://${FRONTEND_BUCKET}/"
+          aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths /index.html

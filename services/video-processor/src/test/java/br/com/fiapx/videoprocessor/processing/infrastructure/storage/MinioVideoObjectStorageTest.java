@@ -8,35 +8,32 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.fiapx.videoprocessor.processing.domain.ResultLocation;
-import io.minio.DownloadObjectArgs;
-import io.minio.MinioClient;
-import io.minio.StatObjectArgs;
-import io.minio.UploadObjectArgs;
-import io.minio.errors.ErrorResponseException;
-import io.minio.messages.ErrorResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.UUID;
-import okhttp3.Protocol;
-import okhttp3.Request;
-import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @ExtendWith(MockitoExtension.class)
 class MinioVideoObjectStorageTest {
 
-    private static final StorageProperties PROPERTIES =
-            new StorageProperties("http://localhost:9000", "fiapx", "fiapx-secret", "videos");
+    private static final StorageProperties PROPERTIES = new StorageProperties("http://localhost:9000", "videos", "us-east-1");
 
     @Mock
-    private MinioClient client;
+    private S3Client client;
 
     @TempDir
     Path workspace;
@@ -44,88 +41,75 @@ class MinioVideoObjectStorageTest {
     private final ResultLocation resultLocation = ResultLocation.forJob(UUID.randomUUID());
 
     @Test
-    void reportsTheResultAsPresentWhenTheObjectCanBeStatted() throws Exception {
+    void reportsTheResultAsPresentWhenTheObjectCanBeStatted() {
         assertThat(storage().exists(resultLocation)).isTrue();
 
-        ArgumentCaptor<StatObjectArgs> captor = ArgumentCaptor.forClass(StatObjectArgs.class);
-        verify(client).statObject(captor.capture());
+        ArgumentCaptor<HeadObjectRequest> captor = ArgumentCaptor.forClass(HeadObjectRequest.class);
+        verify(client).headObject(captor.capture());
         assertThat(captor.getValue().bucket()).isEqualTo("videos");
-        assertThat(captor.getValue().object()).isEqualTo(resultLocation.key());
+        assertThat(captor.getValue().key()).isEqualTo(resultLocation.key());
     }
 
     @Test
-    void reportsTheResultAsAbsentWhenTheObjectDoesNotExist() throws Exception {
-        when(client.statObject(any(StatObjectArgs.class))).thenThrow(notFound());
+    void reportsTheResultAsAbsentWhenTheObjectDoesNotExist() {
+        when(client.headObject(any(HeadObjectRequest.class))).thenThrow(S3Exception.builder().statusCode(404).build());
 
         assertThat(storage().exists(resultLocation)).isFalse();
     }
 
     @Test
-    void surfacesAnyOtherStatFailureAsTransient() throws Exception {
-        when(client.statObject(any(StatObjectArgs.class))).thenThrow(new IOException("connection reset"));
+    void surfacesAnyOtherStatFailureAsTransient() {
+        when(client.headObject(any(HeadObjectRequest.class))).thenThrow(S3Exception.builder().statusCode(503).build());
 
         assertThatThrownBy(() -> storage().exists(resultLocation)).isInstanceOf(StorageException.class);
     }
 
     @Test
-    void downloadsTheSourceIntoTheWorkspaceFile() throws Exception {
-        Path target = Paths.get("workspace", "job-1", "source");
+    void downloadsTheSourceIntoTheWorkspaceFile() {
+        Path target = workspace.resolve("source.mp4");
+        when(client.<Path>getObject(any(GetObjectRequest.class), any(ResponseTransformer.class))).thenReturn(target);
 
         assertThat(storage().download("uploads/video.mp4", target)).isEqualTo(target);
 
-        ArgumentCaptor<DownloadObjectArgs> captor = ArgumentCaptor.forClass(DownloadObjectArgs.class);
-        verify(client).downloadObject(captor.capture());
+        ArgumentCaptor<GetObjectRequest> captor = ArgumentCaptor.forClass(GetObjectRequest.class);
+        verify(client).getObject(captor.capture(), any(ResponseTransformer.class));
         assertThat(captor.getValue().bucket()).isEqualTo("videos");
-        assertThat(captor.getValue().object()).isEqualTo("uploads/video.mp4");
-        assertThat(captor.getValue().filename()).isEqualTo(target.toString());
+        assertThat(captor.getValue().key()).isEqualTo("uploads/video.mp4");
     }
 
     @Test
-    void surfacesADownloadFailureAsTransient() throws Exception {
-        doThrow(new IOException("connection reset")).when(client).downloadObject(any(DownloadObjectArgs.class));
+    void surfacesADownloadFailureAsTransient() {
+        when(client.<Path>getObject(any(GetObjectRequest.class), any(ResponseTransformer.class)))
+                .thenThrow(new RuntimeException("connection reset"));
 
-        assertThatThrownBy(() -> storage().download("uploads/video.mp4", Paths.get("source")))
+        assertThatThrownBy(() -> storage().download("uploads/video.mp4", workspace.resolve("source.mp4")))
                 .isInstanceOf(StorageException.class);
     }
 
     @Test
-    void uploadsTheArchiveUnderTheDeterministicResultKey() throws Exception {
-        Path archive = anArchiveOnDisk();
+    void uploadsTheArchiveUnderTheDeterministicResultKey() throws IOException {
+        Path archive = Files.writeString(workspace.resolve("frames.zip"), "archive bytes");
+        when(client.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenReturn(PutObjectResponse.builder().build());
 
         storage().upload(resultLocation, archive);
 
-        ArgumentCaptor<UploadObjectArgs> captor = ArgumentCaptor.forClass(UploadObjectArgs.class);
-        verify(client).uploadObject(captor.capture());
+        ArgumentCaptor<PutObjectRequest> captor = ArgumentCaptor.forClass(PutObjectRequest.class);
+        verify(client).putObject(captor.capture(), any(RequestBody.class));
         assertThat(captor.getValue().bucket()).isEqualTo("videos");
-        assertThat(captor.getValue().object()).isEqualTo(resultLocation.key());
-        assertThat(captor.getValue().filename()).isEqualTo(archive.toString());
+        assertThat(captor.getValue().key()).isEqualTo(resultLocation.key());
+        assertThat(captor.getValue().contentType()).isEqualTo("application/zip");
     }
 
     @Test
-    void surfacesAnUploadFailureAsTransient() throws Exception {
-        doThrow(new IOException("broken pipe")).when(client).uploadObject(any(UploadObjectArgs.class));
-        Path archive = anArchiveOnDisk();
+    void surfacesAnUploadFailureAsTransient() throws IOException {
+        Path archive = Files.writeString(workspace.resolve("frames.zip"), "archive bytes");
+        doThrow(new RuntimeException("broken pipe"))
+                .when(client).putObject(any(PutObjectRequest.class), any(RequestBody.class));
 
         assertThatThrownBy(() -> storage().upload(resultLocation, archive)).isInstanceOf(StorageException.class);
     }
 
     private MinioVideoObjectStorage storage() {
         return new MinioVideoObjectStorage(client, PROPERTIES);
-    }
-
-    private Path anArchiveOnDisk() throws IOException {
-        return Files.writeString(workspace.resolve("frames.zip"), "archive bytes");
-    }
-
-    private ErrorResponseException notFound() {
-        ErrorResponse error =
-                new ErrorResponse("NoSuchKey", "Object does not exist", "videos", resultLocation.key(), "", "", "");
-        Response response = new Response.Builder()
-                .request(new Request.Builder().url("http://localhost:9000/videos").build())
-                .protocol(Protocol.HTTP_1_1)
-                .code(404)
-                .message("Not Found")
-                .build();
-        return new ErrorResponseException(error, response, null);
     }
 }

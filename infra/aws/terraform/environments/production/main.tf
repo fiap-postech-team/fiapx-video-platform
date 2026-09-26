@@ -1,0 +1,900 @@
+provider "aws" {
+  region = var.aws_region
+  default_tags {
+    tags = {
+      Project     = var.project_name
+      Environment = "production"
+      ManagedBy   = "Terraform"
+      Repository  = "fiapx-video-platform"
+    }
+  }
+}
+
+provider "random" {}
+
+data "aws_caller_identity" "current" {}
+data "aws_availability_zones" "available" { state = "available" }
+data "aws_route53_zone" "root" { name = "${var.root_domain}." }
+
+locals {
+  azs              = slice(data.aws_availability_zones.available.names, 0, 2)
+  service_names    = ["video-api", "video-processor", "notification-worker"]
+  repository_names = concat(local.service_names, ["adot-collector"])
+  service_ports    = { video-api = 8080, video-processor = 8081, notification-worker = 8082 }
+  service_images = {
+    video-api           = var.api_image
+    video-processor     = var.processor_image
+    notification-worker = var.notification_image
+  }
+  name_prefix            = "${var.project_name}-prod"
+  mq_host                = trimprefix(split(":", trimprefix(aws_mq_broker.rabbitmq.instances[0].endpoints[0], "amqps://"))[0], "//")
+  db_api_secret          = jsonencode({ username = "video_api", password = random_password.api_db.result })
+  db_notification_secret = jsonencode({ username = "notification_worker", password = random_password.notification_db.result })
+}
+
+resource "aws_vpc" "main" {
+  cidr_block           = "10.20.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+  tags                 = { Name = "${local.name_prefix}-vpc" }
+}
+
+resource "aws_internet_gateway" "main" { vpc_id = aws_vpc.main.id }
+
+resource "aws_subnet" "public" {
+  count                   = 2
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = ["10.20.0.0/20", "10.20.16.0/20"][count.index]
+  availability_zone       = local.azs[count.index]
+  map_public_ip_on_launch = true
+  tags                    = { Name = "${local.name_prefix}-public-${count.index + 1}" }
+}
+
+resource "aws_subnet" "application" {
+  count             = 2
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = ["10.20.32.0/20", "10.20.48.0/20"][count.index]
+  availability_zone = local.azs[count.index]
+  tags              = { Name = "${local.name_prefix}-application-${count.index + 1}" }
+}
+
+resource "aws_subnet" "data" {
+  count             = 2
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = ["10.20.64.0/20", "10.20.80.0/20"][count.index]
+  availability_zone = local.azs[count.index]
+  tags              = { Name = "${local.name_prefix}-data-${count.index + 1}" }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+}
+resource "aws_route_table_association" "public" {
+  count          = 2
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_eip" "nat" {
+  count  = var.nat_gateway_enabled ? 1 : 0
+  domain = "vpc"
+}
+resource "aws_nat_gateway" "main" {
+  count         = var.nat_gateway_enabled ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[0].id
+  depends_on    = [aws_internet_gateway.main]
+}
+resource "aws_route_table" "application" {
+  count  = 2
+  vpc_id = aws_vpc.main.id
+  dynamic "route" {
+    for_each = var.nat_gateway_enabled ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[0].id
+    }
+  }
+}
+resource "aws_route_table_association" "application" {
+  count          = 2
+  subnet_id      = aws_subnet.application[count.index].id
+  route_table_id = aws_route_table.application[count.index].id
+}
+resource "aws_route_table" "data" {
+  count  = 2
+  vpc_id = aws_vpc.main.id
+}
+resource "aws_route_table_association" "data" {
+  count          = 2
+  subnet_id      = aws_subnet.data[count.index].id
+  route_table_id = aws_route_table.data[count.index].id
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = concat(aws_route_table.application[*].id, aws_route_table.data[*].id)
+}
+
+resource "aws_security_group" "alb" {
+  name   = "${local.name_prefix}-alb"
+  vpc_id = aws_vpc.main.id
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront.id]
+  }
+  egress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+data "aws_ec2_managed_prefix_list" "cloudfront" { name = "com.amazonaws.global.cloudfront.origin-facing" }
+
+resource "aws_security_group" "ecs" {
+  name   = "${local.name_prefix}-ecs"
+  vpc_id = aws_vpc.main.id
+  ingress {
+    from_port = 0
+    to_port   = 0
+    protocol  = "-1"
+    self      = true
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_security_group" "api" {
+  name   = "${local.name_prefix}-api"
+  vpc_id = aws_vpc.main.id
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_security_group" "rds" {
+  name   = "${local.name_prefix}-rds"
+  vpc_id = aws_vpc.main.id
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs.id]
+  }
+}
+resource "aws_security_group" "mq" {
+  name   = "${local.name_prefix}-mq"
+  vpc_id = aws_vpc.main.id
+  ingress {
+    from_port       = 5671
+    to_port         = 5671
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs.id]
+  }
+}
+
+resource "aws_cloudwatch_log_group" "services" {
+  for_each          = toset(local.service_names)
+  name              = "/ecs/${local.name_prefix}/${each.key}"
+  retention_in_days = 30
+}
+resource "aws_cloudwatch_log_group" "adot" {
+  name              = "/ecs/${local.name_prefix}/adot"
+  retention_in_days = 30
+}
+
+resource "aws_ecr_repository" "services" {
+  for_each             = toset(local.repository_names)
+  name                 = "${var.project_name}/${each.key}"
+  image_tag_mutability = "IMMUTABLE"
+  image_scanning_configuration { scan_on_push = true }
+  encryption_configuration { encryption_type = "AES256" }
+}
+resource "aws_ecr_lifecycle_policy" "services" {
+  for_each   = aws_ecr_repository.services
+  repository = each.value.name
+  policy     = jsonencode({ rules = [{ rulePriority = 1, description = "Retain 30 recent images", selection = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 30 }, action = { type = "expire" } }] })
+}
+
+resource "aws_s3_bucket" "media" { bucket_prefix = "${var.project_name}-media-" }
+resource "aws_s3_bucket_public_access_block" "media" {
+  bucket                  = aws_s3_bucket.media.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+resource "aws_s3_bucket_cors_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "GET", "HEAD"]
+    allowed_origins = ["https://app.${var.root_domain}"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+}
+resource "aws_s3_bucket_lifecycle_configuration" "media" {
+  bucket = aws_s3_bucket.media.id
+  rule {
+    id     = "abort-incomplete-uploads"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
+  }
+}
+
+resource "aws_s3_bucket" "frontend" { bucket_prefix = "${var.project_name}-frontend-" }
+resource "aws_s3_bucket_public_access_block" "frontend" {
+  bucket                  = aws_s3_bucket.frontend.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+resource "aws_cloudfront_origin_access_control" "frontend" {
+  name                              = local.name_prefix
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+resource "aws_cloudfront_function" "spa" {
+  name    = "${local.name_prefix}-spa-fallback"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = file("${path.module}/../../observability/spa-fallback.js")
+}
+
+resource "aws_acm_certificate" "edge" {
+  domain_name               = "app.${var.root_domain}"
+  subject_alternative_names = ["origin.${var.root_domain}"]
+  validation_method         = "DNS"
+  lifecycle { create_before_destroy = true }
+}
+resource "aws_route53_record" "cert_validation" {
+  for_each = { for dvo in aws_acm_certificate.edge.domain_validation_options : dvo.domain_name => dvo }
+  zone_id  = data.aws_route53_zone.root.zone_id
+  name     = each.value.resource_record_name
+  type     = each.value.resource_record_type
+  records  = [each.value.resource_record_value]
+  ttl      = 60
+}
+resource "aws_acm_certificate_validation" "edge" {
+  certificate_arn         = aws_acm_certificate.edge.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+resource "random_password" "origin_header" {
+  length  = 48
+  special = false
+}
+resource "aws_lb" "api" {
+  name               = "${local.name_prefix}-api"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = aws_subnet.public[*].id
+}
+resource "aws_lb_target_group" "api" {
+  name        = "${local.name_prefix}-api"
+  port        = 8080
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+  health_check {
+    path     = "/actuator/health"
+    matcher  = "200-399"
+    interval = 30
+  }
+}
+resource "aws_lb_listener" "api" {
+  load_balancer_arn = aws_lb.api.arn
+  port              = 443
+  protocol          = "HTTPS"
+  certificate_arn   = aws_acm_certificate_validation.edge.certificate_arn
+  default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Forbidden"
+      status_code  = "403"
+    }
+  }
+}
+resource "aws_lb_listener_rule" "cloudfront_only" {
+  listener_arn = aws_lb_listener.api.arn
+  priority     = 10
+  condition {
+    http_header {
+      http_header_name = "X-Origin-Verify"
+      values           = [random_password.origin_header.result]
+    }
+  }
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+}
+
+resource "aws_cloudfront_distribution" "app" {
+  enabled             = true
+  default_root_object = "index.html"
+  aliases             = ["app.${var.root_domain}"]
+  price_class         = "PriceClass_100"
+  origin {
+    domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
+    origin_id                = "frontend-s3"
+    origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
+  }
+  origin {
+    domain_name = "origin.${var.root_domain}"
+    origin_id   = "api-alb"
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+    custom_header {
+      name  = "X-Origin-Verify"
+      value = random_password.origin_header.result
+    }
+  }
+  default_cache_behavior {
+    target_origin_id       = "frontend-s3"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa.arn
+    }
+  }
+  ordered_cache_behavior {
+    path_pattern             = "/v1/*"
+    target_origin_id         = "api-alb"
+    viewer_protocol_policy   = "redirect-to-https"
+    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods           = ["GET", "HEAD"]
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+  }
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+  viewer_certificate {
+    acm_certificate_arn      = aws_acm_certificate_validation.edge.certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+  depends_on = [aws_route53_record.origin]
+}
+data "aws_cloudfront_cache_policy" "caching_optimized" { name = "Managed-CachingOptimized" }
+data "aws_cloudfront_cache_policy" "caching_disabled" { name = "Managed-CachingDisabled" }
+data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" { name = "Managed-AllViewerExceptHostHeader" }
+data "aws_iam_policy_document" "frontend_bucket" {
+  statement {
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.frontend.arn}/*"]
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.app.arn]
+    }
+  }
+}
+resource "aws_s3_bucket_policy" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+  policy = data.aws_iam_policy_document.frontend_bucket.json
+}
+resource "aws_route53_record" "app" {
+  zone_id = data.aws_route53_zone.root.zone_id
+  name    = "app.${var.root_domain}"
+  type    = "A"
+  alias {
+    name                   = aws_cloudfront_distribution.app.domain_name
+    zone_id                = aws_cloudfront_distribution.app.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+resource "aws_route53_record" "origin" {
+  zone_id = data.aws_route53_zone.root.zone_id
+  name    = "origin.${var.root_domain}"
+  type    = "A"
+  alias {
+    name                   = aws_lb.api.dns_name
+    zone_id                = aws_lb.api.zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_db_subnet_group" "main" {
+  name       = local.name_prefix
+  subnet_ids = aws_subnet.data[*].id
+}
+resource "random_password" "api_db" {
+  length  = 40
+  special = false
+}
+resource "random_password" "notification_db" {
+  length  = 40
+  special = false
+}
+resource "aws_db_instance" "main" {
+  identifier                      = local.name_prefix
+  engine                          = "postgres"
+  instance_class                  = var.db_instance_class
+  allocated_storage               = 20
+  max_allocated_storage           = 100
+  storage_type                    = "gp3"
+  storage_encrypted               = true
+  db_name                         = "fiapx"
+  username                        = "dbadmin"
+  manage_master_user_password     = true
+  db_subnet_group_name            = aws_db_subnet_group.main.name
+  vpc_security_group_ids          = [aws_security_group.rds.id]
+  publicly_accessible             = false
+  multi_az                        = false
+  backup_retention_period         = 7
+  deletion_protection             = true
+  skip_final_snapshot             = false
+  final_snapshot_identifier       = "${local.name_prefix}-final"
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+}
+resource "aws_secretsmanager_secret" "api_database" { name = "${local.name_prefix}/database/video-api" }
+resource "aws_secretsmanager_secret_version" "api_database" {
+  secret_id     = aws_secretsmanager_secret.api_database.id
+  secret_string = jsonencode({ username = "video_api", password = random_password.api_db.result, host = aws_db_instance.main.address, dbname = "fiapx" })
+}
+resource "aws_secretsmanager_secret" "notification_database" { name = "${local.name_prefix}/database/notification-worker" }
+resource "aws_secretsmanager_secret_version" "notification_database" {
+  secret_id     = aws_secretsmanager_secret.notification_database.id
+  secret_string = jsonencode({ username = "notification_worker", password = random_password.notification_db.result, host = aws_db_instance.main.address, dbname = "fiapx_notifications" })
+}
+resource "aws_secretsmanager_secret" "jwt" { name = "${local.name_prefix}/jwt" }
+resource "aws_secretsmanager_secret_version" "jwt" {
+  secret_id     = aws_secretsmanager_secret.jwt.id
+  secret_string = jsonencode({ private_key_base64 = var.jwt_private_key_base64, public_key_base64 = var.jwt_public_key_base64 })
+}
+
+resource "aws_mq_broker" "rabbitmq" {
+  broker_name                = "${local.name_prefix}-mq"
+  engine_type                = "RabbitMQ"
+  engine_version             = "4.3"
+  host_instance_type         = "mq.m7g.medium"
+  deployment_mode            = "SINGLE_INSTANCE"
+  publicly_accessible        = false
+  subnet_ids                 = [aws_subnet.application[0].id]
+  security_groups            = [aws_security_group.mq.id]
+  auto_minor_version_upgrade = true
+  user {
+    username = "fiapx"
+    password = random_password.mq.result
+  }
+}
+resource "random_password" "mq" {
+  length  = 32
+  special = false
+}
+resource "aws_secretsmanager_secret" "rabbitmq" { name = "${local.name_prefix}/rabbitmq" }
+resource "aws_secretsmanager_secret_version" "rabbitmq" {
+  secret_id     = aws_secretsmanager_secret.rabbitmq.id
+  secret_string = jsonencode({ username = "fiapx", password = random_password.mq.result, host = local.mq_host, port = 5671 })
+}
+
+resource "aws_ses_domain_identity" "main" { domain = var.root_domain }
+resource "aws_route53_record" "ses_verification" {
+  zone_id = data.aws_route53_zone.root.zone_id
+  name    = "_amazonses.${var.root_domain}"
+  type    = "TXT"
+  ttl     = 600
+  records = [aws_ses_domain_identity.main.verification_token]
+}
+resource "aws_ses_domain_dkim" "main" { domain = aws_ses_domain_identity.main.domain }
+resource "aws_route53_record" "ses_dkim" {
+  count   = 3
+  zone_id = data.aws_route53_zone.root.zone_id
+  name    = "${aws_ses_domain_dkim.main.dkim_tokens[count.index]}._domainkey.${var.root_domain}"
+  type    = "CNAME"
+  ttl     = 600
+  records = ["${aws_ses_domain_dkim.main.dkim_tokens[count.index]}.dkim.amazonses.com"]
+}
+resource "aws_iam_user" "ses_smtp" { name = "${local.name_prefix}-ses-smtp" }
+resource "aws_iam_user_policy" "ses_smtp" {
+  name   = "ses-send-email"
+  user   = aws_iam_user.ses_smtp.name
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["ses:SendRawEmail"], Resource = "*" }] })
+}
+resource "aws_secretsmanager_secret" "smtp" { name = "${local.name_prefix}/ses-smtp" }
+resource "aws_secretsmanager_secret_version" "smtp" {
+  secret_id     = aws_secretsmanager_secret.smtp.id
+  secret_string = jsonencode({ username = var.ses_smtp_username, password = var.ses_smtp_password, host = "email-smtp.${var.aws_region}.amazonaws.com", port = 587 })
+}
+
+resource "aws_prometheus_workspace" "main" { alias = "${local.name_prefix}-metrics" }
+resource "aws_ecs_cluster" "main" {
+  name = local.name_prefix
+  setting {
+    name  = "containerInsights"
+    value = "enhanced"
+  }
+}
+resource "aws_iam_role" "task_execution" {
+  name               = "${local.name_prefix}-task-execution"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+resource "aws_iam_role" "task" {
+  for_each           = toset(local.service_names)
+  name               = "${local.name_prefix}-${each.key}-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+data "aws_iam_policy_document" "ecs_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
+}
+resource "aws_iam_role_policy_attachment" "execution" {
+  role       = aws_iam_role.task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+resource "aws_iam_role_policy" "secrets_execution" {
+  name   = "read-runtime-secrets"
+  role   = aws_iam_role.task_execution.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [aws_secretsmanager_secret.api_database.arn, aws_secretsmanager_secret.notification_database.arn, aws_secretsmanager_secret.rabbitmq.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.smtp.arn, aws_db_instance.main.master_user_secret[0].secret_arn] }] })
+}
+resource "aws_iam_role_policy" "app_s3" {
+  for_each = toset(["video-api", "video-processor"])
+  name     = "media-bucket-access"
+  role     = aws_iam_role.task[each.key].id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload"], Resource = "${aws_s3_bucket.media.arn}/*" },
+    { Effect = "Allow", Action = ["s3:ListBucket"], Resource = aws_s3_bucket.media.arn }
+  ] })
+}
+resource "aws_iam_role_policy" "amp_write" {
+  for_each = toset(local.service_names)
+  name     = "amp-remote-write"
+  role     = aws_iam_role.task[each.key].id
+  policy   = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["aps:RemoteWrite"], Resource = aws_prometheus_workspace.main.arn }] })
+}
+
+resource "aws_iam_role_policy" "task_ecr_pull" {
+  name = "pull-service-images"
+  role = aws_iam_role.task_execution.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
+    { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"], Resource = [for repository in aws_ecr_repository.services : repository.arn] }
+  ] })
+}
+
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+}
+resource "aws_iam_role" "github_plan" {
+  name               = "${local.name_prefix}-github-plan"
+  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = "repo:fiap-postech-team/fiapx-video-platform:*" } } }] })
+}
+resource "aws_iam_role_policy_attachment" "github_plan_readonly" {
+  role       = aws_iam_role.github_plan.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+resource "aws_iam_role_policy" "github_plan_state" {
+  name = "terraform-state-access"
+  role = aws_iam_role.github_plan.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["s3:GetObject"], Resource = "arn:aws:s3:::${var.terraform_state_bucket_name}/fiapx-video-platform/production/terraform.tfstate" },
+    { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource = "arn:aws:s3:::${var.terraform_state_bucket_name}/fiapx-video-platform/production/terraform.tfstate.tflock" },
+    { Effect = "Allow", Action = ["s3:ListBucket"], Resource = "arn:aws:s3:::${var.terraform_state_bucket_name}", Condition = { StringLike = { "s3:prefix" = ["fiapx-video-platform/production/*"] } } },
+    { Effect = "Allow", Action = ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"], Resource = "*" }
+  ] })
+}
+resource "aws_iam_role" "github_deploy" {
+  name               = "${local.name_prefix}-github-deploy"
+  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com", "token.actions.githubusercontent.com:sub" = "repo:fiap-postech-team/fiapx-video-platform:environment:production" } } }] })
+}
+resource "aws_iam_role_policy" "github_deploy" {
+  name = "deploy-platform"
+  role = aws_iam_role.github_deploy.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["ecr:GetAuthorizationToken", "sts:GetCallerIdentity"], Resource = "*" },
+    { Effect = "Allow", Action = ["acm:*", "amp:*", "application-autoscaling:*", "cloudfront:*", "cloudwatch:*", "ec2:*", "ecs:*", "ecr:*", "elasticloadbalancing:*", "kms:*", "mq:*", "rds:*", "route53:*", "s3:*", "secretsmanager:*", "ses:*", "sns:*", "logs:*", "tag:GetResources"], Resource = "*" },
+    { Effect = "Allow", Action = ["iam:AttachRolePolicy", "iam:CreateRole", "iam:CreateUser", "iam:DeleteRole", "iam:DeleteRolePolicy", "iam:DeleteUser", "iam:DeleteUserPolicy", "iam:DetachRolePolicy", "iam:GetOpenIDConnectProvider", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:GetRole", "iam:GetRolePolicy", "iam:GetUser", "iam:GetUserPolicy", "iam:ListAttachedRolePolicies", "iam:ListRolePolicies", "iam:ListUserPolicies", "iam:PutRolePolicy", "iam:PutUserPolicy", "iam:TagRole", "iam:TagUser", "iam:UntagRole", "iam:UntagUser", "iam:UpdateAssumeRolePolicy"], Resource = ["arn:aws:iam::*:role/${local.name_prefix}-*", "arn:aws:iam::*:user/${local.name_prefix}-*", "arn:aws:iam::aws:policy/ReadOnlyAccess", "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy", "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"] },
+    { Effect = "Allow", Action = ["iam:ListOpenIDConnectProviders", "iam:ListRoles", "iam:ListUsers"], Resource = "*" },
+    { Effect = "Allow", Action = ["iam:CreateServiceLinkedRole"], Resource = "*", Condition = { StringEquals = { "iam:AWSServiceName" = ["mq.amazonaws.com", "rds.amazonaws.com", "elasticloadbalancing.amazonaws.com", "ecs.amazonaws.com", "application-autoscaling.amazonaws.com"] } } },
+    { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:DescribeRepositories", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart"], Resource = [for repository in aws_ecr_repository.services : repository.arn] },
+    { Effect = "Allow", Action = ["ecs:DescribeClusters", "ecs:DescribeServices", "ecs:DescribeTaskDefinition", "ecs:ListTaskDefinitions", "ecs:RegisterTaskDefinition", "ecs:UpdateService", "ecs:DescribeTasks", "ecs:RunTask"], Resource = "*" },
+    { Effect = "Allow", Action = ["iam:PassRole"], Resource = concat([aws_iam_role.task_execution.arn], [for role in aws_iam_role.task : role.arn]) },
+    { Effect = "Allow", Action = ["s3:PutObject", "s3:ListBucket", "cloudfront:CreateInvalidation", "cloudfront:GetDistribution"], Resource = [aws_s3_bucket.frontend.arn, "${aws_s3_bucket.frontend.arn}/*", aws_cloudfront_distribution.app.arn] }
+  ] })
+}
+
+resource "aws_ecs_task_definition" "service" {
+  for_each                 = toset(local.service_names)
+  family                   = "${local.name_prefix}-${each.key}"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = each.key == "video-processor" ? "2048" : each.key == "video-api" ? "512" : "256"
+  memory                   = each.key == "video-processor" ? "4096" : each.key == "video-api" ? "1024" : "512"
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task[each.key].arn
+  ephemeral_storage { size_in_gib = each.key == "video-processor" ? 50 : 21 }
+  container_definitions = jsonencode([
+    merge({
+      name             = each.key
+      image            = local.service_images[each.key]
+      essential        = true
+      portMappings     = [{ containerPort = local.service_ports[each.key], protocol = "tcp" }]
+      logConfiguration = { logDriver = "awslogs", options = { "awslogs-group" = aws_cloudwatch_log_group.services[each.key].name, "awslogs-region" = var.aws_region, "awslogs-stream-prefix" = "ecs" } }
+      environment = concat([
+        { name = "RABBITMQ_HOST", value = local.mq_host },
+        { name = "RABBITMQ_PORT", value = "5671" },
+        { name = "SPRING_RABBITMQ_SSL_ENABLED", value = "true" },
+        { name = "RABBITMQ_USER", value = "fiapx" },
+        { name = "S3_BUCKET", value = aws_s3_bucket.media.id },
+        { name = "S3_ENDPOINT", value = "" },
+        { name = "APP_VIDEO_STORAGE_MODE", value = "s3" },
+        { name = "AWS_REGION", value = var.aws_region }
+        ], each.key == "video-api" ? [
+        { name = "SPRING_PROFILES_ACTIVE", value = "prod" },
+        { name = "DATABASE_URL", value = "jdbc:postgresql://${aws_db_instance.main.address}:5432/fiapx?sslmode=require" },
+        { name = "DATABASE_USER", value = "video_api" },
+        { name = "RABBITMQ_USER", value = "fiapx" },
+        { name = "APP_AUTH_ISSUER", value = "https://app.${var.root_domain}" },
+        { name = "APP_AUTH_AUDIENCE", value = "fiapx-video-platform" },
+        { name = "APP_AUTH_KEY_ID", value = "fiapx-production-1" },
+        { name = "APP_WEB_ALLOWED_ORIGINS", value = "https://app.${var.root_domain}" }
+        ] : each.key == "notification-worker" ? [
+        { name = "NOTIFICATION_DATABASE_URL", value = "jdbc:postgresql://${aws_db_instance.main.address}:5432/fiapx_notifications?sslmode=require" },
+        { name = "DATABASE_USER", value = "notification_worker" },
+        { name = "SMTP_HOST", value = "email-smtp.${var.aws_region}.amazonaws.com" },
+        { name = "SMTP_PORT", value = "587" },
+        { name = "SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH", value = "true" },
+        { name = "SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE", value = "true" },
+        { name = "NOTIFICATION_DEFAULT_RECIPIENT", value = var.default_notification_recipient },
+        { name = "NOTIFICATION_FROM_ADDRESS", value = "noreply@${var.root_domain}" }
+        ] : [
+        { name = "S3_BUCKET", value = aws_s3_bucket.media.id },
+        { name = "RABBITMQ_EXCHANGE", value = "video.events" },
+        { name = "RABBITMQ_QUEUE", value = "video.processing.v1" }
+      ])
+      secrets = concat(
+        each.key == "video-api" ? [
+          { name = "DATABASE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.api_database.arn}:password::" },
+          { name = "APP_AUTH_PRIVATE_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:private_key_base64::" },
+          { name = "APP_AUTH_PUBLIC_KEY_BASE64", valueFrom = "${aws_secretsmanager_secret.jwt.arn}:public_key_base64::" }
+        ] : [],
+        each.key == "notification-worker" ? [
+          { name = "DATABASE_PASSWORD", valueFrom = "${aws_secretsmanager_secret.notification_database.arn}:password::" },
+          { name = "SMTP_USER", valueFrom = "${aws_secretsmanager_secret.smtp.arn}:username::" },
+          { name = "SMTP_PASSWORD", valueFrom = "${aws_secretsmanager_secret.smtp.arn}:password::" }
+        ] : [],
+        [{ name = "RABBITMQ_PASSWORD", valueFrom = "${aws_secretsmanager_secret.rabbitmq.arn}:password::" }]
+      )
+    }, each.key == "video-processor" ? { healthCheck = { command = ["CMD-SHELL", "wget -q -O - http://localhost:8081/actuator/health | grep -q UP"], interval = 30, timeout = 5, retries = 3, startPeriod = 60 } } : {}),
+    {
+      name      = "adot-collector"
+      image     = var.collector_image
+      essential = false
+      command   = ["--config=/etc/ecs/ecs-amp.yaml"]
+      environment = [
+        { name = "AWS_REGION", value = var.aws_region },
+        { name = "AMP_ENDPOINT", value = "${aws_prometheus_workspace.main.prometheus_endpoint}api/v1/remote_write" }
+      ]
+      logConfiguration = { logDriver = "awslogs", options = { "awslogs-group" = aws_cloudwatch_log_group.adot.name, "awslogs-region" = var.aws_region, "awslogs-stream-prefix" = each.key } }
+    }
+  ])
+}
+
+resource "aws_ecs_task_definition" "database_bootstrap" {
+  family                   = "${local.name_prefix}-database-bootstrap"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task_execution.arn
+  container_definitions = jsonencode([{
+    name  = "database-bootstrap"
+    image = "postgres:17-alpine"
+    command = ["sh", "-c", <<-EOT
+      set -eu
+      until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; do sleep 3; done
+      psql -v ON_ERROR_STOP=1 -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='video_api'" | grep -q 1 || psql -v ON_ERROR_STOP=1 -d postgres -c 'CREATE ROLE video_api LOGIN'
+      psql -v ON_ERROR_STOP=1 -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='notification_worker'" | grep -q 1 || psql -v ON_ERROR_STOP=1 -d postgres -c 'CREATE ROLE notification_worker LOGIN'
+      psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER ROLE video_api WITH PASSWORD '$API_DB_PASSWORD'"
+      psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER ROLE notification_worker WITH PASSWORD '$NOTIFICATION_DB_PASSWORD'"
+      psql -v ON_ERROR_STOP=1 -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='fiapx_notifications'" | grep -q 1 || createdb -O notification_worker fiapx_notifications
+      psql -v ON_ERROR_STOP=1 -d postgres -c "ALTER DATABASE fiapx OWNER TO video_api"
+      psql -v ON_ERROR_STOP=1 -d postgres -c "GRANT CONNECT ON DATABASE fiapx_notifications TO notification_worker"
+    EOT
+    ]
+    environment = [
+      { name = "PGHOST", value = aws_db_instance.main.address },
+      { name = "PGPORT", value = "5432" },
+      { name = "PGUSER", value = "dbadmin" }
+    ]
+    secrets = [
+      { name = "PGPASSWORD", valueFrom = "${aws_db_instance.main.master_user_secret[0].secret_arn}:password::" },
+      { name = "API_DB_PASSWORD", valueFrom = "${aws_secretsmanager_secret.api_database.arn}:password::" },
+      { name = "NOTIFICATION_DB_PASSWORD", valueFrom = "${aws_secretsmanager_secret.notification_database.arn}:password::" }
+    ]
+    essential = true
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.adot.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "database-bootstrap"
+      }
+    }
+  }])
+}
+
+resource "aws_ecs_service" "service" {
+  for_each                           = toset(local.service_names)
+  name                               = each.key
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.service[each.key].arn
+  desired_count                      = each.key == "video-api" ? var.api_desired_count : each.key == "video-processor" ? var.processor_desired_count : var.notification_desired_count
+  launch_type                        = "FARGATE"
+  platform_version                   = "LATEST"
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+  network_configuration {
+    subnets          = aws_subnet.application[*].id
+    security_groups  = concat([aws_security_group.ecs.id], each.key == "video-api" ? [aws_security_group.api.id] : [])
+    assign_public_ip = false
+  }
+  dynamic "load_balancer" {
+    for_each = each.key == "video-api" ? [1] : []
+    content {
+      target_group_arn = aws_lb_target_group.api.arn
+      container_name   = "video-api"
+      container_port   = 8080
+    }
+  }
+  depends_on = [aws_lb_listener_rule.cloudfront_only, aws_iam_role_policy_attachment.execution, aws_iam_role_policy.secrets_execution]
+}
+
+resource "aws_appautoscaling_target" "processor" {
+  max_capacity       = 3
+  min_capacity       = var.processor_desired_count
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.service["video-processor"].name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+resource "aws_appautoscaling_policy" "processor_cpu" {
+  name               = "${local.name_prefix}-processor-cpu"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.processor.resource_id
+  scalable_dimension = aws_appautoscaling_target.processor.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.processor.service_namespace
+  target_tracking_scaling_policy_configuration {
+    target_value       = 70
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 60
+    predefined_metric_specification { predefined_metric_type = "ECSServiceAverageCPUUtilization" }
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_5xx" {
+  alarm_name          = "${local.name_prefix}-alb-5xx"
+  namespace           = "AWS/ApplicationELB"
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  statistic           = "Sum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 10
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  dimensions          = { LoadBalancer = aws_lb.api.arn_suffix }
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+resource "aws_cloudwatch_metric_alarm" "api_cpu" {
+  alarm_name          = "${local.name_prefix}-api-cpu"
+  namespace           = "AWS/ECS"
+  metric_name         = "CPUUtilization"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = 80
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  dimensions          = { ClusterName = aws_ecs_cluster.main.name, ServiceName = aws_ecs_service.service["video-api"].name }
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
+  alarm_name          = "${local.name_prefix}-rds-cpu"
+  namespace           = "AWS/RDS"
+  metric_name         = "CPUUtilization"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 3
+  threshold           = 80
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  dimensions          = { DBInstanceIdentifier = aws_db_instance.main.id }
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+resource "aws_cloudwatch_metric_alarm" "mq_cpu" {
+  alarm_name          = "${local.name_prefix}-mq-cpu"
+  namespace           = "AWS/AmazonMQ"
+  metric_name         = "SystemCpuUtilization"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 3
+  threshold           = 80
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  dimensions          = { Broker = aws_mq_broker.rabbitmq.broker_name }
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+}
+resource "aws_cloudwatch_metric_alarm" "mq_backlog" {
+  alarm_name          = "${local.name_prefix}-mq-message-backlog"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 3
+  threshold           = 1000
+  alarm_description   = "Aggregate RabbitMQ message count is elevated; inspect application queues and DLQs in AMP/RabbitMQ."
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+  metric_query {
+    id          = "m1"
+    expression  = "SUM(SEARCH('{AWS/AmazonMQ,Broker,Node} MetricName=\"MessageCount\" Broker=\"${aws_mq_broker.rabbitmq.broker_name}\"', 'Maximum', 60))"
+    label       = "Aggregate RabbitMQ messages"
+    return_data = true
+  }
+}
+resource "aws_sns_topic" "alerts" { name = "${local.name_prefix}-alerts" }
+resource "aws_sns_topic_subscription" "email" {
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "email"
+  endpoint  = var.alert_email
+}

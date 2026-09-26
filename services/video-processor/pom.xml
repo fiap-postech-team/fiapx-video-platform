@@ -11,6 +11,7 @@
     <properties>
         <!-- This module has a Spring Boot main class, so it overrides the root skip. -->
         <spring-boot.repackage.skip>false</spring-boot.repackage.skip>
+        <aws.sdk.version>2.32.26</aws.sdk.version>
     </properties>
     <dependencies>
         <dependency>
@@ -30,6 +31,12 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- Kept for the legacy processor entry point while the active application uses AWS SDK v2. -->
         <dependency>
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
