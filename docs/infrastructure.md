@@ -1,7 +1,7 @@
 # Infraestrutura AWS
 
 Esta documentação descreve a infraestrutura Terraform em `infra/aws/terraform` e o fluxo de implantação do FIAP X.
-O deployment de produção é autorizado somente pela branch `master`.
+O deployment de produção é autorizado somente pela branch `main`.
 
 ## Arquitetura
 
@@ -56,7 +56,7 @@ restrito ao GitHub Environment `production` deste repositório. O OIDC provider 
 também precisa existir na conta AWS, pois o Terraform o consulta e não tenta recriá-lo. Depois do primeiro
 provisionamento, use os roles Terraform `github_deploy` e `github_plan`.
 
-Não execute `terraform apply` localmente. Crie o GitHub Environment `production`, restrinja seus deployments à `master`,
+Não execute `terraform apply` localmente. Crie o GitHub Environment `production`, restrinja seus deployments à `main`,
 exija aprovação e cadastre nele `AWS_BOOTSTRAP_ROLE_ARN`, `TERRAFORM_STATE_BUCKET`, `ROOT_DOMAIN`, `ALERT_EMAIL` e
 `DEFAULT_NOTIFICATION_RECIPIENT`. O nome do bucket precisa ser globalmente único. Não versione `.tfstate`, arquivos
 `.tfplan` nem `terraform.tfvars` com segredos.
@@ -93,30 +93,30 @@ SES também exige verificação do domínio e, para envio fora da sandbox, aprov
 
 1. Gere um par RSA compatível com a aplicação e codifique a chave privada e pública em Base64. Cadastre os valores em
    `JWT_PRIVATE_KEY_BASE64` e `JWT_PUBLIC_KEY_BASE64` nos GitHub Secrets do environment `production`.
-2. Inicie manualmente `provision-production` na branch `master`. Esse workflow cria o backend, aplica a infraestrutura
+2. Inicie manualmente `provision-production` na branch `main`. Esse workflow cria o backend, aplica a infraestrutura
    inicial com todas as contagens ECS em zero e executa o bootstrap idempotente que cria os roles e databases.
 3. Copie os outputs `AWS plan role` e `Initial AWS deploy role` para `AWS_PLAN_ROLE_ARN` e `AWS_DEPLOY_ROLE_ARN` no
    environment. Gere as credenciais SMTP para o IAM user criado, salve `SES_SMTP_USERNAME` e `SES_SMTP_PASSWORD` nos
    GitHub Secrets e envie o formulário de verificação SES. O endpoint SMTP é o regional padrão na porta 587.
-4. Faça um merge ou dispatch de `deploy-production` na branch `master`; o workflow publica imagens imutáveis por digest,
+4. Faça um merge ou dispatch de `deploy-production` na branch `main`; o workflow publica imagens imutáveis por digest,
    escala os serviços para uma task cada, aplica Terraform e publica a SPA.
 
 O primeiro workflow cria o role de deploy gerenciado por Terraform, mas continua usando a identidade bootstrap daquele
-run. Depois de validar os outputs, use o role de deploy restrito à branch `master` nos deploys seguintes. A role bootstrap
-pode ser desativada após confirmar a primeira publicação; nenhuma execução fora de `master` executa `apply`.
+run. Depois de validar os outputs, use o role de deploy restrito à branch `main` nos deploys seguintes. A role bootstrap
+pode ser desativada após confirmar a primeira publicação; nenhuma execução fora de `main` executa `apply`.
 
-## CI/CD e controle pela master
+## CI/CD e controle pela main
 
 `.github/workflows/terraform-check.yml` roda formatação, validação, TFLint, Checkov e `terraform plan` em branches e em
-Pull Requests direcionados à `master`. Esse role é somente leitura, exceto pelo acesso ao state e pelo lockfile.
+Pull Requests direcionados à `main`. Esse role é somente leitura, exceto pelo acesso ao state e pelo lockfile.
 Para não expor state Terraform a código não confiável, o plan com role AWS roda apenas em PRs originados neste mesmo
 repositório; PRs de forks ainda executam validação, lint e scanner sem credenciais AWS.
 
-`.github/workflows/provision-production.yml` só executa por dispatch na `master`, sob Environment protegido; cria o state,
-aplica a base inicial e executa o bootstrap PostgreSQL. `.github/workflows/deploy-production.yml` só inicia para `master`
-(ou `workflow_dispatch` na `master`) e usa o GitHub
+`.github/workflows/provision-production.yml` só executa por dispatch na `main`, sob Environment protegido; cria o state,
+aplica a base inicial e executa o bootstrap PostgreSQL. `.github/workflows/deploy-production.yml` só inicia para `main`
+(ou `workflow_dispatch` na `main`) e usa o GitHub
 Environment `production`. A trust policy OIDC de deploy exige `repo:fiap-postech-team/fiapx-video-platform:environment:production`;
-por isso o environment precisa restringir branch permitida para `master`. Nenhum outro branch recebe credenciais de
+por isso o environment precisa restringir branch permitida para `main`. Nenhum outro branch recebe credenciais de
 deploy ou executa apply.
 
 O workflow executa verificação Java e frontend, publica as imagens ECR com tag de commit imutável, resolve os digests,
@@ -166,7 +166,7 @@ por fila que pareçam configurados, mas nunca recebam datapoints nessa versão d
   exige snapshot final.
 - Buckets de mídia e frontend bloqueiam acesso público. Upload multipart incompleto expira após sete dias.
 - Imagens ECR dos serviços e do collector usam tags imutáveis e retenção de 30 imagens por repositório.
-- Rollback de aplicação: reutilizar os digests da execução de release anterior no plano e fazer novo deploy pela `master`.
+- Rollback de aplicação: reutilizar os digests da execução de release anterior no plano e fazer novo deploy pela `main`.
 - Rollback de banco é forward-only via Flyway; restaure snapshot/PITR apenas em recuperação de dados planejada.
 - MQ e RDS começam Single-AZ no MVP. Backlog crescente, perda de AZ ou requisitos de disponibilidade exigem migrar
   para Amazon MQ cluster multi-AZ e RDS Multi-AZ.

@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   provision:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main'
     environment: production
     runs-on: ubuntu-latest
     steps:

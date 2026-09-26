@@ -7,7 +7,7 @@ on:
       - "infra/aws/**"
       - ".github/workflows/terraform-check.yml"
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - "infra/aws/**"
       - ".github/workflows/terraform-check.yml"
@@ -47,7 +47,7 @@ jobs:
           soft_fail: false
 
   plan:
-    if: ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/master')) && vars.AWS_PLAN_ROLE_ARN != '' && vars.TERRAFORM_STATE_BUCKET != '' && vars.ROOT_DOMAIN != '' && vars.ALERT_EMAIL != '' && vars.DEFAULT_NOTIFICATION_RECIPIENT != ''
+    if: ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name != 'pull_request' && github.ref != 'refs/heads/main')) && vars.AWS_PLAN_ROLE_ARN != '' && vars.TERRAFORM_STATE_BUCKET != '' && vars.ROOT_DOMAIN != '' && vars.ALERT_EMAIL != '' && vars.DEFAULT_NOTIFICATION_RECIPIENT != ''
     needs: validate
     runs-on: ubuntu-latest
     steps:
