@@ -12,7 +12,6 @@ provider "aws" {
 
 provider "random" {}
 
-data "aws_caller_identity" "current" {}
 data "aws_availability_zones" "available" { state = "available" }
 data "aws_route53_zone" "root" { name = "${var.root_domain}." }
 
@@ -26,10 +25,8 @@ locals {
     video-processor     = var.processor_image
     notification-worker = var.notification_image
   }
-  name_prefix            = "${var.project_name}-prod"
-  mq_host                = trimprefix(split(":", trimprefix(aws_mq_broker.rabbitmq.instances[0].endpoints[0], "amqps://"))[0], "//")
-  db_api_secret          = jsonencode({ username = "video_api", password = random_password.api_db.result })
-  db_notification_secret = jsonencode({ username = "notification_worker", password = random_password.notification_db.result })
+  name_prefix = "${var.project_name}-prod"
+  mq_host     = trimprefix(split(":", trimprefix(aws_mq_broker.rabbitmq.instances[0].endpoints[0], "amqps://"))[0], "//")
 }
 
 resource "aws_vpc" "main" {

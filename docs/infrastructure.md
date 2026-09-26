@@ -78,7 +78,6 @@ Obrigatórias no primeiro apply:
 - `alert_email`: destino da confirmação e dos alarmes SNS;
 - `default_notification_recipient`;
 - `api_image`, `processor_image`, `notification_image`: imagens válidas para as definições ECS;
-- `frontend_commit`;
 - `jwt_private_key_base64` e `jwt_public_key_base64`;
 - `ses_smtp_username` e `ses_smtp_password`.
 

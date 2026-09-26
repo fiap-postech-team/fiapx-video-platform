@@ -56,11 +56,6 @@ variable "collector_image" {
   type        = string
   description = "Immutable ADOT collector image reference including digest."
 }
-variable "frontend_commit" {
-  type        = string
-  description = "Git commit used to build the SPA."
-}
-
 variable "nat_gateway_enabled" {
   type    = bool
   default = true

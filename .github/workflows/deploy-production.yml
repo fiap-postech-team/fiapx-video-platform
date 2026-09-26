@@ -87,7 +87,6 @@ jobs:
           TF_VAR_processor_image: ${{ steps.images.outputs.video_processor_image }}
           TF_VAR_notification_image: ${{ steps.images.outputs.notification_worker_image }}
           TF_VAR_collector_image: ${{ steps.images.outputs.collector_image }}
-          TF_VAR_frontend_commit: ${{ github.sha }}
           TF_VAR_api_desired_count: 1
           TF_VAR_processor_desired_count: 1
           TF_VAR_notification_desired_count: 1

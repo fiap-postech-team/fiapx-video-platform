@@ -77,7 +77,6 @@ jobs:
           TF_VAR_processor_image: public.ecr.aws/docker/library/busybox:latest
           TF_VAR_notification_image: public.ecr.aws/docker/library/busybox:latest
           TF_VAR_collector_image: public.ecr.aws/aws-observability/aws-otel-collector:latest
-          TF_VAR_frontend_commit: ${{ github.sha }}
         run: terraform plan -out=tfplan
       - uses: actions/upload-artifact@v4
         with:

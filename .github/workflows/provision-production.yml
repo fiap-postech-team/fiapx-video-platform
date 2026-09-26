@@ -61,7 +61,6 @@ jobs:
           TF_VAR_processor_image: public.ecr.aws/docker/library/busybox:latest
           TF_VAR_notification_image: public.ecr.aws/docker/library/busybox:latest
           TF_VAR_collector_image: public.ecr.aws/aws-observability/aws-otel-collector:latest
-          TF_VAR_frontend_commit: ${{ github.sha }}
           TF_VAR_api_desired_count: 0
           TF_VAR_processor_desired_count: 0
           TF_VAR_notification_desired_count: 0

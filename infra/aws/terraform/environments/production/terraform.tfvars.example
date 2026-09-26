@@ -5,4 +5,3 @@ api_image                       = "123456789012.dkr.ecr.us-east-1.amazonaws.com/
 processor_image                 = "123456789012.dkr.ecr.us-east-1.amazonaws.com/fiapx-video-platform/video-processor@sha256:replace"
 notification_image              = "123456789012.dkr.ecr.us-east-1.amazonaws.com/fiapx-video-platform/notification-worker@sha256:replace"
 collector_image                 = "123456789012.dkr.ecr.us-east-1.amazonaws.com/fiapx-video-platform/adot-collector@sha256:replace"
-frontend_commit                 = "replace-with-git-commit"
