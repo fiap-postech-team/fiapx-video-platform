@@ -27,6 +27,8 @@ locals {
   }
   name_prefix = "${var.project_name}-prod"
   mq_host     = trimprefix(split(":", trimprefix(aws_mq_broker.rabbitmq.instances[0].endpoints[0], "amqps://"))[0], "//")
+  # GitHub's immutable OIDC subject uses the owner and repository IDs for this repository.
+  github_oidc_repository = "repo:fiap-postech-team@255778553/fiapx-video-platform@1351790055"
 }
 
 resource "aws_vpc" "main" {
@@ -788,7 +790,7 @@ data "aws_iam_openid_connect_provider" "github" {
 }
 resource "aws_iam_role" "github_plan" {
   name               = "${local.name_prefix}-github-plan"
-  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = "repo:fiap-postech-team/fiapx-video-platform:*" } } }] })
+  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = "${local.github_oidc_repository}:*" } } }] })
 }
 resource "aws_iam_role_policy_attachment" "github_plan_readonly" {
   role       = aws_iam_role.github_plan.name
@@ -806,7 +808,7 @@ resource "aws_iam_role_policy" "github_plan_state" {
 }
 resource "aws_iam_role" "github_deploy" {
   name               = "${local.name_prefix}-github-deploy"
-  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com", "token.actions.githubusercontent.com:sub" = "repo:fiap-postech-team/fiapx-video-platform:environment:production" } } }] })
+  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com", "token.actions.githubusercontent.com:sub" = "${local.github_oidc_repository}:environment:production", "token.actions.githubusercontent.com:ref" = "refs/heads/main" } } }] })
 }
 resource "aws_iam_role_policy" "github_deploy" {
   name = "deploy-platform"

@@ -50,16 +50,26 @@ S3 usa endpoint Gateway para evitar NAT no caminho de upload/download dos objeto
 ### Bootstrap do state
 
 O backend Terraform usa bucket S3 criptografado por KMS, versionamento e lockfile S3 nativo. O backend é criado uma vez
-e migrado de state local para o próprio S3 pelo workflow protegido `provision-production.yml`. Antes da primeira
+e migrado de state local para o próprio S3 pelo workflow manual `provision-production.yml`. Antes da primeira
 execução, um administrador AWS precisa disponibilizar um role OIDC de bootstrap com permissões para criar este stack,
-restrito ao GitHub Environment `production` deste repositório. O OIDC provider `token.actions.githubusercontent.com`
-também precisa existir na conta AWS, pois o Terraform o consulta e não tenta recriá-lo. Depois do primeiro
-provisionamento, use os roles Terraform `github_deploy` e `github_plan`.
+restrito ao repositório e à branch `main`. Este repositório foi criado após a adoção do subject OIDC imutável do GitHub:
+use `token.actions.githubusercontent.com:sub` igual a
+`repo:fiap-postech-team@255778553/fiapx-video-platform@1351790055:environment:production`,
+`token.actions.githubusercontent.com:ref` igual a `refs/heads/main` e audience `sts.amazonaws.com` na trust policy.
+O OIDC provider `token.actions.githubusercontent.com` também precisa existir na conta AWS, pois o Terraform o consulta
+e não tenta recriá-lo. Depois do primeiro provisionamento, use os roles Terraform `github_deploy` e `github_plan`.
 
-Não execute `terraform apply` localmente. Crie o GitHub Environment `production`, restrinja seus deployments à `main`,
-exija aprovação e cadastre nele `AWS_BOOTSTRAP_ROLE_ARN`, `TERRAFORM_STATE_BUCKET`, `ROOT_DOMAIN`, `ALERT_EMAIL` e
-`DEFAULT_NOTIFICATION_RECIPIENT`. O nome do bucket precisa ser globalmente único. Não versione `.tfstate`, arquivos
-`.tfplan` nem `terraform.tfvars` com segredos.
+Não execute `terraform apply` localmente. Cadastre `AWS_BOOTSTRAP_ROLE_ARN`, `TERRAFORM_STATE_BUCKET`, `ROOT_DOMAIN`,
+`ALERT_EMAIL` e `DEFAULT_NOTIFICATION_RECIPIENT` nas GitHub Variables do repositório. O nome do bucket precisa ser
+globalmente único. Não versione `.tfstate`, arquivos `.tfplan` nem `terraform.tfvars` com segredos.
+
+O repositório privado pertence a uma organização GitHub Free. Nesse plano, a proteção por revisores do GitHub
+Environment não está disponível. Por isso os workflows que alteram a AWS exigem disparo manual na `main` e o role
+AWS de deploy verifica também o claim OIDC `ref=refs/heads/main`. O job ainda declara o Environment `production`
+para compor o claim `sub`, mas isso não equivale à aprovação independente. Caso essa aprovação seja obrigatória,
+é preciso habilitar um plano GitHub que ofereça required reviewers para repositórios privados antes do primeiro apply.
+Consulte as [limitações dos Environments por plano](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
+e o [formato dos claims OIDC](https://docs.github.com/en/actions/reference/security/oidc).
 
 ### Ambiente production
 
@@ -92,14 +102,14 @@ SES também exige verificação do domínio e, para envio fora da sandbox, aprov
 ## Primeiro provisionamento
 
 1. Gere um par RSA compatível com a aplicação e codifique a chave privada e pública em Base64. Cadastre os valores em
-   `JWT_PRIVATE_KEY_BASE64` e `JWT_PUBLIC_KEY_BASE64` nos GitHub Secrets do environment `production`.
+   `JWT_PRIVATE_KEY_BASE64` e `JWT_PUBLIC_KEY_BASE64` nos GitHub Secrets do repositório.
 2. Inicie manualmente `provision-production` na branch `main`. Esse workflow cria o backend, aplica a infraestrutura
    inicial com todas as contagens ECS em zero e executa o bootstrap idempotente que cria os roles e databases.
 3. Copie os outputs `AWS plan role` e `Initial AWS deploy role` para `AWS_PLAN_ROLE_ARN` e `AWS_DEPLOY_ROLE_ARN` no
-   environment. Gere as credenciais SMTP para o IAM user criado, salve `SES_SMTP_USERNAME` e `SES_SMTP_PASSWORD` nos
+   repositório. Gere as credenciais SMTP para o IAM user criado, salve `SES_SMTP_USERNAME` e `SES_SMTP_PASSWORD` nos
    GitHub Secrets e envie o formulário de verificação SES. O endpoint SMTP é o regional padrão na porta 587.
-4. Faça um merge ou dispatch de `deploy-production` na branch `main`; o workflow publica imagens imutáveis por digest,
-   escala os serviços para uma task cada, aplica Terraform e publica a SPA.
+4. Após o merge em `main`, inicie manualmente `deploy-production` nessa branch; o workflow publica imagens imutáveis
+   por digest, escala os serviços para uma task cada, aplica Terraform e publica a SPA.
 
 O primeiro workflow cria o role de deploy gerenciado por Terraform, mas continua usando a identidade bootstrap daquele
 run. Depois de validar os outputs, use o role de deploy restrito à branch `main` nos deploys seguintes. A role bootstrap
@@ -112,12 +122,12 @@ Pull Requests direcionados à `main`. Esse role é somente leitura, exceto pelo 
 Para não expor state Terraform a código não confiável, o plan com role AWS roda apenas em PRs originados neste mesmo
 repositório; PRs de forks ainda executam validação, lint e scanner sem credenciais AWS.
 
-`.github/workflows/provision-production.yml` só executa por dispatch na `main`, sob Environment protegido; cria o state,
-aplica a base inicial e executa o bootstrap PostgreSQL. `.github/workflows/deploy-production.yml` só inicia para `main`
-(ou `workflow_dispatch` na `main`) e usa o GitHub
-Environment `production`. A trust policy OIDC de deploy exige `repo:fiap-postech-team/fiapx-video-platform:environment:production`;
-por isso o environment precisa restringir branch permitida para `main`. Nenhum outro branch recebe credenciais de
-deploy ou executa apply.
+`.github/workflows/provision-production.yml` só executa por dispatch na `main`; cria o state, aplica a base inicial e
+executa o bootstrap PostgreSQL. `.github/workflows/deploy-production.yml` também só inicia por dispatch na `main`.
+Ambos os jobs declaram o GitHub Environment `production`, mas a restrição efetiva de branch vem do `if` do workflow
+e da trust policy AWS. O role de deploy exige o subject imutável do repositório com `environment:production` e o
+claim `ref=refs/heads/main`; o role de bootstrap deve usar a mesma restrição. Nenhum outro branch assume essas roles
+ou executa apply. O role de plan aceita branches e PRs deste repositório e tem permissões limitadas a leitura e state.
 
 O workflow executa verificação Java e frontend, publica as imagens ECR com tag de commit imutável, resolve os digests,
 gera e aplica o plano Terraform, publica o frontend no bucket e invalida `/index.html` na CloudFront.
@@ -142,8 +152,8 @@ As exceções intencionais priorizam o custo do ambiente inicial: sem cópia S3 
 
 As exceções devem ser reavaliadas antes de produção com requisitos regulatórios, RTO/RPO ou tráfego relevante. Habilitar WAF, replicação, retenção de logs maior ou redundância Multi-AZ exige revisar o impacto recorrente no custo.
 
-O role de deploy é amplo o bastante para criar/atualizar os recursos desse stack e deve ficar restrito ao environment
-protegido. Revise a policy IAM antes de adicionar novas categorias de recursos.
+O role de deploy é amplo o bastante para criar/atualizar os recursos desse stack e deve manter a trust policy restrita
+à `main`. Revise a policy IAM antes de adicionar novas categorias de recursos.
 
 ## Observabilidade
 
