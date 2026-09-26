@@ -808,7 +808,7 @@ resource "aws_iam_role_policy" "github_plan_state" {
 }
 resource "aws_iam_role" "github_deploy" {
   name               = "${local.name_prefix}-github-deploy"
-  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com", "token.actions.githubusercontent.com:sub" = "${local.github_oidc_repository}:environment:production", "token.actions.githubusercontent.com:ref" = "refs/heads/main" } } }] })
+  assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = "sts:AssumeRoleWithWebIdentity", Principal = { Federated = data.aws_iam_openid_connect_provider.github.arn }, Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com", "token.actions.githubusercontent.com:sub" = "${local.github_oidc_repository}:ref:refs/heads/main" } } }] })
 }
 resource "aws_iam_role_policy" "github_deploy" {
   name = "deploy-platform"

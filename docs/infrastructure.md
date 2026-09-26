@@ -54,8 +54,8 @@ e migrado de state local para o próprio S3 pelo workflow manual `provision-prod
 execução, um administrador AWS precisa disponibilizar um role OIDC de bootstrap com permissões para criar este stack,
 restrito ao repositório e à branch `main`. Este repositório foi criado após a adoção do subject OIDC imutável do GitHub:
 use `token.actions.githubusercontent.com:sub` igual a
-`repo:fiap-postech-team@255778553/fiapx-video-platform@1351790055:environment:production`,
-`token.actions.githubusercontent.com:ref` igual a `refs/heads/main` e audience `sts.amazonaws.com` na trust policy.
+`repo:fiap-postech-team@255778553/fiapx-video-platform@1351790055:ref:refs/heads/main`
+e audience `sts.amazonaws.com` na trust policy.
 O OIDC provider `token.actions.githubusercontent.com` também precisa existir na conta AWS, pois o Terraform o consulta
 e não tenta recriá-lo. Depois do primeiro provisionamento, use os roles Terraform `github_deploy` e `github_plan`.
 
@@ -64,10 +64,10 @@ Não execute `terraform apply` localmente. Cadastre `AWS_BOOTSTRAP_ROLE_ARN`, `T
 globalmente único. Não versione `.tfstate`, arquivos `.tfplan` nem `terraform.tfvars` com segredos.
 
 O repositório privado pertence a uma organização GitHub Free. Nesse plano, a proteção por revisores do GitHub
-Environment não está disponível. Por isso os workflows que alteram a AWS exigem disparo manual na `main` e o role
-AWS de deploy verifica também o claim OIDC `ref=refs/heads/main`. O job ainda declara o Environment `production`
-para compor o claim `sub`, mas isso não equivale à aprovação independente. Caso essa aprovação seja obrigatória,
-é preciso habilitar um plano GitHub que ofereça required reviewers para repositórios privados antes do primeiro apply.
+Environment não está disponível. Por isso os workflows que alteram a AWS exigem disparo manual na `main` e as roles
+AWS de bootstrap e deploy verificam o subject OIDC da branch. Isso exige uma ação manual para iniciar o deploy, mas
+não equivale à aprovação por outra pessoa. Caso essa aprovação seja obrigatória, é preciso habilitar um plano GitHub
+que ofereça required reviewers para repositórios privados antes do primeiro apply.
 Consulte as [limitações dos Environments por plano](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
 e o [formato dos claims OIDC](https://docs.github.com/en/actions/reference/security/oidc).
 
@@ -124,9 +124,8 @@ repositório; PRs de forks ainda executam validação, lint e scanner sem creden
 
 `.github/workflows/provision-production.yml` só executa por dispatch na `main`; cria o state, aplica a base inicial e
 executa o bootstrap PostgreSQL. `.github/workflows/deploy-production.yml` também só inicia por dispatch na `main`.
-Ambos os jobs declaram o GitHub Environment `production`, mas a restrição efetiva de branch vem do `if` do workflow
-e da trust policy AWS. O role de deploy exige o subject imutável do repositório com `environment:production` e o
-claim `ref=refs/heads/main`; o role de bootstrap deve usar a mesma restrição. Nenhum outro branch assume essas roles
+Ambos os jobs verificam `github.ref` e a trust policy AWS exige o subject imutável do repositório com
+`ref:refs/heads/main`; o role de bootstrap deve usar a mesma restrição. Nenhum outro branch assume essas roles
 ou executa apply. O role de plan aceita branches e PRs deste repositório e tem permissões limitadas a leitura e state.
 
 O workflow executa verificação Java e frontend, publica as imagens ECR com tag de commit imutável, resolve os digests,
