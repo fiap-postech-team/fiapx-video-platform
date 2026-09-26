@@ -40,8 +40,12 @@ public class OutboxEventEntity {
     protected OutboxEventEntity() { }
     OutboxEventEntity(UUID id, UUID jobId, String payload, Map<String, Object> payloadJson,
                       Instant occurredAt) {
+        this(id, jobId, payload, payloadJson, occurredAt, jobId);
+    }
+    OutboxEventEntity(UUID id, UUID jobId, String payload, Map<String, Object> payloadJson,
+                      Instant occurredAt, UUID correlationId) {
         this.id = id; aggregateId = jobId; aggregateType = "JOB"; routingKey = "video.job.requested.v1";
-        eventType = routingKey; schemaVersion = 1; correlationId = jobId; this.payload = payload;
+        eventType = routingKey; schemaVersion = 1; this.correlationId = correlationId; this.payload = payload;
         this.payloadJson = payloadJson; createdAt = occurredAt; nextAttemptAt = occurredAt;
         status = OutboxStatus.PENDING;
     }

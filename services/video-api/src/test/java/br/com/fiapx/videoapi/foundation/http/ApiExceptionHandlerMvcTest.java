@@ -90,8 +90,7 @@ class ApiExceptionHandlerMvcTest {
             .andExpect(jsonPath("$.detail").value("Não foi possível concluir a solicitação."))
             .andExpect(content().string(not(containsString("internal database failure"))));
 
-        assertThat(output).contains("method=GET path=/fixture/failure")
-            .doesNotContain("internal database failure");
+        assertThat(output).doesNotContain("internal database failure");
     }
 
     @Test

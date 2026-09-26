@@ -96,6 +96,7 @@ class OutboxRecoveryIT {
         var response = postJob(token, sourceKey);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         var jobId = UUID.fromString(response.getBody().get("id").toString());
+        var correlationId = UUID.fromString(response.getHeaders().getFirst("X-Correlation-Id"));
         var eventId = jdbc.queryForObject("select id from outbox_events where aggregate_id = ?", UUID.class, jobId);
         assertThat(jdbc.queryForObject("select status from outbox_events where id = ?", String.class, eventId))
             .isEqualTo("PENDING");
@@ -109,6 +110,7 @@ class OutboxRecoveryIT {
         assertThat(published).isNotNull();
         assertThat(published.getMessageProperties().getReceivedDeliveryMode())
             .isEqualTo(MessageDeliveryMode.PERSISTENT);
+        assertThat(published.getMessageProperties().getCorrelationId()).isEqualTo(correlationId.toString());
         var body = new String(published.getBody());
         assertThat(body).contains(eventId.toString(), jobId.toString(), sourceKey,
             "video.job.requested.v1", "schemaVersion", "correlationId", "occurredAt");
@@ -120,7 +122,7 @@ class OutboxRecoveryIT {
         assertThat(envelope.path("type").asText()).isEqualTo("video.job.requested.v1");
         assertThat(envelope.path("schemaVersion").asInt()).isEqualTo(1);
         assertThat(envelope.path("occurredAt").isTextual()).isTrue();
-        assertThat(envelope.path("correlationId").asText()).isEqualTo(jobId.toString());
+        assertThat(envelope.path("correlationId").asText()).isEqualTo(correlationId.toString());
         assertThat(jdbc.queryForObject("select status from outbox_events where id = ?", String.class, eventId))
             .isEqualTo("PUBLISHED");
 

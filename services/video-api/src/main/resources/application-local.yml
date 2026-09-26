@@ -3,9 +3,9 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:postgresql://localhost:5432/fiapx
-    username: fiapx
-    password: fiapx
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fiapx}
+    username: ${DATABASE_USER:fiapx}
+    password: ${DATABASE_PASSWORD:fiapx}
 
 server:
   port: 8080

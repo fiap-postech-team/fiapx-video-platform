@@ -23,6 +23,11 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 20s
 
+logging:
+  structured:
+    format:
+      console: logstash
+
 server:
   shutdown: graceful
 
@@ -50,6 +55,10 @@ app:
   jobs:
     max-page-size: ${VIDEO_API_JOBS_MAX_PAGE_SIZE:100}
     result-listener-enabled: ${VIDEO_API_JOBS_RESULT_LISTENER_ENABLED:true}
+    result-consumer:
+      max-attempts: ${VIDEO_API_RESULT_MAX_ATTEMPTS:3}
+      initial-backoff: ${VIDEO_API_RESULT_INITIAL_BACKOFF:500ms}
+      max-backoff: ${VIDEO_API_RESULT_MAX_BACKOFF:2s}
   outbox:
     batch-size: ${VIDEO_API_OUTBOX_BATCH_SIZE:50}
     poll-interval-ms: ${VIDEO_API_OUTBOX_POLL_INTERVAL_MS:1000}

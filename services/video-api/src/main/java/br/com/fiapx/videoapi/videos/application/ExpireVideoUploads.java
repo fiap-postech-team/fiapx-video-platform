@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import br.com.fiapx.videoapi.foundation.observability.BusinessMetrics;
 
 public final class ExpireVideoUploads {
     private static final Logger LOGGER = LoggerFactory.getLogger(ExpireVideoUploads.class);
@@ -16,30 +17,39 @@ public final class ExpireVideoUploads {
     private final VideoTransactions transactions;
     private final VideoUploadPolicy policy;
     private final Clock clock;
+    private final BusinessMetrics metrics;
 
     public ExpireVideoUploads(VideoStore videos, VideoObjectStorage storage, VideoTransactions transactions,
                               VideoUploadPolicy policy, Clock clock) {
+        this(videos, storage, transactions, policy, clock, null);
+    }
+
+    public ExpireVideoUploads(VideoStore videos, VideoObjectStorage storage, VideoTransactions transactions,
+                              VideoUploadPolicy policy, Clock clock, BusinessMetrics metrics) {
         this.videos = videos;
         this.storage = storage;
         this.transactions = transactions;
         this.policy = policy;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     public void run() {
         for (var videoId : videos.pendingExpired(clock.instant(), policy.cleanupBatchSize())) {
-            transactions.execute(() -> expireIfDue(videoId));
+            var expired = transactions.execute(() -> expireIfDue(videoId));
+            if (expired && metrics != null) metrics.uploadExpired();
         }
         for (var videoId : videos.expiredUncleaned(policy.cleanupBatchSize())) {
             cleanIfExpired(videoId);
         }
     }
 
-    private Void expireIfDue(UUID videoId) {
-        videos.lock(videoId).filter(video -> video.status() == VideoStatus.PENDING)
-            .filter(video -> !clock.instant().isBefore(video.expiresAt()))
-            .ifPresent(video -> videos.save(video.expire(clock.instant())));
-        return null;
+    private boolean expireIfDue(UUID videoId) {
+        var pending = videos.lock(videoId).filter(video -> video.status() == VideoStatus.PENDING)
+            .filter(video -> !clock.instant().isBefore(video.expiresAt()));
+        if (pending.isEmpty()) return false;
+        videos.save(pending.get().expire(clock.instant()));
+        return true;
     }
 
     private void cleanIfExpired(UUID videoId) {

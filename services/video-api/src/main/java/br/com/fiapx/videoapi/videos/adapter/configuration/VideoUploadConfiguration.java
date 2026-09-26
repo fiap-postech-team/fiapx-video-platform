@@ -8,6 +8,7 @@ import br.com.fiapx.videoapi.videos.application.port.out.VideoObjectStorage;
 import br.com.fiapx.videoapi.videos.application.port.out.VideoStore;
 import br.com.fiapx.videoapi.videos.application.port.out.VideoTransactions;
 import br.com.fiapx.videoapi.videos.adapter.out.storage.S3VideoObjectStorage;
+import br.com.fiapx.videoapi.foundation.observability.BusinessMetrics;
 import java.net.URI;
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -85,19 +86,21 @@ public class VideoUploadConfiguration {
 
     @Bean
     CreateVideoUpload createVideoUpload(VideoStore videos, VideoObjectStorage storage,
-                                        VideoTransactions transactions, VideoUploadPolicy policy, Clock clock) {
-        return new CreateVideoUpload(videos, storage, transactions, policy, clock);
+                                        VideoTransactions transactions, VideoUploadPolicy policy, Clock clock,
+                                        BusinessMetrics metrics) {
+        return new CreateVideoUpload(videos, storage, transactions, policy, clock, metrics);
     }
 
     @Bean
     ConfirmVideo confirmVideo(VideoStore videos, VideoObjectStorage storage,
-                              VideoTransactions transactions, Clock clock) {
-        return new ConfirmVideo(videos, storage, transactions, clock);
+                              VideoTransactions transactions, Clock clock, BusinessMetrics metrics) {
+        return new ConfirmVideo(videos, storage, transactions, clock, metrics);
     }
 
     @Bean
     ExpireVideoUploads expireVideoUploads(VideoStore videos, VideoObjectStorage storage,
-                                          VideoTransactions transactions, VideoUploadPolicy policy, Clock clock) {
-        return new ExpireVideoUploads(videos, storage, transactions, policy, clock);
+                                          VideoTransactions transactions, VideoUploadPolicy policy, Clock clock,
+                                          BusinessMetrics metrics) {
+        return new ExpireVideoUploads(videos, storage, transactions, policy, clock, metrics);
     }
 }

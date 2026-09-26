@@ -5,8 +5,6 @@ import java.net.URI;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -35,7 +33,6 @@ import br.com.fiapx.videoapi.videos.application.StorageUnavailableException;
 @RestControllerAdvice
 public final class ApiExceptionHandler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
     private final ApiProblemFactory problems;
 
     /**
@@ -68,12 +65,7 @@ public final class ApiExceptionHandler {
         Exception exception,
         HttpServletRequest request
     ) {
-        LOGGER.error(
-            "Unexpected HTTP failure method={} path={} exceptionType={}",
-            request.getMethod(),
-            request.getRequestURI(),
-            exception.getClass().getName()
-        );
+        request.setAttribute("fiapx.errorType", exception.getClass().getSimpleName());
         return response(ProblemType.INTERNAL_ERROR, request);
     }
 
@@ -138,6 +130,7 @@ public final class ApiExceptionHandler {
     }
 
     private ResponseEntity<ProblemDetail> response(ProblemType type, HttpServletRequest request) {
+        request.setAttribute("fiapx.errorCode", type.name());
         return ResponseEntity.status(type.status())
             .contentType(MediaType.APPLICATION_PROBLEM_JSON)
             .body(problems.create(type, URI.create(request.getRequestURI())));

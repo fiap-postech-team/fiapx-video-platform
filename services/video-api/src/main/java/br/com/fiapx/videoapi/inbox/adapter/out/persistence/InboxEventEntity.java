@@ -20,6 +20,7 @@ class InboxEventEntity {
     Instant occurredAt;
     Instant receivedAt;
     Instant processedAt;
+    String ignoredReason;
 
     protected InboxEventEntity() {
     }

@@ -5,15 +5,13 @@ import java.util.List;
 import java.util.UUID;
 import java.time.Instant;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import jakarta.persistence.LockModeType;
 
 interface SpringDataJobRepository extends JpaRepository<JobEntity, UUID> {
     Optional<JobEntity> findByIdAndUserId(UUID id, UUID userId);
     Optional<JobEntity> findByVideoIdAndVideoLibraryVisibleIsTrue(UUID videoId);
-    @Lock(LockModeType.PESSIMISTIC_WRITE) Optional<JobEntity> findById(UUID id);
+    Optional<JobEntity> findById(UUID id);
     @Query(value = """
             select * from jobs
             where user_id = :userId and (:createdBefore is null

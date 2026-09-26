@@ -41,6 +41,7 @@ public class JpaJobStore implements JobStore {
         }
     }
     public Optional<Job> findOwned(UUID id, UUID userId) { return repository.findByIdAndUserId(id, userId).map(JobEntity::toDomain); }
+    public Optional<Job> findForResult(UUID id) { return repository.findById(id).map(JobEntity::toDomain); }
     public Optional<Job> findVisibleByVideoId(UUID videoId) {
         return repository.findByVideoIdAndVideoLibraryVisibleIsTrue(videoId).map(JobEntity::toDomain);
     }
@@ -61,11 +62,12 @@ public class JpaJobStore implements JobStore {
         var entity = repository.findById(event.jobId()).orElseThrow();
         var job = entity.toDomain();
         if (job.status().isTerminal() || job.status() == event.status()) return;
-        job.apply(event.status(), event.resultKey());
+        job.applyResult(event.status(), event.resultKey(), event.reasonCode(), event.occurredAt());
         var recordedAt = clock.instant();
         entity.apply(job, recordedAt);
         history.save(new JobStatusHistoryEntity(job.id(), job.status().name(), event.eventId(),
             event.reasonCode(), event.occurredAt(), recordedAt));
+        repository.flush();
     }
 
     private static boolean videoJobConflict(DataIntegrityViolationException exception) {
