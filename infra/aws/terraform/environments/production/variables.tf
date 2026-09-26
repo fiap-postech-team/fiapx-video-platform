@@ -3,6 +3,16 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
+variable "availability_zones" {
+  type        = list(string)
+  description = "Two stable Availability Zone names for the production VPC; update when selecting another AWS region."
+  default     = ["us-east-1a", "us-east-1b"]
+  validation {
+    condition     = length(var.availability_zones) == 2
+    error_message = "Exactly two Availability Zones are required."
+  }
+}
+
 variable "project_name" {
   type    = string
   default = "fiapx-video-platform"

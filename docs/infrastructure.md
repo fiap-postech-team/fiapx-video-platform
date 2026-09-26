@@ -134,6 +134,14 @@ GitHub Secrets necessários:
 - `JWT_PRIVATE_KEY_BASE64`, `JWT_PUBLIC_KEY_BASE64`;
 - `SES_SMTP_USERNAME`, `SES_SMTP_PASSWORD`.
 
+### Checkov e exceções de custo
+
+O workflow mantém o Checkov como bloqueante e registra exceções pontuais no próprio recurso Terraform; não há `soft_fail` nem desativação global de regras. A configuração conserva criptografia em repouso usando SSE-S3/AES-256 ou chaves AWS-managed para S3, ECR, Secrets Manager, CloudWatch Logs, SNS e Amazon MQ. O state Terraform continua criptografado com a CMK do bootstrap.
+
+As exceções intencionais priorizam o custo do ambiente inicial: sem cópia S3 entre regiões nem buckets adicionais para access logs; sem VPC Flow Logs, WAF ou logs de acesso de ALB/CloudFront; retenção CloudWatch de 30 dias; RDS Single-AZ sem Performance Insights/Enhanced Monitoring/IAM DB auth; sem rotação automática de credenciais até existir rollout coordenado para aplicações; sem geo-restrição da SPA. Os motivos específicos ficam junto aos recursos com `checkov:skip`. Métricas CloudWatch/AMP, alarmes, versionamento e bloqueio público dos buckets permanecem ativos.
+
+As exceções devem ser reavaliadas antes de produção com requisitos regulatórios, RTO/RPO ou tráfego relevante. Habilitar WAF, replicação, retenção de logs maior ou redundância Multi-AZ exige revisar o impacto recorrente no custo.
+
 O role de deploy é amplo o bastante para criar/atualizar os recursos desse stack e deve ficar restrito ao environment
 protegido. Revise a policy IAM antes de adicionar novas categorias de recursos.
 

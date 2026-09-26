@@ -12,11 +12,11 @@ provider "aws" {
 
 provider "random" {}
 
-data "aws_availability_zones" "available" { state = "available" }
+data "aws_caller_identity" "current" {}
 data "aws_route53_zone" "root" { name = "${var.root_domain}." }
 
 locals {
-  azs              = slice(data.aws_availability_zones.available.names, 0, 2)
+  azs              = var.availability_zones
   service_names    = ["video-api", "video-processor", "notification-worker"]
   repository_names = concat(local.service_names, ["adot-collector"])
   service_ports    = { video-api = 8080, video-processor = 8081, notification-worker = 8082 }
@@ -34,6 +34,7 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
   enable_dns_support   = true
   tags                 = { Name = "${local.name_prefix}-vpc" }
+  #checkov:skip=CKV2_AWS_11:VPC flow logs incur continuous CloudWatch ingestion and storage charges; application and service metrics/logs are enabled, with flow logs deferred until traffic and retention needs are measured.
 }
 
 resource "aws_internet_gateway" "main" { vpc_id = aws_vpc.main.id }
@@ -43,7 +44,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = ["10.20.0.0/20", "10.20.16.0/20"][count.index]
   availability_zone       = local.azs[count.index]
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
   tags                    = { Name = "${local.name_prefix}-public-${count.index + 1}" }
 }
 
@@ -79,6 +80,13 @@ resource "aws_route_table_association" "public" {
 resource "aws_eip" "nat" {
   count  = var.nat_gateway_enabled ? 1 : 0
   domain = "vpc"
+  #checkov:skip=CKV2_AWS_19:This Elastic IP is attached to the NAT Gateway below; Checkov does not model the aws_nat_gateway allocation_id reference.
+}
+
+resource "aws_default_security_group" "main" {
+  vpc_id  = aws_vpc.main.id
+  ingress = []
+  egress  = []
 }
 resource "aws_nat_gateway" "main" {
   count         = var.nat_gateway_enabled ? 1 : 0
@@ -120,59 +128,105 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_security_group" "alb" {
-  name   = "${local.name_prefix}-alb"
-  vpc_id = aws_vpc.main.id
+  name        = "${local.name_prefix}-alb"
+  description = "Accept HTTPS from CloudFront and forward API requests to private VPC targets."
+  vpc_id      = aws_vpc.main.id
   ingress {
+    description     = "HTTPS origin requests from CloudFront origin-facing addresses."
     from_port       = 443
     to_port         = 443
     protocol        = "tcp"
     prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront.id]
   }
   egress {
+    description = "Forward API traffic to targets inside the VPC."
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 }
 data "aws_ec2_managed_prefix_list" "cloudfront" { name = "com.amazonaws.global.cloudfront.origin-facing" }
 
 resource "aws_security_group" "ecs" {
-  name   = "${local.name_prefix}-ecs"
-  vpc_id = aws_vpc.main.id
+  name        = "${local.name_prefix}-ecs"
+  description = "Private ECS task ingress and application egress."
+  vpc_id      = aws_vpc.main.id
   ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
-  }
-  egress {
+    description = "Allow communication between trusted tasks in this security group."
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
+    self        = true
+  }
+  egress {
+    description = "HTTPS to AWS APIs and external dependencies through the private subnet NAT route."
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    description = "STARTTLS SMTP delivery to Amazon SES."
+    from_port   = 587
+    to_port     = 587
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    description = "PostgreSQL and AMQPS traffic to private data services in the VPC."
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+  egress {
+    description = "AMQPS traffic to the private RabbitMQ service in the VPC."
+    from_port   = 5671
+    to_port     = 5671
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 }
 resource "aws_security_group" "api" {
-  name   = "${local.name_prefix}-api"
-  vpc_id = aws_vpc.main.id
+  name        = "${local.name_prefix}-api"
+  description = "Video API tasks reachable only from the ALB."
+  vpc_id      = aws_vpc.main.id
   ingress {
+    description     = "HTTP from the ALB to the video API target port."
     from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "HTTPS to required external services through the private subnet NAT route."
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    description = "PostgreSQL traffic to the private RDS instance in the VPC."
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+  egress {
+    description = "AMQPS traffic to the private RabbitMQ broker in the VPC."
+    from_port   = 5671
+    to_port     = 5671
+    protocol    = "tcp"
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 }
 resource "aws_security_group" "rds" {
-  name   = "${local.name_prefix}-rds"
-  vpc_id = aws_vpc.main.id
+  name        = "${local.name_prefix}-rds"
+  description = "PostgreSQL ingress from private ECS tasks only."
+  vpc_id      = aws_vpc.main.id
   ingress {
+    description     = "PostgreSQL from the private ECS task security group."
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
@@ -180,9 +234,11 @@ resource "aws_security_group" "rds" {
   }
 }
 resource "aws_security_group" "mq" {
-  name   = "${local.name_prefix}-mq"
-  vpc_id = aws_vpc.main.id
+  name        = "${local.name_prefix}-mq"
+  description = "TLS RabbitMQ ingress from private ECS tasks only."
+  vpc_id      = aws_vpc.main.id
   ingress {
+    description     = "AMQPS from the private ECS task security group."
     from_port       = 5671
     to_port         = 5671
     protocol        = "tcp"
@@ -194,10 +250,14 @@ resource "aws_cloudwatch_log_group" "services" {
   for_each          = toset(local.service_names)
   name              = "/ecs/${local.name_prefix}/${each.key}"
   retention_in_days = 30
+  #checkov:skip=CKV_AWS_158:CloudWatch Logs uses the AWS-owned service encryption key by default; a customer-managed key adds per-ingest and per-read KMS charges.
+  #checkov:skip=CKV_AWS_338:Thirty-day retention controls CloudWatch storage cost for the initial environment; extend after measuring volume and compliance requirements.
 }
 resource "aws_cloudwatch_log_group" "adot" {
   name              = "/ecs/${local.name_prefix}/adot"
   retention_in_days = 30
+  #checkov:skip=CKV_AWS_158:CloudWatch Logs uses the AWS-owned service encryption key by default; a customer-managed key adds per-ingest and per-read KMS charges.
+  #checkov:skip=CKV_AWS_338:Thirty-day retention controls CloudWatch storage cost for the initial environment; extend after measuring volume and compliance requirements.
 }
 
 resource "aws_ecr_repository" "services" {
@@ -206,6 +266,7 @@ resource "aws_ecr_repository" "services" {
   image_tag_mutability = "IMMUTABLE"
   image_scanning_configuration { scan_on_push = true }
   encryption_configuration { encryption_type = "AES256" }
+  #checkov:skip=CKV_AWS_136:ECR uses AWS-managed AES-256 encryption at rest; a customer-managed key adds recurring KMS key and request costs without changing the repository access boundary.
 }
 resource "aws_ecr_lifecycle_policy" "services" {
   for_each   = aws_ecr_repository.services
@@ -213,7 +274,13 @@ resource "aws_ecr_lifecycle_policy" "services" {
   policy     = jsonencode({ rules = [{ rulePriority = 1, description = "Retain 30 recent images", selection = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 30 }, action = { type = "expire" } }] })
 }
 
-resource "aws_s3_bucket" "media" { bucket_prefix = "${var.project_name}-media-" }
+resource "aws_s3_bucket" "media" {
+  bucket_prefix = "${var.project_name}-media-"
+  #checkov:skip=CKV_AWS_145:SSE-S3 AES-256 encrypts video objects at rest without per-request KMS charges on high-volume media traffic.
+  #checkov:skip=CKV_AWS_18:Dedicated access-log buckets add storage and request cost; defer until the organization defines an access-audit retention requirement.
+  #checkov:skip=CKV_AWS_144:Cross-region replication would duplicate video storage cost; defer until recovery objectives are defined.
+  #checkov:skip=CKV2_AWS_62:Uploads use presigned URLs and the application publishes processing jobs through RabbitMQ; S3 events are not part of this event flow.
+}
 resource "aws_s3_bucket_public_access_block" "media" {
   bucket                  = aws_s3_bucket.media.id
   block_public_acls       = true
@@ -228,6 +295,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
       sse_algorithm = "AES256"
     }
   }
+}
+resource "aws_s3_bucket_versioning" "media" {
+  bucket = aws_s3_bucket.media.id
+  versioning_configuration { status = "Enabled" }
 }
 resource "aws_s3_bucket_cors_configuration" "media" {
   bucket = aws_s3_bucket.media.id
@@ -249,7 +320,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "media" {
   }
 }
 
-resource "aws_s3_bucket" "frontend" { bucket_prefix = "${var.project_name}-frontend-" }
+resource "aws_s3_bucket" "frontend" {
+  bucket_prefix = "${var.project_name}-frontend-"
+  #checkov:skip=CKV_AWS_145:SSE-S3 AES-256 encrypts frontend objects at rest without KMS request charges for routine CDN reads and deployments.
+  #checkov:skip=CKV_AWS_18:Dedicated access-log buckets add storage and request cost; defer until access-audit retention requirements are defined.
+  #checkov:skip=CKV_AWS_144:Cross-region replication is deferred in the cost-controlled initial environment.
+  #checkov:skip=CKV2_AWS_62:Frontend releases are uploaded by the deployment workflow and served by CloudFront; there is no S3 event consumer.
+}
 resource "aws_s3_bucket_public_access_block" "frontend" {
   bucket                  = aws_s3_bucket.frontend.id
   block_public_acls       = true
@@ -263,6 +340,21 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
     }
+  }
+}
+resource "aws_s3_bucket_versioning" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+  versioning_configuration { status = "Enabled" }
+}
+resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  rule {
+    id     = "expire-old-frontend-versions"
+    status = "Enabled"
+    filter {}
+    noncurrent_version_expiration { noncurrent_days = 30 }
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
   }
 }
 resource "aws_cloudfront_origin_access_control" "frontend" {
@@ -302,11 +394,16 @@ resource "random_password" "origin_header" {
   special = false
 }
 resource "aws_lb" "api" {
-  name               = "${local.name_prefix}-api"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id
+  name                       = "${local.name_prefix}-api"
+  internal                   = false
+  load_balancer_type         = "application"
+  security_groups            = [aws_security_group.alb.id]
+  subnets                    = aws_subnet.public[*].id
+  enable_deletion_protection = true
+  drop_invalid_header_fields = true
+  desync_mitigation_mode     = "strictest"
+  #checkov:skip=CKV_AWS_91:ALB access logging requires a dedicated S3 destination bucket and ongoing log storage/requests; CloudWatch ALB metrics and alarms remain enabled.
+  #checkov:skip=CKV2_AWS_28:CloudFront-only origin ingress and a secret origin-verification header protect this origin; an additional WAF is deferred to control monthly cost.
 }
 resource "aws_lb_target_group" "api" {
   name        = "${local.name_prefix}-api"
@@ -314,6 +411,7 @@ resource "aws_lb_target_group" "api" {
   protocol    = "HTTP"
   target_type = "ip"
   vpc_id      = aws_vpc.main.id
+  #checkov:skip=CKV_AWS_378:TLS terminates at the HTTPS ALB; target traffic stays in private subnets and ingress is restricted to the ALB security group.
   health_check {
     path     = "/actuator/health"
     matcher  = "200-399"
@@ -325,6 +423,7 @@ resource "aws_lb_listener" "api" {
   port              = 443
   protocol          = "HTTPS"
   certificate_arn   = aws_acm_certificate_validation.edge.certificate_arn
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   default_action {
     type = "fixed-response"
     fixed_response {
@@ -354,6 +453,11 @@ resource "aws_cloudfront_distribution" "app" {
   default_root_object = "index.html"
   aliases             = ["app.${var.root_domain}"]
   price_class         = "PriceClass_100"
+  #checkov:skip=CKV_AWS_68:AWS WAF for CloudFront adds recurring charges; the origin is restricted to CloudFront and requires a high-entropy verification header.
+  #checkov:skip=CKV2_AWS_47:WAF is intentionally deferred in this cost-controlled baseline; if enabled later, include current Log4j managed protections.
+  #checkov:skip=CKV_AWS_86:CloudFront access logging requires a dedicated S3 bucket and recurring storage/requests; CloudWatch and AMP metrics remain enabled.
+  #checkov:skip=CKV_AWS_310:SPA and API use distinct origins selected by path behavior; failing over between them would return incompatible content.
+  #checkov:skip=CKV_AWS_374:The app is intended to be globally available; geography is not an access-control requirement.
   origin {
     domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
     origin_id                = "frontend-s3"
@@ -374,25 +478,27 @@ resource "aws_cloudfront_distribution" "app" {
     }
   }
   default_cache_behavior {
-    target_origin_id       = "frontend-s3"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
-    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
+    target_origin_id           = "frontend-s3"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_optimized.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.spa.arn
     }
   }
   ordered_cache_behavior {
-    path_pattern             = "/v1/*"
-    target_origin_id         = "api-alb"
-    viewer_protocol_policy   = "redirect-to-https"
-    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods           = ["GET", "HEAD"]
-    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
-    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+    path_pattern               = "/v1/*"
+    target_origin_id           = "api-alb"
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods             = ["GET", "HEAD"]
+    cache_policy_id            = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id   = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
   restrictions {
     geo_restriction {
@@ -405,6 +511,26 @@ resource "aws_cloudfront_distribution" "app" {
     minimum_protocol_version = "TLSv1.2_2021"
   }
   depends_on = [aws_route53_record.origin]
+}
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name = "${local.name_prefix}-security-headers"
+  security_headers_config {
+    content_type_options { override = true }
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      preload                    = true
+      override                   = true
+    }
+  }
 }
 data "aws_cloudfront_cache_policy" "caching_optimized" { name = "Managed-CachingOptimized" }
 data "aws_cloudfront_cache_policy" "caching_disabled" { name = "Managed-CachingDisabled" }
@@ -462,37 +588,56 @@ resource "random_password" "notification_db" {
   special = false
 }
 resource "aws_db_instance" "main" {
-  identifier                      = local.name_prefix
-  engine                          = "postgres"
-  instance_class                  = var.db_instance_class
-  allocated_storage               = 20
-  max_allocated_storage           = 100
-  storage_type                    = "gp3"
-  storage_encrypted               = true
-  db_name                         = "fiapx"
-  username                        = "dbadmin"
-  manage_master_user_password     = true
-  db_subnet_group_name            = aws_db_subnet_group.main.name
-  vpc_security_group_ids          = [aws_security_group.rds.id]
-  publicly_accessible             = false
-  multi_az                        = false
+  identifier                  = local.name_prefix
+  engine                      = "postgres"
+  instance_class              = var.db_instance_class
+  allocated_storage           = 20
+  max_allocated_storage       = 100
+  storage_type                = "gp3"
+  storage_encrypted           = true
+  db_name                     = "fiapx"
+  username                    = "dbadmin"
+  manage_master_user_password = true
+  db_subnet_group_name        = aws_db_subnet_group.main.name
+  vpc_security_group_ids      = [aws_security_group.rds.id]
+  publicly_accessible         = false
+  multi_az                    = false
+  #checkov:skip=CKV_AWS_157:Multi-AZ roughly doubles database compute cost; this initial environment uses automated backups and a final snapshot, with Multi-AZ as a production availability upgrade.
+  #checkov:skip=CKV_AWS_161:The current Spring services authenticate with Secrets Manager-managed PostgreSQL credentials; IAM database authentication requires an application connection-provider migration.
+  #checkov:skip=CKV_AWS_118:Enhanced Monitoring adds monitoring-stream cost; standard CloudWatch RDS metrics and alarms are enabled.
+  #checkov:skip=CKV_AWS_353:Performance Insights is deferred to control cost until database workload baselines exist.
+  #checkov:skip=CKV2_AWS_30:Full SQL statement logging may capture sensitive values and increase log ingestion; PostgreSQL and upgrade logs are exported without statement payload logging.
   backup_retention_period         = 7
   deletion_protection             = true
   skip_final_snapshot             = false
   final_snapshot_identifier       = "${local.name_prefix}-final"
+  copy_tags_to_snapshot           = true
+  auto_minor_version_upgrade      = true
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
 }
-resource "aws_secretsmanager_secret" "api_database" { name = "${local.name_prefix}/database/video-api" }
+resource "aws_secretsmanager_secret" "api_database" {
+  name = "${local.name_prefix}/database/video-api"
+  #checkov:skip=CKV_AWS_149:Secrets Manager uses the AWS-managed service key by default; customer-managed KMS encryption adds recurring request charges.
+  #checkov:skip=CKV2_AWS_57:Credential rotation requires a coordinated database password change and ECS task rollout; automated rotation is deferred until that flow is implemented.
+}
 resource "aws_secretsmanager_secret_version" "api_database" {
   secret_id     = aws_secretsmanager_secret.api_database.id
   secret_string = jsonencode({ username = "video_api", password = random_password.api_db.result, host = aws_db_instance.main.address, dbname = "fiapx" })
 }
-resource "aws_secretsmanager_secret" "notification_database" { name = "${local.name_prefix}/database/notification-worker" }
+resource "aws_secretsmanager_secret" "notification_database" {
+  name = "${local.name_prefix}/database/notification-worker"
+  #checkov:skip=CKV_AWS_149:Secrets Manager uses the AWS-managed service key by default; customer-managed KMS encryption adds recurring request charges.
+  #checkov:skip=CKV2_AWS_57:Credential rotation requires a coordinated database password change and ECS task rollout; automated rotation is deferred until that flow is implemented.
+}
 resource "aws_secretsmanager_secret_version" "notification_database" {
   secret_id     = aws_secretsmanager_secret.notification_database.id
   secret_string = jsonencode({ username = "notification_worker", password = random_password.notification_db.result, host = aws_db_instance.main.address, dbname = "fiapx_notifications" })
 }
-resource "aws_secretsmanager_secret" "jwt" { name = "${local.name_prefix}/jwt" }
+resource "aws_secretsmanager_secret" "jwt" {
+  name = "${local.name_prefix}/jwt"
+  #checkov:skip=CKV_AWS_149:Secrets Manager uses the AWS-managed service key by default; customer-managed KMS encryption adds recurring request charges.
+  #checkov:skip=CKV2_AWS_57:JWT key rotation requires a coordinated key-id and public-key rollout across deployed clients; automated rotation is deferred until that flow exists.
+}
 resource "aws_secretsmanager_secret_version" "jwt" {
   secret_id     = aws_secretsmanager_secret.jwt.id
   secret_string = jsonencode({ private_key_base64 = var.jwt_private_key_base64, public_key_base64 = var.jwt_public_key_base64 })
@@ -508,6 +653,11 @@ resource "aws_mq_broker" "rabbitmq" {
   subnet_ids                 = [aws_subnet.application[0].id]
   security_groups            = [aws_security_group.mq.id]
   auto_minor_version_upgrade = true
+  encryption_options {
+    use_aws_owned_key = true
+  }
+  logs { general = true }
+  #checkov:skip=CKV_AWS_209:Amazon MQ remains encrypted with its AWS-owned KMS key; a customer-managed key adds recurring KMS charges.
   user {
     username = "fiapx"
     password = random_password.mq.result
@@ -517,7 +667,11 @@ resource "random_password" "mq" {
   length  = 32
   special = false
 }
-resource "aws_secretsmanager_secret" "rabbitmq" { name = "${local.name_prefix}/rabbitmq" }
+resource "aws_secretsmanager_secret" "rabbitmq" {
+  name = "${local.name_prefix}/rabbitmq"
+  #checkov:skip=CKV_AWS_149:Secrets Manager uses the AWS-managed service key by default; customer-managed KMS encryption adds recurring request charges.
+  #checkov:skip=CKV2_AWS_57:Broker password rotation requires a coordinated broker and ECS task rollout; automated rotation is deferred until that flow is implemented.
+}
 resource "aws_secretsmanager_secret_version" "rabbitmq" {
   secret_id     = aws_secretsmanager_secret.rabbitmq.id
   secret_string = jsonencode({ username = "fiapx", password = random_password.mq.result, host = local.mq_host, port = 5671 })
@@ -540,13 +694,21 @@ resource "aws_route53_record" "ses_dkim" {
   ttl     = 600
   records = ["${aws_ses_domain_dkim.main.dkim_tokens[count.index]}.dkim.amazonses.com"]
 }
-resource "aws_iam_user" "ses_smtp" { name = "${local.name_prefix}-ses-smtp" }
+resource "aws_iam_user" "ses_smtp" {
+  name = "${local.name_prefix}-ses-smtp"
+  #checkov:skip=CKV_AWS_273:SES SMTP authentication uses SMTP credentials derived from an IAM user's access key; the dedicated user is scoped to sending from this verified domain and is not used for console access.
+}
 resource "aws_iam_user_policy" "ses_smtp" {
+  #checkov:skip=CKV_AWS_40:Amazon SES SMTP credentials are derived from this dedicated least-privilege IAM user; the policy is restricted to the verified sending identity.
   name   = "ses-send-email"
   user   = aws_iam_user.ses_smtp.name
-  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["ses:SendRawEmail"], Resource = "*" }] })
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["ses:SendRawEmail"], Resource = "arn:aws:ses:${var.aws_region}:${data.aws_caller_identity.current.account_id}:identity/${var.root_domain}" }] })
 }
-resource "aws_secretsmanager_secret" "smtp" { name = "${local.name_prefix}/ses-smtp" }
+resource "aws_secretsmanager_secret" "smtp" {
+  name = "${local.name_prefix}/ses-smtp"
+  #checkov:skip=CKV_AWS_149:Secrets Manager uses the AWS-managed service key by default; customer-managed KMS encryption adds recurring request charges.
+  #checkov:skip=CKV2_AWS_57:SMTP credential rotation requires a coordinated SES credential replacement and ECS rollout; automated rotation is deferred until that flow is implemented.
+}
 resource "aws_secretsmanager_secret_version" "smtp" {
   secret_id     = aws_secretsmanager_secret.smtp.id
   secret_string = jsonencode({ username = var.ses_smtp_username, password = var.ses_smtp_password, host = "email-smtp.${var.aws_region}.amazonaws.com", port = 587 })
@@ -562,6 +724,10 @@ resource "aws_ecs_cluster" "main" {
 }
 resource "aws_iam_role" "task_execution" {
   name               = "${local.name_prefix}-task-execution"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+resource "aws_iam_role" "database_bootstrap" {
+  name               = "${local.name_prefix}-database-bootstrap-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
 }
 resource "aws_iam_role" "task" {
@@ -586,6 +752,11 @@ resource "aws_iam_role_policy" "secrets_execution" {
   name   = "read-runtime-secrets"
   role   = aws_iam_role.task_execution.id
   policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [aws_secretsmanager_secret.api_database.arn, aws_secretsmanager_secret.notification_database.arn, aws_secretsmanager_secret.rabbitmq.arn, aws_secretsmanager_secret.jwt.arn, aws_secretsmanager_secret.smtp.arn, aws_db_instance.main.master_user_secret[0].secret_arn] }] })
+}
+resource "aws_iam_role_policy" "database_bootstrap_secrets" {
+  name   = "read-bootstrap-database-secrets"
+  role   = aws_iam_role.database_bootstrap.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [aws_db_instance.main.master_user_secret[0].secret_arn, aws_secretsmanager_secret.api_database.arn, aws_secretsmanager_secret.notification_database.arn] }] })
 }
 resource "aws_iam_role_policy" "app_s3" {
   for_each = toset(["video-api", "video-processor"])
@@ -630,7 +801,7 @@ resource "aws_iam_role_policy" "github_plan_state" {
     { Effect = "Allow", Action = ["s3:GetObject"], Resource = "arn:aws:s3:::${var.terraform_state_bucket_name}/fiapx-video-platform/production/terraform.tfstate" },
     { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource = "arn:aws:s3:::${var.terraform_state_bucket_name}/fiapx-video-platform/production/terraform.tfstate.tflock" },
     { Effect = "Allow", Action = ["s3:ListBucket"], Resource = "arn:aws:s3:::${var.terraform_state_bucket_name}", Condition = { StringLike = { "s3:prefix" = ["fiapx-video-platform/production/*"] } } },
-    { Effect = "Allow", Action = ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"], Resource = "*" }
+    { Effect = "Allow", Action = ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"], Resource = "arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/*" }
   ] })
 }
 resource "aws_iam_role" "github_deploy" {
@@ -648,7 +819,7 @@ resource "aws_iam_role_policy" "github_deploy" {
     { Effect = "Allow", Action = ["iam:CreateServiceLinkedRole"], Resource = "*", Condition = { StringEquals = { "iam:AWSServiceName" = ["mq.amazonaws.com", "rds.amazonaws.com", "elasticloadbalancing.amazonaws.com", "ecs.amazonaws.com", "application-autoscaling.amazonaws.com"] } } },
     { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:DescribeRepositories", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart"], Resource = [for repository in aws_ecr_repository.services : repository.arn] },
     { Effect = "Allow", Action = ["ecs:DescribeClusters", "ecs:DescribeServices", "ecs:DescribeTaskDefinition", "ecs:ListTaskDefinitions", "ecs:RegisterTaskDefinition", "ecs:UpdateService", "ecs:DescribeTasks", "ecs:RunTask"], Resource = "*" },
-    { Effect = "Allow", Action = ["iam:PassRole"], Resource = concat([aws_iam_role.task_execution.arn], [for role in aws_iam_role.task : role.arn]) },
+    { Effect = "Allow", Action = ["iam:PassRole"], Resource = concat([aws_iam_role.task_execution.arn, aws_iam_role.database_bootstrap.arn], [for role in aws_iam_role.task : role.arn]) },
     { Effect = "Allow", Action = ["s3:PutObject", "s3:ListBucket", "cloudfront:CreateInvalidation", "cloudfront:GetDistribution"], Resource = [aws_s3_bucket.frontend.arn, "${aws_s3_bucket.frontend.arn}/*", aws_cloudfront_distribution.app.arn] }
   ] })
 }
@@ -737,7 +908,7 @@ resource "aws_ecs_task_definition" "database_bootstrap" {
   cpu                      = "256"
   memory                   = "512"
   execution_role_arn       = aws_iam_role.task_execution.arn
-  task_role_arn            = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.database_bootstrap.arn
   container_definitions = jsonencode([{
     name  = "database-bootstrap"
     image = "postgres:17-alpine"
@@ -889,7 +1060,10 @@ resource "aws_cloudwatch_metric_alarm" "mq_backlog" {
     return_data = true
   }
 }
-resource "aws_sns_topic" "alerts" { name = "${local.name_prefix}-alerts" }
+resource "aws_sns_topic" "alerts" {
+  name              = "${local.name_prefix}-alerts"
+  kms_master_key_id = "alias/aws/sns"
+}
 resource "aws_sns_topic_subscription" "email" {
   topic_arn = aws_sns_topic.alerts.arn
   protocol  = "email"
