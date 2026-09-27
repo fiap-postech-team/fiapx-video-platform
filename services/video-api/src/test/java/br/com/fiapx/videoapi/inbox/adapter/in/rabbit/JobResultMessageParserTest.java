@@ -55,6 +55,16 @@ class JobResultMessageParserTest {
     }
 
     @Test
+    void acceptsProcessorSchemaVersionOnePointZero() {
+        var parser = new JobResultMessageParser(new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
+        var event = parser.parse("""
+            {"eventId":"%s","jobId":"%s","type":"COMPLETED","schemaVersion":"1.0","resultKey":"results/job/frames.zip"}
+            """.formatted(UUID.randomUUID(), UUID.randomUUID()));
+        assertThat(event.schemaVersion()).isOne();
+        assertThat(event.resultKey()).isEqualTo("results/job/frames.zip");
+    }
+
+    @Test
     void rejectsUnsupportedVersionAndConditionalFields() {
         var parser = new JobResultMessageParser(new ObjectMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
         var eventId = UUID.randomUUID();
