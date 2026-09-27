@@ -99,6 +99,8 @@ Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisp
 | videos.retry | Meus vídeos | Tentar de novo | falha recuperável | fixo |
 | videos.openDetail | Meus vídeos | Ver detalhes | item da lista | fixo |
 | videos.downloadPreparing | Meus vídeos | Resultado em preparação | indicador acessível para resultado ainda em processamento | fixo |
+| videos.downloadPreparingTooltip | Meus vídeos | O vídeo está sendo processado.. | tooltip do resultado em processamento | fixo |
+| videos.downloadAvailableTooltip | Meus vídeos | Download disponível | tooltip do download disponível | fixo |
 | videos.sortByColumn | Meus vídeos | Ordenar por {column} | cabeçalho ordenável inativo | dinâmico |
 | videos.sortBy | Meus vídeos | Ordenar por {column}; ordem atual {direction} | cabeçalho ordenável | dinâmico |
 | videos.sentAt | Meus vídeos | Enviado em {data} | item com horário de envio | dinâmico |

@@ -72,7 +72,7 @@ function DownloadPreparingIndicator() {
       className="download-preparing"
       role="img"
       aria-label={copy.videos.downloadPreparing}
-      title={copy.videos.downloadPreparing}
+      title={copy.videos.downloadPreparingTooltip}
     >
       <svg className="loading-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
         <circle cx="10" cy="10" r="6.5" />

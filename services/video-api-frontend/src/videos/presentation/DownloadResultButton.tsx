@@ -54,7 +54,7 @@ export function DownloadResultButton({
         disabled={pending}
         aria-busy={pending}
         aria-label={pending ? copy.videos.downloadPending : copy.videos.download}
-        title={iconOnly ? (pending ? copy.videos.downloadPending : copy.videos.download) : undefined}
+        title={iconOnly ? (pending ? copy.videos.downloadPending : copy.videos.downloadAvailableTooltip) : undefined}
       >
         <DownloadIcon />
         {!iconOnly && <span>{pending ? copy.videos.downloadPending : copy.videos.download}</span>}
