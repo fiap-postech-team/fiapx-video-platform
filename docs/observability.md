@@ -4,7 +4,7 @@ Esta configuração cobre o `video-api`. Actuator e Micrometer fornecem métrica
 
 ## Logs e correlação
 
-O `video-api` escreve logs JSON no formato Logstash. O resumo HTTP é emitido para operações que alteram estado e para qualquer resposta de erro; leituras bem-sucedidas, como `GET /v1/me`, não geram essa linha. O registro inclui método, rota sem identificadores, status, resultado e duração. Actuator e Swagger também são omitidos para evitar ruído.
+O `video-api` escreve o console em texto, no mesmo formato em local e em produção: hora, nível, logger, mensagem e, quando existirem, `correlationId`, `jobId` e os pares operacionais. Framework (`org.springframework`, Hibernate, Tomcat e Hikari) fica em `WARN`. O resumo HTTP é emitido para operações que alteram estado e para qualquer resposta de erro; leituras bem-sucedidas, como `GET /v1/me`, não geram essa linha. O registro inclui método, rota sem identificadores, status, resultado e duração. Actuator e Swagger também são omitidos para evitar ruído.
 
 O filtro aceita `X-Correlation-Id` como UUID. Se o header não vier ou não for um UUID válido, a API gera um UUID; em ambos os casos, devolve o valor no header da resposta. O valor aparece no MDC/log como `correlationId`, é propagado no payload e no header AMQP da outbox, e os consumidores de resultados adicionam `correlationId` e `jobId` ao contexto durante o processamento.
 
