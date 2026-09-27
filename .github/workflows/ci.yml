@@ -93,12 +93,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Download frontend coverage
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: frontend-coverage
           path: services/video-api-frontend/coverage
       - name: Download backend analysis data
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: backend-analysis
           path: services
