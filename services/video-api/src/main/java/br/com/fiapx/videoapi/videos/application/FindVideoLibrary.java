@@ -13,10 +13,14 @@ public final class FindVideoLibrary {
     }
 
     public VideoLibraryPage execute(UUID ownerId, int pageNumber) {
+        return execute(ownerId, pageNumber, VideoLibraryCriteria.all());
+    }
+
+    public VideoLibraryPage execute(UUID ownerId, int pageNumber, VideoLibraryCriteria criteria) {
         if (pageNumber < 1) {
             throw new IllegalArgumentException("Invalid page");
         }
-        var result = reader.findPage(ownerId, pageNumber, PAGE_SIZE);
+        var result = reader.findPage(ownerId, pageNumber, PAGE_SIZE, criteria);
         var totalPages = result.totalItems() == 0 ? 0 : (int) Math.ceil(result.totalItems() / (double) PAGE_SIZE);
         var items = result.items().stream().map(row -> new VideoLibraryPage.VideoLibraryItem(
             VideoRef.encode(row.videoId()),

@@ -71,6 +71,9 @@ paths:
       security: [ { bearerAuth: [ ] } ]
       parameters:
         - { name: page, in: query, required: false, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: name, in: query, required: false, description: Início ou nome completo do arquivo; espaços externos são ignorados., schema: { type: string, maxLength: 512 } }
+        - { name: match, in: query, required: false, description: PREFIX busca nomes que começam com name; EXACT exige o nome completo., schema: { type: string, enum: [ PREFIX, EXACT ], default: PREFIX } }
+        - { name: status, in: query, required: false, description: Agrupamento de status exibido na biblioteca., schema: { type: string, enum: [ ALL, PROCESSED, PROCESSING, FAILED ], default: ALL } }
       responses:
         '200': { description: Página de vídeos de produto, content: { application/json: { schema: { $ref: '#/components/schemas/VideoLibraryPage' } } } }
         '400': { $ref: '#/components/responses/ValidationError' }

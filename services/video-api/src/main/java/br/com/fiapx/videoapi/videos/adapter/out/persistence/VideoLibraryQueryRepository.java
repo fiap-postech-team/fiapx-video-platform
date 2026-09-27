@@ -24,14 +24,56 @@ interface VideoLibraryQueryRepository extends Repository<VideoEntity, UUID> {
         from videos v
         left join jobs j on j.video_id = v.id and j.video_library_visible = true
         where v.user_id = :ownerId and v.upload_status <> 'DELETED'
+          and (
+            :normalizedName is null
+            or (:nameMatch = 'EXACT' and lower(v.original_filename) = :normalizedName)
+            or (:nameMatch = 'PREFIX' and starts_with(lower(v.original_filename), :normalizedName))
+          )
+          and (
+            :statusFilter = 'ALL'
+            or (:statusFilter = 'PROCESSED' and j.status = 'COMPLETED')
+            or (:statusFilter = 'PROCESSING' and (
+              j.status in ('PENDING', 'PROCESSING')
+              or (j.id is null and v.upload_status = 'UPLOADED')
+            ))
+            or (:statusFilter = 'FAILED' and (
+              j.status = 'FAILED'
+              or (j.id is null and v.upload_status in ('REJECTED', 'EXPIRED'))
+            ))
+          )
         order by coalesce(j.updated_at, j.created_at, v.created_at) desc, v.id desc
         """,
         countQuery = """
-        select count(*) from videos v
+        select count(*)
+        from videos v
+        left join jobs j on j.video_id = v.id and j.video_library_visible = true
         where v.user_id = :ownerId and v.upload_status <> 'DELETED'
+          and (
+            :normalizedName is null
+            or (:nameMatch = 'EXACT' and lower(v.original_filename) = :normalizedName)
+            or (:nameMatch = 'PREFIX' and starts_with(lower(v.original_filename), :normalizedName))
+          )
+          and (
+            :statusFilter = 'ALL'
+            or (:statusFilter = 'PROCESSED' and j.status = 'COMPLETED')
+            or (:statusFilter = 'PROCESSING' and (
+              j.status in ('PENDING', 'PROCESSING')
+              or (j.id is null and v.upload_status = 'UPLOADED')
+            ))
+            or (:statusFilter = 'FAILED' and (
+              j.status = 'FAILED'
+              or (j.id is null and v.upload_status in ('REJECTED', 'EXPIRED'))
+            ))
+          )
         """,
         nativeQuery = true)
-    Page<VideoLibraryQuery> findPage(@Param("ownerId") UUID ownerId, Pageable pageable);
+    Page<VideoLibraryQuery> findPage(
+        @Param("ownerId") UUID ownerId,
+        @Param("normalizedName") String normalizedName,
+        @Param("nameMatch") String nameMatch,
+        @Param("statusFilter") String statusFilter,
+        Pageable pageable
+    );
 
     @Query(value = """
         select v.id as videoId,

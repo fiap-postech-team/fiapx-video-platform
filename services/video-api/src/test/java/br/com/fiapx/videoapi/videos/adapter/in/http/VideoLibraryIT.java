@@ -2,6 +2,7 @@ package br.com.fiapx.videoapi.videos.adapter.in.http;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -89,6 +91,97 @@ class VideoLibraryIT extends VideoUploadIntegrationSupport {
     }
 
     @Test
+    void searchesNamesByPrefixOrExactValueAndTreatsWildcardsAsText() {
+        var owner = token();
+        var ownerId = UUID.fromString(me(owner).get("id").toString());
+        var start = Instant.parse("2026-09-20T10:00:00Z");
+        insertVideo(ownerId, "Black-1.mp4", "UPLOADED", start, start);
+        insertVideo(ownerId, "Blackstock.mp4", "UPLOADED", start.plusSeconds(1), start.plusSeconds(1));
+        insertVideo(ownerId, "Black%literal.mp4", "UPLOADED", start.plusSeconds(2), start.plusSeconds(2));
+        insertVideo(ownerId, "Black_literal.mp4", "UPLOADED", start.plusSeconds(3), start.plusSeconds(3));
+        insertVideo(ownerId, "Black\\literal.mp4", "UPLOADED", start.plusSeconds(4), start.plusSeconds(4));
+        insertVideo(ownerId, "Aula.mp4", "UPLOADED", start.plusSeconds(5), start.plusSeconds(5));
+
+        var prefix = get("/v1/videos?name=BLA&match=PREFIX", owner).getBody();
+        assertThat(prefix.get("totalItems")).isEqualTo(5);
+        assertThat(names(prefix)).containsExactly(
+            "Black\\literal.mp4", "Black_literal.mp4", "Black%literal.mp4", "Blackstock.mp4", "Black-1.mp4");
+
+        var exact = get("/v1/videos?name=BLACKSTOCK.MP4&match=EXACT", owner).getBody();
+        assertThat(names(exact)).containsExactly("Blackstock.mp4");
+        assertThat(get("/v1/videos?name=" + encoded("  bla  "), owner).getBody().get("totalItems"))
+            .isEqualTo(5);
+        assertThat(names(get("/v1/videos?name=" + encoded("Black%"), owner).getBody()))
+            .containsExactly("Black%literal.mp4");
+        assertThat(names(get("/v1/videos?name=" + encoded("Black_"), owner).getBody()))
+            .containsExactly("Black_literal.mp4");
+        assertThat(names(get("/v1/videos?name=" + encoded("Black\\"), owner).getBody()))
+            .containsExactly("Black\\literal.mp4");
+        assertThat(get("/v1/videos?name=" + encoded("   "), owner).getBody().get("totalItems"))
+            .isEqualTo(6);
+    }
+
+    @Test
+    void groupsStatusesAndCombinesThemBeforePagination() {
+        var owner = token();
+        var ownerId = UUID.fromString(me(owner).get("id").toString());
+        var start = Instant.parse("2026-09-21T10:00:00Z");
+        insertVideo(ownerId, "awaiting.mp4", "PENDING", start, null);
+        insertVideo(ownerId, "uploaded.mp4", "UPLOADED", start.plusSeconds(1), start.plusSeconds(1));
+        var queued = insertVideo(ownerId, "queued.mp4", "UPLOADED", start.plusSeconds(2), start.plusSeconds(2));
+        var active = insertVideo(ownerId, "active.mp4", "UPLOADED", start.plusSeconds(3), start.plusSeconds(3));
+        var completed = insertVideo(ownerId, "processed.mp4", "UPLOADED", start.plusSeconds(4), start.plusSeconds(4));
+        var failed = insertVideo(ownerId, "failed.mp4", "UPLOADED", start.plusSeconds(5), start.plusSeconds(5));
+        insertJob(UUID.randomUUID(), ownerId, queued, start.plusSeconds(6), "PENDING");
+        insertJob(UUID.randomUUID(), ownerId, active, start.plusSeconds(7), "PROCESSING");
+        insertJob(UUID.randomUUID(), ownerId, completed, start.plusSeconds(8), "COMPLETED");
+        insertJob(UUID.randomUUID(), ownerId, failed, start.plusSeconds(9), "FAILED");
+        insertVideo(ownerId, "rejected.mp4", "REJECTED", start.plusSeconds(10), null);
+        insertVideo(ownerId, "expired.mp4", "EXPIRED", start.plusSeconds(11), null);
+
+        assertThat(names(get("/v1/videos?status=PROCESSED", owner).getBody()))
+            .containsExactly("processed.mp4");
+        assertThat(names(get("/v1/videos?status=PROCESSING", owner).getBody()))
+            .containsExactly("active.mp4", "queued.mp4", "uploaded.mp4");
+        assertThat(names(get("/v1/videos?status=FAILED", owner).getBody()))
+            .containsExactly("expired.mp4", "rejected.mp4", "failed.mp4");
+        assertThat(names(get("/v1/videos?name=pro&status=PROCESSED", owner).getBody()))
+            .containsExactly("processed.mp4");
+
+        for (int index = 0; index < 6; index++) {
+            insertVideo(ownerId, "batch-" + index + ".mp4", "UPLOADED",
+                start.plusSeconds(20 + index), start.plusSeconds(20 + index));
+        }
+        var first = get("/v1/videos?page=1&name=batch&status=PROCESSING", owner).getBody();
+        var second = get("/v1/videos?page=2&name=batch&status=PROCESSING", owner).getBody();
+        assertThat(first.get("totalItems")).isEqualTo(6);
+        assertThat(first.get("totalPages")).isEqualTo(2);
+        assertThat(names(first)).hasSize(5);
+        assertThat(names(second)).containsExactly("batch-0.mp4");
+    }
+
+    @Test
+    void rejectsInvalidLibraryCriteria() {
+        var owner = token();
+
+        assertValidationError(get("/v1/videos?status=UNKNOWN", owner));
+        assertValidationError(get("/v1/videos?match=CONTAINS", owner));
+        assertValidationError(get("/v1/videos?name=" + "a".repeat(513), owner));
+    }
+
+    @Test
+    void createsTheCaseInsensitiveOwnerNameIndex() {
+        var definition = jdbc.queryForObject("""
+            select indexdef from pg_indexes
+            where tablename = 'videos' and indexname = 'videos_owner_name_ci_idx'
+            """, String.class);
+
+        assertThat(definition)
+            .contains("user_id", "lower((original_filename)::text)", "text_pattern_ops")
+            .contains("upload_status", "DELETED");
+    }
+
+    @Test
     void rejectsASecondJobForTheSameConfirmedVideo() throws Exception {
         var owner = token();
         var bytes = "library job fixture".getBytes(StandardCharsets.UTF_8);
@@ -147,6 +240,20 @@ class VideoLibraryIT extends VideoUploadIntegrationSupport {
     private void insertHistory(UUID jobId, String status, Instant at) {
         jdbc.update("insert into job_status_history (job_id, status, occurred_at) values (?, ?, ?)",
             jobId, status, ts(at));
+    }
+
+    private static java.util.List<String> names(Map<String, Object> page) {
+        var items = (java.util.List<Map<String, Object>>) page.get("items");
+        return items.stream().map(item -> item.get("originalFilename").toString()).toList();
+    }
+
+    private static String encoded(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private static void assertValidationError(ResponseEntity<Map> response) {
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().get("code")).isEqualTo("VALIDATION_ERROR");
     }
 
     private static Timestamp ts(Instant value) {

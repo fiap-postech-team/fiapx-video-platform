@@ -5,8 +5,11 @@ import br.com.fiapx.videoapi.videos.application.FindVideoDetail;
 import br.com.fiapx.videoapi.videos.application.FindVideoLibrary;
 import br.com.fiapx.videoapi.videos.application.ProductProcessingStatus;
 import br.com.fiapx.videoapi.videos.application.ProductVideoStatus;
+import br.com.fiapx.videoapi.videos.application.VideoLibraryCriteria;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryDetail;
+import br.com.fiapx.videoapi.videos.application.VideoLibraryNameMatch;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryPage;
+import br.com.fiapx.videoapi.videos.application.VideoLibraryStatusFilter;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -30,8 +33,12 @@ public class VideoLibraryController {
 
     @GetMapping
     LibraryPageResponse list(@RequestParam(defaultValue = "1") int page,
+                             @RequestParam(required = false) String name,
+                             @RequestParam(defaultValue = "PREFIX") VideoLibraryNameMatch match,
+                             @RequestParam(defaultValue = "ALL") VideoLibraryStatusFilter status,
                              @AuthenticationPrincipal AuthenticatedIdentity identity) {
-        return LibraryPageResponse.from(library.execute(identity.userId(), page));
+        var criteria = new VideoLibraryCriteria(name, match, status);
+        return LibraryPageResponse.from(library.execute(identity.userId(), page, criteria));
     }
 
     @GetMapping("/{videoRef}")
