@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Local-only object storage used to exercise the browser PUT flow without S3. */
 public final class LocalMockVideoObjectStorage implements VideoObjectStorage {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final long maxSizeBytes;
     private final String publicEndpoint;
     private final Path directory;
@@ -127,7 +130,7 @@ public final class LocalMockVideoObjectStorage implements VideoObjectStorage {
 
     private String randomCapability() {
         byte[] bytes = new byte[32];
-        new java.security.SecureRandom().nextBytes(bytes);
+        SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
