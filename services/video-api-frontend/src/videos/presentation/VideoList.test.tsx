@@ -168,14 +168,14 @@ describe('VideoList query controls', () => {
 
     const processingRow = await screen.findByRole('row', { name: /processando\.mp4/ })
     expect(within(processingRow).getByLabelText(copy.videos.downloadPreparing)).toHaveAttribute(
-      'title',
+      'data-tooltip',
       copy.videos.downloadPreparingTooltip,
     )
     const failedRow = screen.getByRole('row', { name: /falha\.mp4/ })
     expect(within(failedRow).queryByLabelText(copy.videos.downloadPreparing)).not.toBeInTheDocument()
     const availableRow = screen.getByRole('row', { name: /pronto\.mp4/ })
     expect(within(availableRow).getByRole('button', { name: copy.videos.download })).toHaveAttribute(
-      'title',
+      'data-tooltip',
       copy.videos.downloadAvailableTooltip,
     )
     expect(within(availableRow).queryByLabelText(copy.videos.downloadPreparing)).not.toBeInTheDocument()
