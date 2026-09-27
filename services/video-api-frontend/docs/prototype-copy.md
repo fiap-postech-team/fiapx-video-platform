@@ -79,6 +79,18 @@ Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisp
 | status.* | Meus vídeos / Detalhe | ver tabela de estados | estado visível do vídeo | fixo |
 | videos.title | Meus vídeos | Meus vídeos | cabeçalho | fixo |
 | videos.lead | Meus vídeos | Acompanhe o envio e o processamento dos seus arquivos. | cabeçalho | fixo |
+| videos.searchLabel | Meus vídeos | Buscar por nome do vídeo | campo de busca | fixo |
+| videos.searchPlaceholder | Meus vídeos | Buscar por nome... | campo de busca vazio | fixo |
+| videos.searchExactAction | Meus vídeos | Buscar nome completo | envio do campo de busca | fixo |
+| videos.statusFilterLabel | Meus vídeos | Filtrar por status | grupo de filtros | fixo |
+| videos.statusFilterButton | Meus vídeos | Status | filtro fechado sem seleção | fixo |
+| videos.statusAll | Meus vídeos | Todos | filtro sem restrição | fixo |
+| videos.statusProcessed | Meus vídeos | Processado | filtro de processados | fixo |
+| videos.statusProcessing | Meus vídeos | Processando | filtro em processamento | fixo |
+| videos.statusFailed | Meus vídeos | Falha no processamento | filtro com falha | fixo |
+| videos.clearCriteria | Meus vídeos | Limpar busca e filtros | busca ou filtro informado | fixo |
+| videos.filteredEmptyTitle | Meus vídeos | Nenhum vídeo encontrado | consulta sem resultados | fixo |
+| videos.filteredEmptyBody | Meus vídeos | Ajuste a busca ou o status para encontrar outros vídeos. | consulta sem resultados | fixo |
 | videos.emptyTitle | Meus vídeos | Nenhum vídeo ainda | lista vazia | fixo |
 | videos.emptyBody | Meus vídeos | Você ainda não enviou vídeos. | lista vazia | fixo |
 | videos.emptyAction | Meus vídeos | Enviar o primeiro vídeo | lista vazia | fixo |
@@ -86,6 +98,8 @@ Marcos futuros mostram `Aguardando`. Dado histórico ausente mostra `Data indisp
 | videos.error | Meus vídeos | Não foi possível carregar seus vídeos. | falha recuperável | fixo |
 | videos.retry | Meus vídeos | Tentar de novo | falha recuperável | fixo |
 | videos.openDetail | Meus vídeos | Ver detalhes | item da lista | fixo |
+| videos.sortByColumn | Meus vídeos | Ordenar por {column} | cabeçalho ordenável inativo | dinâmico |
+| videos.sortBy | Meus vídeos | Ordenar por {column}; ordem atual {direction} | cabeçalho ordenável | dinâmico |
 | videos.sentAt | Meus vídeos | Enviado em {data} | item com horário de envio | dinâmico |
 | videos.pagination | Meus vídeos | Paginação da biblioteca | navegação entre páginas | fixo |
 | detail.back | Detalhe do vídeo | Voltar para meus vídeos | botão abaixo do detalhe | fixo |

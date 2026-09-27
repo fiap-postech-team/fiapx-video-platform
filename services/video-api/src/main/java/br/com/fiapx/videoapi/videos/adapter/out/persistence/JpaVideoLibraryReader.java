@@ -26,6 +26,8 @@ public final class JpaVideoLibraryReader implements VideoLibraryReader {
             normalizedName,
             criteria.match().name(),
             criteria.status().name(),
+            criteria.sort().name(),
+            criteria.direction().name(),
             PageRequest.of(pageNumber - 1, pageSize)
         );
         return new Page(result.getContent().stream().map(this::row).toList(), result.getTotalElements());

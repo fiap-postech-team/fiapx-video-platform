@@ -47,6 +47,26 @@ export interface VideoLibraryPage {
   totalPages: number
 }
 
+export const VIDEO_LIBRARY_NAME_MATCHES = ['PREFIX', 'EXACT'] as const
+export type VideoLibraryNameMatch = (typeof VIDEO_LIBRARY_NAME_MATCHES)[number]
+
+export const VIDEO_LIBRARY_STATUS_FILTERS = ['ALL', 'PROCESSED', 'PROCESSING', 'FAILED'] as const
+export type VideoLibraryStatusFilter = (typeof VIDEO_LIBRARY_STATUS_FILTERS)[number]
+
+export const VIDEO_LIBRARY_SORTS = ['UPDATED_AT', 'STATUS'] as const
+export type VideoLibrarySort = (typeof VIDEO_LIBRARY_SORTS)[number]
+
+export const VIDEO_LIBRARY_SORT_DIRECTIONS = ['ASC', 'DESC'] as const
+export type VideoLibrarySortDirection = (typeof VIDEO_LIBRARY_SORT_DIRECTIONS)[number]
+
+export interface VideoLibraryQuery {
+  name?: string
+  match?: VideoLibraryNameMatch
+  status: VideoLibraryStatusFilter
+  sort?: VideoLibrarySort
+  direction?: VideoLibrarySortDirection
+}
+
 export interface VideoDetail {
   videoRef: string
   originalFilename: string
@@ -107,6 +127,11 @@ export interface PrototypeScenario {
   delayMs?: number
 }
 
+export interface VideoListOptions {
+  scenario?: PrototypeScenario
+  query?: VideoLibraryQuery
+}
+
 export type VideoServiceErrorCode =
   | 'LIST_UNAVAILABLE'
   | 'UPLOAD_UNAVAILABLE'
@@ -139,7 +164,7 @@ export function isVideoServiceError(value: unknown): value is VideoServiceError 
 }
 
 export interface VideoService {
-  list(page?: number, options?: { scenario?: PrototypeScenario }): Promise<VideoLibraryPage>
+  list(page?: number, options?: VideoListOptions): Promise<VideoLibraryPage>
   get(videoRef: string): Promise<VideoDetail | null>
   download(jobId: string): Promise<DownloadResult>
   simulateUpload(

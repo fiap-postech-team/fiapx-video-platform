@@ -13,6 +13,7 @@ import {
   type VideoDetail,
   type VideoLibraryItem,
   type VideoLibraryPage,
+  type VideoListOptions,
   type VideoService,
   type VideoServiceError,
 } from '../domain/video'
@@ -34,8 +35,25 @@ export class VideoHttpService implements VideoService {
     this.wait = options.wait ?? waitFor
   }
 
-  async list(page = 1): Promise<VideoLibraryPage> {
-    const response = await this.authorizedFetch(`${this.baseUrl}/v1/videos?page=${page}`)
+  async list(page = 1, options?: VideoListOptions): Promise<VideoLibraryPage> {
+    const parameters = new URLSearchParams({ page: String(page) })
+    const name = options?.query?.name?.trim()
+    if (name) {
+      parameters.set('name', name)
+      if (options?.query?.match) {
+        parameters.set('match', options.query.match)
+      }
+    }
+    if (options?.query?.status && options.query.status !== 'ALL') {
+      parameters.set('status', options.query.status)
+    }
+    if (options?.query?.sort && options.query.sort !== 'UPDATED_AT') {
+      parameters.set('sort', options.query.sort)
+    }
+    if (options?.query?.direction && options.query.direction !== 'DESC') {
+      parameters.set('direction', options.query.direction)
+    }
+    const response = await this.authorizedFetch(`${this.baseUrl}/v1/videos?${parameters.toString()}`)
     if (!response.ok) {
       throw { code: 'LIST_UNAVAILABLE', message: 'list unavailable' }
     }

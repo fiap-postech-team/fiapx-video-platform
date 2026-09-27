@@ -74,6 +74,8 @@ paths:
         - { name: name, in: query, required: false, description: Início ou nome completo do arquivo; espaços externos são ignorados., schema: { type: string, maxLength: 512 } }
         - { name: match, in: query, required: false, description: PREFIX busca nomes que começam com name; EXACT exige o nome completo., schema: { type: string, enum: [ PREFIX, EXACT ], default: PREFIX } }
         - { name: status, in: query, required: false, description: Agrupamento de status exibido na biblioteca., schema: { type: string, enum: [ ALL, PROCESSED, PROCESSING, FAILED ], default: ALL } }
+        - { name: sort, in: query, required: false, description: Coluna usada para ordenar a biblioteca antes da paginação., schema: { type: string, enum: [ UPDATED_AT, STATUS ], default: UPDATED_AT } }
+        - { name: direction, in: query, required: false, description: Direção da ordenação., schema: { type: string, enum: [ ASC, DESC ], default: DESC } }
       responses:
         '200': { description: Página de vídeos de produto, content: { application/json: { schema: { $ref: '#/components/schemas/VideoLibraryPage' } } } }
         '400': { $ref: '#/components/responses/ValidationError' }

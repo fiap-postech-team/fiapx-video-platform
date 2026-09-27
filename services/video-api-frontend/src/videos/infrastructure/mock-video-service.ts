@@ -5,6 +5,8 @@ import type {
   VideoDetail,
   VideoLibraryItem,
   VideoLibraryPage,
+  VideoLibraryQuery,
+  VideoListOptions,
   VideoService,
 } from '../domain/video'
 import { demoVideos, type DemoVideo } from './fixtures'
@@ -34,6 +36,52 @@ function byActivity(left: VideoLibraryItem, right: VideoLibraryItem): number {
   return right.activityAt.localeCompare(left.activityAt) || right.videoRef.localeCompare(left.videoRef)
 }
 
+const STATUS_ORDER: Record<VideoLibraryItem['status'], number> = {
+  EXPIRED: 1,
+  FAILED: 2,
+  AWAITING_UPLOAD: 3,
+  AVAILABLE: 4,
+  UPLOADED: 5,
+  PROCESSING: 5,
+  REJECTED: 6,
+}
+
+function byLibraryOrder(query?: VideoLibraryQuery) {
+  const direction = query?.direction === 'ASC' ? 1 : -1
+  return (left: VideoLibraryItem, right: VideoLibraryItem): number => {
+    if (query?.sort === 'STATUS') {
+      const statusOrder = (STATUS_ORDER[left.status] - STATUS_ORDER[right.status]) * direction
+      if (statusOrder !== 0) return statusOrder
+    } else {
+      const activityOrder = left.activityAt.localeCompare(right.activityAt) * direction
+      if (activityOrder !== 0) return activityOrder
+    }
+    return byActivity(left, right)
+  }
+}
+
+function matchesName(video: VideoLibraryItem, query?: VideoLibraryQuery): boolean {
+  const name = query?.name?.trim().toLocaleLowerCase('pt-BR')
+  if (!name) {
+    return true
+  }
+  const filename = video.originalFilename.toLocaleLowerCase('pt-BR')
+  return query?.match === 'EXACT' ? filename === name : filename.startsWith(name)
+}
+
+function matchesStatus(video: VideoLibraryItem, query?: VideoLibraryQuery): boolean {
+  switch (query?.status ?? 'ALL') {
+    case 'PROCESSED':
+      return video.status === 'AVAILABLE'
+    case 'PROCESSING':
+      return video.status === 'UPLOADED' || video.status === 'PROCESSING'
+    case 'FAILED':
+      return video.status === 'FAILED' || video.status === 'REJECTED' || video.status === 'EXPIRED'
+    default:
+      return true
+  }
+}
+
 export class MockVideoService implements VideoService {
   private readonly videos: DemoVideo[]
 
@@ -41,7 +89,7 @@ export class MockVideoService implements VideoService {
     this.videos = videos.map(clone)
   }
 
-  async list(page = 1, options?: { scenario?: PrototypeScenario }): Promise<VideoLibraryPage> {
+  async list(page = 1, options?: VideoListOptions): Promise<VideoLibraryPage> {
     const scenario = options?.scenario
     await wait(scenario?.delayMs ?? 0)
     if (scenario?.kind === 'loading') {
@@ -51,8 +99,9 @@ export class MockVideoService implements VideoService {
       return Promise.reject({ code: 'LIST_UNAVAILABLE', message: 'mock scenario: list unavailable' })
     }
     const owned = (scenario?.kind === 'empty' ? [] : this.videos.map((video) => video.item))
+      .filter((video) => matchesName(video, options?.query) && matchesStatus(video, options?.query))
       .slice()
-      .sort(byActivity)
+      .sort(byLibraryOrder(options?.query))
     const totalItems = owned.length
     const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / PAGE_SIZE)
     const start = Math.max(0, (page - 1) * PAGE_SIZE)

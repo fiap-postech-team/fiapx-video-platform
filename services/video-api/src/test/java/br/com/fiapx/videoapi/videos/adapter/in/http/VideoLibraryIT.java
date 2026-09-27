@@ -148,6 +148,11 @@ class VideoLibraryIT extends VideoUploadIntegrationSupport {
         assertThat(names(get("/v1/videos?name=pro&status=PROCESSED", owner).getBody()))
             .containsExactly("processed.mp4");
 
+        assertThat(names(get("/v1/videos?sort=STATUS&direction=ASC", owner).getBody()))
+            .containsExactly("expired.mp4", "failed.mp4", "awaiting.mp4", "processed.mp4", "active.mp4");
+        assertThat(names(get("/v1/videos?sort=UPDATED_AT&direction=ASC", owner).getBody()))
+            .containsExactly("awaiting.mp4", "uploaded.mp4", "queued.mp4", "active.mp4", "processed.mp4");
+
         for (int index = 0; index < 6; index++) {
             insertVideo(ownerId, "batch-" + index + ".mp4", "UPLOADED",
                 start.plusSeconds(20 + index), start.plusSeconds(20 + index));
@@ -166,6 +171,8 @@ class VideoLibraryIT extends VideoUploadIntegrationSupport {
 
         assertValidationError(get("/v1/videos?status=UNKNOWN", owner));
         assertValidationError(get("/v1/videos?match=CONTAINS", owner));
+        assertValidationError(get("/v1/videos?sort=NAME", owner));
+        assertValidationError(get("/v1/videos?direction=SIDEWAYS", owner));
         assertValidationError(get("/v1/videos?name=" + "a".repeat(513), owner));
     }
 

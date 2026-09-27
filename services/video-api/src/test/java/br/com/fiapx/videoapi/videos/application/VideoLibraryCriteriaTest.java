@@ -14,6 +14,8 @@ class VideoLibraryCriteriaTest {
         assertThat(criteria.name()).isEqualTo("Blackstock.mp4");
         assertThat(criteria.match()).isEqualTo(VideoLibraryNameMatch.PREFIX);
         assertThat(criteria.status()).isEqualTo(VideoLibraryStatusFilter.ALL);
+        assertThat(criteria.sort()).isEqualTo(VideoLibrarySort.UPDATED_AT);
+        assertThat(criteria.direction()).isEqualTo(VideoLibrarySortDirection.DESC);
     }
 
     @Test

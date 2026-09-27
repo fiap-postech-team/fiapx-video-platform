@@ -10,6 +10,8 @@ import br.com.fiapx.videoapi.videos.application.VideoLibraryDetail;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryNameMatch;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryPage;
 import br.com.fiapx.videoapi.videos.application.VideoLibraryStatusFilter;
+import br.com.fiapx.videoapi.videos.application.VideoLibrarySort;
+import br.com.fiapx.videoapi.videos.application.VideoLibrarySortDirection;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -36,8 +38,10 @@ public class VideoLibraryController {
                              @RequestParam(required = false) String name,
                              @RequestParam(defaultValue = "PREFIX") VideoLibraryNameMatch match,
                              @RequestParam(defaultValue = "ALL") VideoLibraryStatusFilter status,
+                             @RequestParam(defaultValue = "UPDATED_AT") VideoLibrarySort sort,
+                             @RequestParam(defaultValue = "DESC") VideoLibrarySortDirection direction,
                              @AuthenticationPrincipal AuthenticatedIdentity identity) {
-        var criteria = new VideoLibraryCriteria(name, match, status);
+        var criteria = new VideoLibraryCriteria(name, match, status, sort, direction);
         return LibraryPageResponse.from(library.execute(identity.userId(), page, criteria));
     }
 
