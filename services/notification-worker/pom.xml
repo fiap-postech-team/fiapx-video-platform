@@ -11,6 +11,7 @@
     <properties>
         <!-- The root still skips repackaging globally; this module already contains an executable application. -->
         <spring-boot.repackage.skip>false</spring-boot.repackage.skip>
+        <jacoco.line.minimum>0.50</jacoco.line.minimum>
     </properties>
     <dependencies>
         <dependency>
