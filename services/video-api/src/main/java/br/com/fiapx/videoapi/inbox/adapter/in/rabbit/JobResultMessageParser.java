@@ -34,7 +34,7 @@ final class JobResultMessageParser {
             var eventId = UUID.fromString(root.required("eventId").asText());
             var jobId = UUID.fromString(root.required("jobId").asText());
             var status = JobStatus.valueOf(root.required("type").asText());
-            var version = root.hasNonNull("schemaVersion") ? root.get("schemaVersion").asInt(-1) : 1;
+            var version = schemaVersion(root);
             if (version != 1) throw new IllegalArgumentException("Unsupported schema version");
             var expected = "video.job." + (status == JobStatus.PROCESSING ? "started" : status.name().toLowerCase()) + ".v1";
             if (routingKey != null && !expected.equals(routingKey)) throw new IllegalArgumentException("Routing key does not match event type");
@@ -60,6 +60,16 @@ final class JobResultMessageParser {
             case "INVALID_MEDIA", "SOURCE_UNAVAILABLE", "RESULT_UPLOAD_FAILED", "PROCESSING_FAILED", "PROCESSING_ERROR" -> code;
             default -> "PROCESSING_FAILED";
         };
+    }
+
+    /** Accepts AsyncAPI integer {@code 1} and the processor wire value {@code "1.0"}. */
+    private static int schemaVersion(JsonNode root) {
+        if (!root.hasNonNull("schemaVersion")) return 1;
+        var node = root.get("schemaVersion");
+        if (node.isNumber()) return node.intValue();
+        var text = node.asText();
+        if ("1".equals(text) || "1.0".equals(text)) return 1;
+        return -1;
     }
 
     private static String textOrNull(JsonNode root, String field) {
