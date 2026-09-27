@@ -49,8 +49,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  backend:
-    name: backend
+  java-services:
+    name: java-services
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -67,11 +67,11 @@ jobs:
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
       - name: Validate Docker Compose
         run: docker compose config --quiet
-      - name: Upload backend analysis data
+      - name: Upload Java analysis data
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: backend-analysis
+          name: java-analysis
           path: |
             services/*/target/classes/**
             services/*/target/generated-sources/**
@@ -83,7 +83,7 @@ jobs:
 
   sonar:
     name: sonar
-    needs: [frontend, backend]
+    needs: [frontend, java-services]
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
@@ -97,10 +97,10 @@ jobs:
         with:
           name: frontend-coverage
           path: services/video-api-frontend/coverage
-      - name: Download backend analysis data
+      - name: Download Java analysis data
         uses: actions/download-artifact@v7
         with:
-          name: backend-analysis
+          name: java-analysis
           path: services
       - name: Analyze with SonarQube Cloud
         uses: SonarSource/sonarqube-scan-action@v7
