@@ -42,7 +42,7 @@ jobs:
         working-directory: services/video-api-frontend
         run: npm run build
       - name: Upload frontend coverage
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: frontend-coverage
           path: services/video-api-frontend/coverage/lcov.info
@@ -69,7 +69,7 @@ jobs:
         run: docker compose config --quiet
       - name: Upload backend analysis data
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: backend-analysis
           path: |
