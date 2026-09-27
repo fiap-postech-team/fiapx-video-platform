@@ -43,7 +43,25 @@ class JpaOutboxStoreTest {
             .containsEntry("type", "video.job.requested.v1")
             .containsEntry("schemaVersion", 1)
             .containsEntry("correlationId", correlationId)
-            .containsEntry("occurredAt", occurredAt.toString());
+            .containsEntry("occurredAt", occurredAt.toString())
+            .doesNotContainKey("recipient")
+            .doesNotContainKey("videoName");
+    }
+
+    @Test
+    void includesRecipientAndVideoNameWhenTheJobKnowsThem() {
+        var repository = mock(SpringDataOutboxRepository.class);
+        var occurredAt = Instant.parse("2026-09-22T12:00:00Z");
+
+        new JpaOutboxStore(repository, new ObjectMapper()).append(
+            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+            "uploads/source.mp4", occurredAt, UUID.randomUUID(), " person@example.test ", " aula.mp4 ");
+
+        var event = ArgumentCaptor.forClass(OutboxEventEntity.class);
+        verify(repository).save(event.capture());
+        assertThat((Map<String, Object>) ReflectionTestUtils.getField(event.getValue(), "payloadJson"))
+            .containsEntry("recipient", "person@example.test")
+            .containsEntry("videoName", "aula.mp4");
     }
 
     @Test

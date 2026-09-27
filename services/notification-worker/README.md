@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Worker assíncrono responsável por notificar o usuário quando um job de processamento de vídeo termina em falha.
+Worker assíncrono responsável por notificar o usuário quando o processamento de um vídeo termina, com sucesso ou com falha.
 Este módulo foi organizado seguindo Clean Architecture para manter as regras de negócio independentes de RabbitMQ,
 SMTP, JPA e Spring.
 
@@ -10,7 +10,7 @@ SMTP, JPA e Spring.
 
 ## Responsabilidades de negócio
 
-- consumir `video.job.failed.v1`;
+- consumir `video.job.completed.v1` e `video.job.failed.v1`;
 - ignorar eventos já entregues com base em `eventId`;
 - montar a notificação de falha;
 - enviar o e-mail;
@@ -78,7 +78,7 @@ adaptadores de saída. A configuração Spring conecta as implementações às p
 
 ```mermaid
 flowchart LR
-    EVENT[video.job.failed.v1] --> LISTENER[Rabbit adapter]
+    EVENT[video.job.completed.v1 / video.job.failed.v1] --> LISTENER[Rabbit adapter]
     LISTENER --> USECASE[NotifyProcessingFailureUseCase]
     USECASE --> EXISTS{eventId já entregue?}
     EXISTS -->|sim| ACK[Ignorar duplicata]
@@ -115,12 +115,12 @@ com Lombok para getters, setters e construtores quando apropriado; não são uti
 
 ## Eventos e persistência
 
-- Consome `video.job.failed.v1` pela fila `video.notifications.failure.v1`.
+- Consome `video.job.completed.v1` e `video.job.failed.v1` pela fila `video.notifications.failure.v1`.
 - DLQ: `video.notifications.failure.dlq.v1`.
 - Tabela própria: `notification_deliveries`, com unicidade em `event_id`.
 
-O contrato atual ainda não exige `recipient`. Enquanto o produtor não enviar esse campo, o worker usa
-`app.notification.default-recipient`, configurável por variável de ambiente.
+`recipient` e `videoName` são opcionais. Sem destinatário, o worker usa `app.notification.default-recipient`.
+Sem nome do vídeo, o texto fala em "seu vídeo". O id do job não entra no e-mail. `video.job.started.v1` não gera e-mail.
 
 ## Configuração
 
@@ -173,7 +173,7 @@ devem conter conteúdo sensível ou endereço de e-mail completo sem necessidade
 
 | Requisito relacionado ao worker | Situação | Implementação |
 |----------------------------------|----------|---------------|
-| Notificar o usuário em caso de erro | Parcial no fluxo ponta a ponta | O worker envia e-mail e aceita `recipient`; enquanto o produtor não preencher esse campo, utiliza um destinatário de fallback configurável. |
+| Notificar o usuário em caso de erro | Atende no worker | O worker envia e-mail de sucesso e de falha. O destinatário e o nome do vídeo vêm do evento; sem destinatário, usa o fallback configurável. |
 | Mensageria | Atende | RabbitMQ, fila durável, retry limitado e DLQ. |
 | Persistência | Atende | PostgreSQL/JPA com migration Flyway e unicidade por `event_id`. |
 | Arquitetura escalável | Atende no worker | Serviço sem estado local, consumidores concorrentes configuráveis e possibilidade de múltiplas réplicas consumindo a mesma fila. |

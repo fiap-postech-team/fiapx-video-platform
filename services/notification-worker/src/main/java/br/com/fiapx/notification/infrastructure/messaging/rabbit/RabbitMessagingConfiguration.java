@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMessagingConfiguration {
 
     public static final String EVENTS_EXCHANGE = "video.events";
+    public static final String COMPLETED_ROUTING_KEY = "video.job.completed.v1";
     public static final String FAILURE_ROUTING_KEY = "video.job.failed.v1";
     public static final String FAILURE_QUEUE = "video.notifications.failure.v1";
     public static final String FAILURE_DLQ = "video.notifications.failure.dlq.v1";
@@ -43,6 +44,16 @@ public class RabbitMessagingConfiguration {
         return BindingBuilder.bind(queue)
                 .to(videoEventsExchange)
                 .with(FAILURE_ROUTING_KEY);
+    }
+
+    @Bean
+    Binding completionNotificationBinding(
+            @Qualifier("failureNotificationQueue") Queue queue,
+            TopicExchange videoEventsExchange
+    ) {
+        return BindingBuilder.bind(queue)
+                .to(videoEventsExchange)
+                .with(COMPLETED_ROUTING_KEY);
     }
 
     @Bean

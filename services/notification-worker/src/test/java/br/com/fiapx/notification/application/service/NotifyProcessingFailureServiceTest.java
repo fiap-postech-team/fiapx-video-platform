@@ -6,6 +6,7 @@ import br.com.fiapx.notification.application.port.out.NotificationSender;
 import br.com.fiapx.notification.application.port.out.OutboundNotification;
 import br.com.fiapx.notification.domain.model.FailureNotification;
 import br.com.fiapx.notification.domain.model.NotificationDelivery;
+import br.com.fiapx.notification.domain.model.ProcessingOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,8 +61,9 @@ class NotifyProcessingFailureServiceTest {
         ArgumentCaptor<OutboundNotification> messageCaptor = ArgumentCaptor.forClass(OutboundNotification.class);
         verify(sender).send(messageCaptor.capture());
         assertEquals(failure.getRecipient(), messageCaptor.getValue().recipient());
-        assertEquals("Falha no processamento do vídeo", messageCaptor.getValue().subject());
-        assertEquals("O job " + failure.getJobId() + " falhou: timeout", messageCaptor.getValue().body());
+        assertEquals("Não foi possível processar o seu vídeo", messageCaptor.getValue().subject());
+        assertEquals("O processamento do seu vídeo não foi concluído.", messageCaptor.getValue().body());
+        org.junit.jupiter.api.Assertions.assertFalse(messageCaptor.getValue().body().contains(failure.getJobId().toString()));
 
         verify(repository).save(new NotificationDelivery(
                 failure.getEventId(),
@@ -69,6 +71,30 @@ class NotifyProcessingFailureServiceTest {
                 failure.getRecipient(),
                 NOW
         ));
+    }
+
+    @Test
+    void shouldNameTheVideoInSuccessAndFailureEmails() {
+        when(repository.existsByEventId(any())).thenReturn(false);
+        FailureNotification success = new FailureNotification(
+                UUID.randomUUID(), UUID.randomUUID(), "student@example.com", null, "aula.mp4", ProcessingOutcome.COMPLETED);
+        FailureNotification failure = new FailureNotification(
+                UUID.randomUUID(), UUID.randomUUID(), "student@example.com", "timeout", "aula.mp4", ProcessingOutcome.FAILED);
+
+        service.notify(success);
+        service.notify(failure);
+
+        ArgumentCaptor<OutboundNotification> messages = ArgumentCaptor.forClass(OutboundNotification.class);
+        verify(sender, org.mockito.Mockito.times(2)).send(messages.capture());
+        assertEquals("Seu vídeo foi processado", messages.getAllValues().get(0).subject());
+        assertEquals(
+                "O processamento do vídeo \"aula.mp4\" terminou. O resultado está disponível na FIAP X.",
+                messages.getAllValues().get(0).body());
+        assertEquals("Não foi possível processar o seu vídeo", messages.getAllValues().get(1).subject());
+        assertEquals(
+                "O processamento do vídeo \"aula.mp4\" não foi concluído.",
+                messages.getAllValues().get(1).body());
+        org.junit.jupiter.api.Assertions.assertFalse(messages.getAllValues().get(1).body().contains("timeout"));
     }
 
     @Test

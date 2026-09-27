@@ -105,7 +105,32 @@ class ProcessVideoJobServiceTest {
         assertThat(completed.occurredAt()).isEqualTo(NOW);
         assertThat(completed.correlationId()).isEqualTo(job.correlationId());
         assertThat(completed.eventId()).isNotEqualTo(published.get(0).eventId());
+        assertThat(completed.recipient()).isNull();
+        assertThat(completed.videoName()).isNull();
         assertThat(workspace.isClosed()).isTrue();
+    }
+
+    @Test
+    void copiesRecipientAndVideoNameOntoCompletionAndFailure() {
+        VideoJob named = new VideoJob(
+                job.jobId(), job.userId(), job.sourceKey(), job.correlationId(), "person@example.test", "aula.mp4");
+        givenAReadableVideoProducing(2);
+
+        service.handle(named);
+
+        JobEvent completed = lastPublishedEvent();
+        assertThat(completed.type()).isEqualTo(JobEventType.COMPLETED);
+        assertThat(completed.recipient()).isEqualTo("person@example.test");
+        assertThat(completed.videoName()).isEqualTo("aula.mp4");
+
+        givenADownloadedSource();
+        when(inspector.inspect(any())).thenReturn(new MediaMetadata(Duration.ofSeconds(3), false));
+        service.handle(named);
+
+        JobEvent failure = lastPublishedEvent();
+        assertThat(failure.type()).isEqualTo(JobEventType.FAILED);
+        assertThat(failure.recipient()).isEqualTo("person@example.test");
+        assertThat(failure.videoName()).isEqualTo("aula.mp4");
     }
 
     @Test

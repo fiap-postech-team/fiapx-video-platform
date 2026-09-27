@@ -39,7 +39,22 @@ class CreateJobTest {
         assertThat(outbox.jobId).isEqualTo(job.id());
         assertThat(outbox.userId).isEqualTo(userId);
         assertThat(outbox.sourceKey).isEqualTo("uploads/source.mp4");
+        assertThat(outbox.videoName).isEqualTo("source.mp4");
+        assertThat(outbox.recipient).isNull();
         assertThat(outbox.eventId).isNotNull();
+    }
+
+    @Test
+    void recordsTheAccountEmailAndVideoNameOnTheRequestedEvent() {
+        var outbox = new RecordingOutboxStore();
+        var userId = UUID.randomUUID();
+        var useCase = new CreateJob(new RecordingJobStore(), outbox, videos(userId), new IdempotencyStore(),
+            ignored -> true, Clock.systemUTC(), UUID::randomUUID, id -> "person@example.test");
+
+        useCase.execute(userId, "uploads/source.mp4");
+
+        assertThat(outbox.recipient).isEqualTo("person@example.test");
+        assertThat(outbox.videoName).isEqualTo("source.mp4");
     }
 
     @Test
@@ -151,9 +166,20 @@ class CreateJobTest {
         private UUID jobId;
         private UUID userId;
         private String sourceKey;
+        private String recipient;
+        private String videoName;
         private int appended;
         public void append(UUID eventId, UUID jobId, UUID userId, String sourceKey) {
-            this.eventId = eventId; this.jobId = jobId; this.userId = userId; this.sourceKey = sourceKey;
+            append(eventId, jobId, userId, null, sourceKey, null, null, null, null);
+        }
+        public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,
+                           Instant occurredAt, UUID correlationId, String recipient, String videoName) {
+            this.eventId = eventId;
+            this.jobId = jobId;
+            this.userId = userId;
+            this.sourceKey = sourceKey;
+            this.recipient = recipient;
+            this.videoName = videoName;
             appended++;
         }
     }

@@ -11,9 +11,11 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 @Component
@@ -27,11 +29,12 @@ public class FailureEventListener {
     private final NotificationProperties properties;
 
     @RabbitListener(queues = RabbitMessagingConfiguration.FAILURE_QUEUE)
-    public void consume(String body) throws JsonProcessingException {
-        FailureEventMessage message = objectMapper.readValue(body, FailureEventMessage.class);
-        validate(message);
+    public void consume(Message message) throws JsonProcessingException {
+        String body = new String(message.getBody(), StandardCharsets.UTF_8);
+        FailureEventMessage event = objectMapper.readValue(body, FailureEventMessage.class);
+        validate(event);
 
-        FailureNotification failure = FailureEventMapper.toDomain(message, properties.getDefaultRecipient());
+        FailureNotification failure = FailureEventMapper.toDomain(event, properties.getDefaultRecipient());
         NotificationResult result = useCase.notify(failure);
 
         log.info(

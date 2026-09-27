@@ -42,7 +42,9 @@ public class FailedEventMessageRecoverer implements MessageRecoverer {
         JobRequestedMessage request = readRequest(message);
         if (request != null && request.jobId() != null) {
             log.error("job {} exhausted processing retries, dead-lettering", request.jobId(), cause);
-            publisher.publish(JobEvent.failed(request.jobId(), request.correlationId(), REASON, true, clock.instant()));
+            publisher.publish(JobEvent.failed(
+                    request.jobId(), request.correlationId(), REASON, true, clock.instant(),
+                    request.recipient(), request.videoName()));
         } else {
             log.error("dead-lettering a message without a readable job id", cause);
         }

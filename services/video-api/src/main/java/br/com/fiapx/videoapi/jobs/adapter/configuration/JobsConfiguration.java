@@ -33,7 +33,8 @@ public class JobsConfiguration {
                               Clock clock, UuidGenerator ids) {
         return new CreateJob(jobs, outbox, videos, idempotency,
             userId -> identities.findUser(userId).map(user -> user.status() == UserStatus.ACTIVE).orElse(false),
-            clock, ids);
+            clock, ids,
+            userId -> identities.findUser(userId).map(user -> user.email()).orElse(null));
     }
     @Bean ProcessJobResult processJobResult(InboxStore inbox, JobStore jobs, BusinessMetrics metrics) {
         return new ProcessJobResult(inbox, jobs, metrics);

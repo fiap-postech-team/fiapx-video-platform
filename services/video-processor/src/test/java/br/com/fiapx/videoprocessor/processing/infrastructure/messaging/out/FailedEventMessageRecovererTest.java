@@ -50,6 +50,8 @@ class FailedEventMessageRecovererTest {
         assertThat(event.correlationId()).isEqualTo(correlationId);
         assertThat(event.terminal()).isTrue();
         assertThat(event.occurredAt()).isEqualTo(NOW);
+        assertThat(event.recipient()).isEqualTo("person@example.test");
+        assertThat(event.videoName()).isEqualTo("aula.mp4");
     }
 
     @Test
@@ -84,7 +86,7 @@ class FailedEventMessageRecovererTest {
     private Message requestFor(UUID jobId, UUID correlationId) {
         String json =
                 """
-                {"eventId":"%s","jobId":"%s","userId":"%s","sourceKey":"uploads/video.mp4","correlationId":%s}
+                {"eventId":"%s","jobId":"%s","userId":"%s","sourceKey":"uploads/video.mp4","correlationId":%s,"recipient":"person@example.test","videoName":"aula.mp4"}
                 """
                         .formatted(
                                 UUID.randomUUID(),
