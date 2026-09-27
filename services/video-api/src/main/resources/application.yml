@@ -24,9 +24,13 @@ spring:
     timeout-per-shutdown-phase: 20s
 
 logging:
-  structured:
-    format:
-      console: logstash
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg %mdc %kvp%n%wEx"
+  level:
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.apache.catalina: WARN
+    com.zaxxer.hikari: WARN
 
 server:
   shutdown: graceful
