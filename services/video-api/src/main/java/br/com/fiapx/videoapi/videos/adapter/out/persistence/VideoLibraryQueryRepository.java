@@ -24,14 +24,84 @@ interface VideoLibraryQueryRepository extends Repository<VideoEntity, UUID> {
         from videos v
         left join jobs j on j.video_id = v.id and j.video_library_visible = true
         where v.user_id = :ownerId and v.upload_status <> 'DELETED'
-        order by coalesce(j.updated_at, j.created_at, v.created_at) desc, v.id desc
+          and (
+            :normalizedName is null
+            or (:nameMatch = 'EXACT' and lower(v.original_filename) = :normalizedName)
+            or (:nameMatch = 'PREFIX' and starts_with(lower(v.original_filename), :normalizedName))
+          )
+          and (
+            :statusFilter = 'ALL'
+            or (:statusFilter = 'PROCESSED' and j.status = 'COMPLETED')
+            or (:statusFilter = 'PROCESSING' and (
+              j.status in ('PENDING', 'PROCESSING')
+              or (j.id is null and v.upload_status = 'UPLOADED')
+            ))
+            or (:statusFilter = 'FAILED' and (
+              j.status = 'FAILED'
+              or (j.id is null and v.upload_status in ('REJECTED', 'EXPIRED'))
+            ))
+          )
+        order by
+          case when :sort = 'STATUS' and :direction = 'ASC' then
+            case
+              when j.status = 'COMPLETED' then 4
+              when j.status = 'FAILED' then 2
+              when j.status in ('PENDING', 'PROCESSING') or (j.id is null and v.upload_status = 'UPLOADED') then 5
+              when v.upload_status = 'EXPIRED' then 1
+              when v.upload_status = 'REJECTED' then 6
+              else 3
+            end
+          end asc,
+          case when :sort = 'STATUS' and :direction = 'DESC' then
+            case
+              when j.status = 'COMPLETED' then 4
+              when j.status = 'FAILED' then 2
+              when j.status in ('PENDING', 'PROCESSING') or (j.id is null and v.upload_status = 'UPLOADED') then 5
+              when v.upload_status = 'EXPIRED' then 1
+              when v.upload_status = 'REJECTED' then 6
+              else 3
+            end
+          end desc,
+          case when :sort = 'UPDATED_AT' and :direction = 'ASC'
+            then coalesce(j.updated_at, j.created_at, v.created_at) end asc,
+          case when :sort = 'UPDATED_AT' and :direction = 'DESC'
+            then coalesce(j.updated_at, j.created_at, v.created_at) end desc,
+          coalesce(j.updated_at, j.created_at, v.created_at) desc,
+          v.id desc
         """,
         countQuery = """
-        select count(*) from videos v
+        select count(*)
+        from videos v
+        left join jobs j on j.video_id = v.id and j.video_library_visible = true
         where v.user_id = :ownerId and v.upload_status <> 'DELETED'
+          and (
+            :normalizedName is null
+            or (:nameMatch = 'EXACT' and lower(v.original_filename) = :normalizedName)
+            or (:nameMatch = 'PREFIX' and starts_with(lower(v.original_filename), :normalizedName))
+          )
+          and (
+            :statusFilter = 'ALL'
+            or (:statusFilter = 'PROCESSED' and j.status = 'COMPLETED')
+            or (:statusFilter = 'PROCESSING' and (
+              j.status in ('PENDING', 'PROCESSING')
+              or (j.id is null and v.upload_status = 'UPLOADED')
+            ))
+            or (:statusFilter = 'FAILED' and (
+              j.status = 'FAILED'
+              or (j.id is null and v.upload_status in ('REJECTED', 'EXPIRED'))
+            ))
+          )
         """,
         nativeQuery = true)
-    Page<VideoLibraryQuery> findPage(@Param("ownerId") UUID ownerId, Pageable pageable);
+    Page<VideoLibraryQuery> findPage(
+        @Param("ownerId") UUID ownerId,
+        @Param("normalizedName") String normalizedName,
+        @Param("nameMatch") String nameMatch,
+        @Param("statusFilter") String statusFilter,
+        @Param("sort") String sort,
+        @Param("direction") String direction,
+        Pageable pageable
+    );
 
     @Query(value = """
         select v.id as videoId,

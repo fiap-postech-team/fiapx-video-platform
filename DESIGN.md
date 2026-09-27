@@ -193,7 +193,7 @@ The approved list is a single white table on the stage:
 3. Status (one lifecycle pill)
 4. Ver detalhes (quiet indigo text button)
 
-Do not show a `5/20` (or `{n} vídeos`) count above the table. **Search and filters are not part of the approved UI.** Do not add search fields, status chips, or extra toolbars. If leftover prototype controls exist in code, do not expand, restyle, or treat them as a pattern.
+The named `prd-filtro-busca-videos` feature adds one compact toolbar before the table: a visually quiet filename field with a search icon, a funnel-triggered single-select status menu, and a quiet clear action. The field applies prefix matching after a 300 ms pause and exact matching on Enter without explanatory helper copy or a visible result counter. Status and Updated at are sortable table headers, with ordering applied before pagination. Criteria remain visible while paging, loading, or retrying. This toolbar is a documented exception and must not expand into unrelated actions, advanced filters, or extra columns.
 
 ### Column alignment
 Header row and every data row **must share the exact same grid**:
@@ -206,7 +206,8 @@ Gap `1.25rem`. Horizontal padding `1.15rem`. Vertical padding `0.9rem`. `align-i
 
 - Date, status, and action tracks are shared widths, not per-row `max-content`.
 - Status header, status cell, and badge left edges share the same x.
-- The action header may be visually empty but must occupy the fourth track with the same padding as `Ver detalhes`.
+- The action header and every `Ver detalhes` label share the fourth track's left edge; retain the button hit area with an optical negative margin rather than shifting the text.
+- The action track reserves a stable icon slot after `Ver detalhes`: show download when the result is available, a compact loading indicator only while the result can still become available, and no misleading loading state for terminal failures.
 - Filename uses `minmax(0, 1fr)`, `nowrap`, `ellipsis` — never `overflow-wrap: anywhere`.
 
 **The Shared Grid Rule.** Independent CSS grids that size columns from their own content are forbidden for this table. Header and rows must paint on one template.
@@ -271,7 +272,7 @@ Do not show separate upload vs processing statuses on the list.
 White surface, 1px line border, `8px` radius. Header row `#f8f9fb` with muted 16px/600 labels. Body rows 16px filename, 15px date. Row min-height about `3.75rem`. No card gallery, no icon columns, no avatars.
 
 ### Page empty / filter-empty
-If the owner has no videos, explain that and offer Enviar o primeiro vídeo. Do not reuse that copy when a query hides rows. (Search/filter themselves are not approved chrome.)
+If the owner has no videos, explain that and offer Enviar o primeiro vídeo. When active criteria hide every row, explain that no video matches and offer to clear the criteria instead of reusing the genuine-empty copy.
 
 ### Inputs
 Surface fill, 1px line, 16px text. Labels 15px/600. Errors in `#b42318` next to the field.

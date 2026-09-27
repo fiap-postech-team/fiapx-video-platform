@@ -24,6 +24,49 @@ describe('MockVideoService', () => {
     ])
   })
 
+  it('filters names and status groups before calculating pagination', async () => {
+    const service = new MockVideoService()
+
+    await expect(service.list(1, {
+      query: { name: '  A  ', match: 'PREFIX', status: 'ALL' },
+    })).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({ originalFilename: 'aula-gravada.mp4' }),
+        expect.objectContaining({ originalFilename: 'apresentacao.mp4' }),
+      ],
+      totalItems: 2,
+      totalPages: 1,
+    })
+    await expect(service.list(1, {
+      query: { name: 'CAMPANHA.MP4', match: 'EXACT', status: 'PROCESSED' },
+    })).resolves.toMatchObject({
+      items: [expect.objectContaining({ originalFilename: 'campanha.mp4' })],
+      totalItems: 1,
+    })
+    await expect(service.list(1, {
+      query: { status: 'PROCESSING' },
+    })).resolves.toMatchObject({ totalItems: 3, totalPages: 1 })
+    await expect(service.list(1, {
+      query: { status: 'FAILED' },
+    })).resolves.toMatchObject({ totalItems: 3, totalPages: 1 })
+  })
+
+  it('sorts the complete filtered collection before pagination', async () => {
+    const service = new MockVideoService()
+
+    const ascending = await service.list(1, {
+      query: { status: 'ALL', sort: 'UPDATED_AT', direction: 'ASC' },
+    })
+    expect(ascending.items[0]?.originalFilename).toBe('rascunho.mp4')
+
+    const byStatus = await service.list(1, {
+      query: { status: 'ALL', sort: 'STATUS', direction: 'ASC' },
+    })
+    expect(byStatus.items.map((video) => video.status)).toEqual([
+      'EXPIRED', 'FAILED', 'AWAITING_UPLOAD', 'AVAILABLE', 'UPLOADED',
+    ])
+  })
+
   it('hides an unknown reference and keeps a single processing on the video', async () => {
     const service = new MockVideoService()
     const video = await service.get('ref-available')

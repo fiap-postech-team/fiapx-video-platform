@@ -1,6 +1,7 @@
 package br.com.fiapx.videoapi.videos.application.port.out;
 
 import br.com.fiapx.videoapi.jobs.domain.JobStatus;
+import br.com.fiapx.videoapi.videos.application.VideoLibraryCriteria;
 import br.com.fiapx.videoapi.videos.domain.VideoStatus;
 import java.time.Instant;
 import java.util.List;
@@ -8,7 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VideoLibraryReader {
-    Page findPage(UUID ownerId, int pageNumber, int pageSize);
+    Page findPage(UUID ownerId, int pageNumber, int pageSize, VideoLibraryCriteria criteria);
 
     Optional<DetailRow> findDetail(UUID ownerId, UUID videoId);
 

@@ -151,7 +151,9 @@ The palette combines production-floor neutrals with scarce, purposeful signals: 
 
 Authenticated screens use a fixed 15.5rem navigation rail beside a fluid content canvas. Main content is centered within a 76rem maximum and receives responsive outer padding between 2rem and 4rem on wide screens. Page headers align the title group and primary action at their lower edge, with generous separation before operational content.
 
-Tables use explicit columns for file, update time, status, and actions. Actions align to the trailing edge and receive enough width for both detail and download controls. Below 980px, navigation becomes an off-canvas panel and the table becomes a two-column summary. Below 620px, each row becomes a single-column labeled panel, preserving the meaning of every value and making actions full-width.
+Tables use explicit columns for file, update time, status, and actions. The Actions header and each detail label share the column's leading edge, followed by a stable icon slot for download or in-progress preparation. Below 980px, navigation becomes an off-canvas panel and the table becomes a two-column summary. Below 620px, each row becomes a single-column labeled panel, preserving the meaning of every value and making actions full-width.
+
+The named `prd-filtro-busca-videos` feature approves one compact query toolbar immediately before the video table. It contains a visually quiet filename field with an accessible hidden label and search icon, a funnel-triggered single-select status menu, and a quiet clear action. Typing applies prefix matching after 300 ms; Enter applies an exact full-name match. No explanatory helper or visible result count accompanies the controls. Status and Updated at are sortable headers, and the selected order is applied before pagination. The controls retain the existing surface, divider, radius, type, focus, and responsive rules and remain visible during loading and retry. This is a named exception, not a pattern for unrelated table chrome.
 
 Spacing follows a compact working rhythm: 0.3–0.5rem within tightly related controls, 1rem within standard containers, 1.5rem between related groups, and 2rem or more between major page regions.
 
@@ -204,7 +206,9 @@ The rail uses Control Room Charcoal with muted cool-gray labels. Hover and curre
 
 ### Video Table
 
-The video table is the signature operational component. Its header uses compact uppercase labels on a cool neutral strip, its rows provide restrained hover feedback, and its action column stays visibly named and trailing-aligned. Mobile rows expose field labels rather than relying on desktop column position.
+The video table is the signature operational component. Its header uses compact uppercase labels on a cool neutral strip, its rows provide restrained hover feedback, and its action column stays visibly named and leading-aligned. A spinner is reserved for non-terminal states whose result is still being prepared; failed, rejected, and expired rows do not imply future availability. Mobile rows expose field labels rather than relying on desktop column position.
+
+The genuine-empty state continues to invite the first upload. A filtered-empty state instead explains that no video matches and offers to clear the active search and status without presenting the query as an error.
 
 ## Do's and Don'ts
 

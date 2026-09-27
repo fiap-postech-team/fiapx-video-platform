@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class FindVideoLibraryTest {
@@ -27,7 +28,7 @@ class FindVideoLibraryTest {
         var submitted = Instant.parse("2026-09-20T10:00:00Z");
         var activity = Instant.parse("2026-09-20T11:00:00Z");
         var reader = new VideoLibraryReader() {
-            public Page findPage(UUID ownerId, int pageNumber, int pageSize) {
+            public Page findPage(UUID ownerId, int pageNumber, int pageSize, VideoLibraryCriteria criteria) {
                 return new Page(List.of(
                     new Row(withJob, "aula.mp4", VideoStatus.UPLOADED, submitted, UUID.randomUUID(), JobStatus.COMPLETED,
                         submitted, activity),
@@ -51,6 +52,29 @@ class FindVideoLibraryTest {
     }
 
     @Test
+    void forwardsCriteriaToTheOwnerScopedReader() {
+        var captured = new AtomicReference<VideoLibraryCriteria>();
+        var reader = new VideoLibraryReader() {
+            public Page findPage(UUID ownerId, int pageNumber, int pageSize, VideoLibraryCriteria criteria) {
+                captured.set(criteria);
+                return new Page(List.of(), 0);
+            }
+            public Optional<DetailRow> findDetail(UUID ownerId, UUID videoId) {
+                return Optional.empty();
+            }
+        };
+        var criteria = new VideoLibraryCriteria(
+            "Black",
+            VideoLibraryNameMatch.EXACT,
+            VideoLibraryStatusFilter.PROCESSED
+        );
+
+        new FindVideoLibrary(reader).execute(UUID.randomUUID(), 1, criteria);
+
+        assertThat(captured).hasValue(criteria);
+    }
+
+    @Test
     void reportsZeroPagesWhenTheOwnerHasNoVideos() {
         var page = new FindVideoLibrary(emptyReader()).execute(UUID.randomUUID(), 1);
         assertThat(page.items()).isEmpty();
@@ -61,7 +85,7 @@ class FindVideoLibraryTest {
 
     private static VideoLibraryReader emptyReader() {
         return new VideoLibraryReader() {
-            public Page findPage(UUID ownerId, int pageNumber, int pageSize) {
+            public Page findPage(UUID ownerId, int pageNumber, int pageSize, VideoLibraryCriteria criteria) {
                 return new Page(List.of(), 0);
             }
             public Optional<DetailRow> findDetail(UUID ownerId, UUID videoId) {

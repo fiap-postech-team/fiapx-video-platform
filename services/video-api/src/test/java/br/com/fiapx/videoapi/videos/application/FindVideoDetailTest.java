@@ -25,7 +25,7 @@ class FindVideoDetailTest {
         var videoId = UUID.randomUUID();
         var requested = Instant.parse("2026-09-20T14:11:13Z");
         var reader = new VideoLibraryReader() {
-            public Page findPage(UUID ownerId, int pageNumber, int pageSize) {
+            public Page findPage(UUID ownerId, int pageNumber, int pageSize, VideoLibraryCriteria criteria) {
                 return new Page(List.of(), 0);
             }
             public Optional<DetailRow> findDetail(UUID ownerId, UUID id) {
@@ -44,7 +44,7 @@ class FindVideoDetailTest {
 
     private static VideoLibraryReader empty() {
         return new VideoLibraryReader() {
-            public Page findPage(UUID ownerId, int pageNumber, int pageSize) {
+            public Page findPage(UUID ownerId, int pageNumber, int pageSize, VideoLibraryCriteria criteria) {
                 return new Page(List.of(), 0);
             }
             public Optional<DetailRow> findDetail(UUID ownerId, UUID videoId) {

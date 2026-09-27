@@ -73,6 +73,30 @@ describe('VideoHttpService', () => {
     expect(JSON.stringify(page)).not.toMatch(/sourceKey|resultKey|userId/)
   })
 
+  it('serializes trimmed library criteria and omits inactive defaults', async () => {
+    const page = { items: [], page: 2, pageSize: 5, totalItems: 0, totalPages: 0 }
+    const authorizedFetch = vi.fn()
+      .mockResolvedValueOnce(json(200, page))
+      .mockResolvedValueOnce(json(200, page))
+    const service = new VideoHttpService(authorizedFetch, 'http://localhost:8080')
+
+    await service.list(2, {
+      query: { name: '  Black% _  ', match: 'EXACT', status: 'FAILED' },
+    })
+    await service.list(1, {
+      query: { name: '   ', match: 'EXACT', status: 'ALL', sort: 'STATUS', direction: 'ASC' },
+    })
+
+    expect(authorizedFetch).toHaveBeenNthCalledWith(
+      1,
+      'http://localhost:8080/v1/videos?page=2&name=Black%25+_&match=EXACT&status=FAILED',
+    )
+    expect(authorizedFetch).toHaveBeenNthCalledWith(
+      2,
+      'http://localhost:8080/v1/videos?page=1&sort=STATUS&direction=ASC',
+    )
+  })
+
   it('requests a fresh temporary download URL and maps stable result errors', async () => {
     const authorizedFetch = vi.fn()
       .mockResolvedValueOnce(json(200, {

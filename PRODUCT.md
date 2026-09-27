@@ -38,6 +38,7 @@ Confirmed:
 - Register USER against the API (email unique); login does not auto-happen after register. Local field checks remain 8–128 characters.
 - Login, silent session restore, read-only profile from `GET /v1/me`, and logout. Access token stays in memory only.
 - List videos owned by the signed-in account; one row per file; one lifecycle status; numbered pages of 5 from `GET /v1/videos`.
+- Search the full video library by case-insensitive name prefix after a 300 ms pause or by exact full name on Enter, combined with one status filter: Todos, Processado, Processando, or Falha no processamento; sort the full result by status or update time before pagination.
 - Detail shows the same lifecycle status and a timeline of the upload plus the single processing. No history, reprocess, or download.
 - Simulated upload: empty picker, selected file, progress, confirmation, success, recoverable failure, pending confirmation. No file bytes leave the browser.
 - Profile is read-only email. No profile edit, password recovery, or admin UI.

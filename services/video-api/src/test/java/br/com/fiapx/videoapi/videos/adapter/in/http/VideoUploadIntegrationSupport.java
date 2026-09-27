@@ -85,7 +85,7 @@ abstract class VideoUploadIntegrationSupport {
         if (token != null) {
             headers.setBearerAuth(token);
         }
-        return client.exchange(url(path), HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+        return client.exchange(URI.create(url(path)), HttpMethod.GET, new HttpEntity<>(headers), Map.class);
     }
 
     int put(Map<String, Object> upload, byte[] bytes) throws Exception {

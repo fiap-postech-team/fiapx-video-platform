@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -123,6 +123,72 @@ describe('authenticated product', () => {
     assertProductLanguage()
   })
 
+  it('searches by prefix after a pause and by exact name on Enter', async () => {
+    const user = userEvent.setup()
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService()}
+      />,
+    )
+    await signIn(user)
+
+    const search = screen.getByRole('searchbox', { name: copy.videos.searchLabel })
+    await user.type(search, 'aula')
+    await waitFor(() => expect(screen.queryByText('campanha.mp4')).not.toBeInTheDocument())
+    expect(screen.getByText('aula-gravada.mp4')).toBeInTheDocument()
+
+    await user.clear(search)
+    await user.type(search, 'AULA-GRAVADA.MP4{Enter}')
+    expect(await screen.findByText('aula-gravada.mp4')).toBeInTheDocument()
+    expect(screen.queryByText(/A busca por início/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/vídeos? encontrados?/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: `${copy.videos.statusFilterLabel}: ${copy.videos.statusAll}` })).toBeInTheDocument()
+  })
+
+  it('combines status and name, then clears the active criteria', async () => {
+    const user = userEvent.setup()
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService()}
+      />,
+    )
+    await signIn(user)
+
+    await user.click(screen.getByRole('button', { name: `${copy.videos.statusFilterLabel}: ${copy.videos.statusAll}` }))
+    await user.click(screen.getByRole('menuitemradio', { name: copy.videos.statusFailed }))
+    await screen.findByText('entrevista.mp4')
+    expect(screen.getByText('entrevista.mp4')).toBeInTheDocument()
+    expect(screen.getByText('material.mp4')).toBeInTheDocument()
+    expect(screen.getByText('rascunho.mp4')).toBeInTheDocument()
+
+    await user.type(screen.getByRole('searchbox'), 'mat')
+    await waitFor(() => expect(screen.queryByText('entrevista.mp4')).not.toBeInTheDocument())
+    expect(screen.getByText('material.mp4')).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: copy.videos.clearCriteria })[0]!)
+    await screen.findByText('campanha.mp4')
+    expect(screen.getByRole('button', { name: `${copy.videos.statusFilterLabel}: ${copy.videos.statusAll}` })).toBeInTheDocument()
+  })
+
+  it('shows a dedicated no-results state with an accessible recovery action', async () => {
+    const user = userEvent.setup()
+    render(
+      <App
+        authenticationService={serviceReturning({ user: DEMO_USER })}
+        videoService={new MockVideoService()}
+      />,
+    )
+    await signIn(user)
+
+    await user.type(screen.getByRole('searchbox'), 'nao-existe')
+    expect(await screen.findByRole('heading', { name: copy.videos.filteredEmptyTitle })).toBeInTheDocument()
+    expect(screen.getByText(copy.videos.filteredEmptyBody)).toBeInTheDocument()
+    expect(screen.queryByText(copy.videos.emptyTitle)).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: copy.videos.clearCriteria }).length).toBeGreaterThan(0)
+  })
+
   it('opens a dedicated detail with a single timeline and a download action', async () => {
     const user = userEvent.setup()
     render(
@@ -160,11 +226,15 @@ describe('authenticated product', () => {
 
   it('shows a recoverable load error', async () => {
     const user = userEvent.setup()
+    const recovered = await new MockVideoService().list(1)
+    const list = vi.fn()
+      .mockRejectedValueOnce({ code: 'LIST_UNAVAILABLE', message: 'mock' })
+      .mockResolvedValue(recovered)
     render(
       <App
         authenticationService={serviceReturning({ user: DEMO_USER })}
         videoService={{
-          list: vi.fn().mockRejectedValue({ code: 'LIST_UNAVAILABLE', message: 'mock' }),
+          list,
           get: vi.fn(),
           download: vi.fn(),
           simulateUpload: vi.fn(),
@@ -173,6 +243,9 @@ describe('authenticated product', () => {
     )
     await signIn(user)
     expect(await screen.findByRole('alert')).toHaveTextContent(copy.videos.error)
+    await user.click(screen.getByRole('button', { name: copy.videos.retry }))
+    expect(await screen.findByRole('columnheader', { name: copy.videos.colFile })).toBeInTheDocument()
+    expect(list).toHaveBeenCalledTimes(2)
   })
 
   it('simulates upload from metadata and never calls the network', async () => {
