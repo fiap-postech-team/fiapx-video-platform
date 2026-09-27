@@ -38,7 +38,13 @@ public class JobRequestedListener {
             throw new AmqpRejectAndDontRequeueException("empty video.job.requested.v1 payload");
         }
         try {
-            return new VideoJob(message.jobId(), message.userId(), message.sourceKey(), message.correlationId());
+            return new VideoJob(
+                    message.jobId(),
+                    message.userId(),
+                    message.sourceKey(),
+                    message.correlationId(),
+                    message.recipient(),
+                    message.videoName());
         } catch (RuntimeException e) {
             throw new AmqpRejectAndDontRequeueException(
                     "invalid video.job.requested.v1 payload: " + e.getMessage(), e);

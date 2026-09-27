@@ -21,10 +21,10 @@ job e histórico de forma transacional.
 
 | Routing key              | Produtor               | Consumidores                       | Quando ocorre              | Campos específicos                                      |
 |--------------------------|------------------------|------------------------------------|----------------------------|---------------------------------------------------------|
-| `video.job.requested.v1` | `video-api` via outbox | `video-processor` | job, histórico e outbox persistidos | `userId`, `videoId` opcional, `sourceKey`              |
+| `video.job.requested.v1` | `video-api` via outbox | `video-processor` | job, histórico e outbox persistidos | `userId`, `videoId` opcional, `sourceKey`, `recipient`, `videoName` |
 | `video.job.started.v1`   | `video-processor`      | `video-api`                        | processor inicia trabalho  | `type=PROCESSING`                                       |
-| `video.job.completed.v1` | `video-processor`      | `video-api`                        | ZIP armazenado com sucesso | `type=COMPLETED`, `resultKey`                           |
-| `video.job.failed.v1`    | `video-processor`      | `video-api`, `notification-worker` | falha declarada terminal   | `type=FAILED`, `terminal`, `reason`, `recipient` futuro |
+| `video.job.completed.v1` | `video-processor`      | `video-api`, `notification-worker` | ZIP armazenado com sucesso | `type=COMPLETED`, `resultKey`, `recipient`, `videoName` |
+| `video.job.failed.v1`    | `video-processor`      | `video-api`, `notification-worker` | falha declarada terminal   | `type=FAILED`, `terminal`, `reason`, `recipient`, `videoName` |
 
 ## Envelope esperado
 

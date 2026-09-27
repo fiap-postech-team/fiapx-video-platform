@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import br.com.fiapx.videoapi.jobs.application.port.out.UuidGenerator;
 
@@ -20,6 +21,7 @@ public final class CreateJob {
     private final Predicate<UUID> activeUsers;
     private final Clock clock;
     private final UuidGenerator ids;
+    private final Function<UUID, String> recipients;
 
     public CreateJob(JobStore jobs, OutboxStore outbox, VideoStore videos, Clock clock) {
         this(jobs, outbox, videos, noIdempotency(), userId -> true, clock, UUID::randomUUID);
@@ -33,6 +35,12 @@ public final class CreateJob {
     public CreateJob(JobStore jobs, OutboxStore outbox, VideoStore videos,
                      JobCreationIdempotencyStore idempotency, Predicate<UUID> activeUsers,
                      Clock clock, UuidGenerator ids) {
+        this(jobs, outbox, videos, idempotency, activeUsers, clock, ids, userId -> null);
+    }
+
+    public CreateJob(JobStore jobs, OutboxStore outbox, VideoStore videos,
+                     JobCreationIdempotencyStore idempotency, Predicate<UUID> activeUsers,
+                     Clock clock, UuidGenerator ids, Function<UUID, String> recipients) {
         this.jobs = jobs;
         this.outbox = outbox;
         this.videos = videos;
@@ -40,6 +48,7 @@ public final class CreateJob {
         this.activeUsers = activeUsers;
         this.clock = clock;
         this.ids = ids;
+        this.recipients = recipients;
     }
 
     public Job execute(UUID userId, String sourceKey) {
@@ -79,7 +88,8 @@ public final class CreateJob {
         if (idempotencyKey != null) {
             idempotency.record(userId, idempotencyKey, fingerprint, job.id());
         }
-        outbox.append(ids.next(), job.id(), userId, video.id(), sourceKey, job.createdAt(), correlationId);
+        outbox.append(ids.next(), job.id(), userId, video.id(), sourceKey, job.createdAt(), correlationId,
+            recipients.apply(userId), lockedVideo.originalFilename());
         return new CreationOutcome(job, true);
     }
 

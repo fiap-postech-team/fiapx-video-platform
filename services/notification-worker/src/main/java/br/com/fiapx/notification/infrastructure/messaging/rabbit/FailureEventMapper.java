@@ -1,6 +1,7 @@
 package br.com.fiapx.notification.infrastructure.messaging.rabbit;
 
 import br.com.fiapx.notification.domain.model.FailureNotification;
+import br.com.fiapx.notification.domain.model.ProcessingOutcome;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -21,7 +22,9 @@ public final class FailureEventMapper {
                 message.getEventId(),
                 message.getJobId(),
                 recipient,
-                normalize(message.getReason())
+                normalize(message.getReason()),
+                normalize(message.getVideoName()),
+                ProcessingOutcome.valueOf(message.getType())
         );
     }
 

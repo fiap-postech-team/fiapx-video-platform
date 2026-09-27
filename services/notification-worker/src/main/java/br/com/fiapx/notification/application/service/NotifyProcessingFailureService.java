@@ -7,6 +7,7 @@ import br.com.fiapx.notification.application.port.out.NotificationSender;
 import br.com.fiapx.notification.application.port.out.OutboundNotification;
 import br.com.fiapx.notification.domain.model.FailureNotification;
 import br.com.fiapx.notification.domain.model.NotificationDelivery;
+import br.com.fiapx.notification.domain.model.ProcessingOutcome;
 import lombok.RequiredArgsConstructor;
 
 import java.time.Clock;
@@ -15,7 +16,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public final class NotifyProcessingFailureService implements NotifyProcessingFailureUseCase {
 
-    private static final String FAILURE_SUBJECT = "Falha no processamento do vídeo";
+    private static final String SUCCESS_SUBJECT = "Seu vídeo foi processado";
+    private static final String FAILURE_SUBJECT = "Não foi possível processar o seu vídeo";
 
     private final NotificationDeliveryRepository deliveryRepository;
     private final NotificationSender notificationSender;
@@ -29,10 +31,11 @@ public final class NotifyProcessingFailureService implements NotifyProcessingFai
             return NotificationResult.ALREADY_DELIVERED;
         }
 
+        boolean succeeded = failure.getOutcome() == ProcessingOutcome.COMPLETED;
         notificationSender.send(new OutboundNotification(
                 failure.getRecipient(),
-                FAILURE_SUBJECT,
-                "O job " + failure.getJobId() + " falhou: " + failure.getReason()
+                succeeded ? SUCCESS_SUBJECT : FAILURE_SUBJECT,
+                body(failure.getVideoName(), succeeded)
         ));
 
         deliveryRepository.save(new NotificationDelivery(
@@ -43,5 +46,16 @@ public final class NotifyProcessingFailureService implements NotifyProcessingFai
         ));
 
         return NotificationResult.DELIVERED;
+    }
+
+    private static String body(String videoName, boolean succeeded) {
+        if (videoName == null) {
+            return succeeded
+                    ? "O processamento do seu vídeo terminou. O resultado está disponível na FIAP X."
+                    : "O processamento do seu vídeo não foi concluído.";
+        }
+        return succeeded
+                ? "O processamento do vídeo \"" + videoName + "\" terminou. O resultado está disponível na FIAP X."
+                : "O processamento do vídeo \"" + videoName + "\" não foi concluído.";
     }
 }

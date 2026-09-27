@@ -8,8 +8,8 @@ import java.util.UUID;
 /**
  * Wire shape of {@code JobResult} in {@code contracts/asyncapi.yaml}.
  *
- * <p>{@code recipient} is not published: the request only carries a user id, and resolving it to an
- * address is the notification worker's responsibility.
+ * <p>{@code recipient} and {@code videoName} are copied from the request when the producer sent them.
+ * The notification worker uses them to address the user without reading the API database.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record JobResultMessage(
@@ -21,7 +21,9 @@ public record JobResultMessage(
         UUID correlationId,
         String resultKey,
         Boolean terminal,
-        String reason) {
+        String reason,
+        String recipient,
+        String videoName) {
 
     static final String SCHEMA_VERSION = "1.0";
 
@@ -35,6 +37,8 @@ public record JobResultMessage(
                 event.correlationId(),
                 event.resultKey(),
                 event.terminal(),
-                event.reason());
+                event.reason(),
+                event.recipient(),
+                event.videoName());
     }
 }

@@ -51,6 +51,21 @@ class JobRequestedListenerTest {
     }
 
     @Test
+    void carriesRecipientAndVideoNameIntoTheJob() {
+        JobRequestedListener listener = new JobRequestedListener(processVideoJob);
+        UUID jobId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        listener.onJobRequested(new JobRequestedMessage(
+                UUID.randomUUID(), jobId, userId, "uploads/video.mp4", null, "person@example.test", "aula.mp4"));
+
+        ArgumentCaptor<VideoJob> captor = ArgumentCaptor.forClass(VideoJob.class);
+        verify(processVideoJob).handle(captor.capture());
+        assertThat(captor.getValue().recipient()).isEqualTo("person@example.test");
+        assertThat(captor.getValue().videoName()).isEqualTo("aula.mp4");
+    }
+
+    @Test
     void rejectsWithoutRetryWhenAContractRequiredFieldIsMissing() {
         JobRequestedListener listener = new JobRequestedListener(processVideoJob);
         JobRequestedMessage withoutSourceKey =

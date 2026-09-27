@@ -1,6 +1,7 @@
 package br.com.fiapx.notification.infrastructure.messaging.rabbit;
 
 import br.com.fiapx.notification.domain.model.FailureNotification;
+import br.com.fiapx.notification.domain.model.ProcessingOutcome;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -22,6 +23,21 @@ class FailureEventMapperTest {
         assertEquals(jobId, failure.getJobId());
         assertEquals("dev@fiapx.local", failure.getRecipient());
         assertEquals("erro não informado", failure.getReason());
+        assertEquals(ProcessingOutcome.FAILED, failure.getOutcome());
+        assertEquals(null, failure.getVideoName());
+    }
+
+    @Test
+    void shouldKeepTheVideoNameAndCompletedOutcome() {
+        FailureEventMessage message = new FailureEventMessage(UUID.randomUUID(), UUID.randomUUID(), "person@example.test", null);
+        message.setType("COMPLETED");
+        message.setVideoName(" aula.mp4 ");
+
+        FailureNotification failure = FailureEventMapper.toDomain(message, "dev@fiapx.local");
+
+        assertEquals(ProcessingOutcome.COMPLETED, failure.getOutcome());
+        assertEquals("aula.mp4", failure.getVideoName());
+        assertEquals("person@example.test", failure.getRecipient());
     }
 
     @Test

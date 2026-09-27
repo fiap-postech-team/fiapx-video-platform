@@ -23,8 +23,10 @@ components:
           userId: { type: string, format: uuid }
           videoId: { type: string, format: uuid }
           sourceKey: { type: string }
+          recipient: { type: string, format: email }
+          videoName: { type: string, minLength: 1, maxLength: 512 }
           type: { type: string, enum: [ video.job.requested.v1 ] }
           schemaVersion: { type: integer, enum: [ 1 ] }
           occurredAt: { type: string, format: date-time }
           correlationId: { type: string, format: uuid }
-    JobResult: { payload: { type: object, required: [ eventId, jobId, type ], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, type: { enum: [ PROCESSING, COMPLETED, FAILED ] }, schemaVersion: { type: integer, enum: [ 1 ], default: 1 }, occurredAt: { type: string, format: date-time }, correlationId: { type: string, format: uuid }, resultKey: { type: string, minLength: 1 }, terminal: { type: boolean }, reason: { type: string }, reasonCode: { type: string, enum: [ INVALID_MEDIA, SOURCE_UNAVAILABLE, RESULT_UPLOAD_FAILED, PROCESSING_FAILED ] }, recipient: { type: string, format: email } } } }
+    JobResult: { payload: { type: object, required: [ eventId, jobId, type ], properties: { eventId: { type: string, format: uuid }, jobId: { type: string, format: uuid }, type: { enum: [ PROCESSING, COMPLETED, FAILED ] }, schemaVersion: { type: integer, enum: [ 1 ], default: 1 }, occurredAt: { type: string, format: date-time }, correlationId: { type: string, format: uuid }, resultKey: { type: string, minLength: 1 }, terminal: { type: boolean }, reason: { type: string }, reasonCode: { type: string, enum: [ INVALID_MEDIA, SOURCE_UNAVAILABLE, RESULT_UPLOAD_FAILED, PROCESSING_FAILED ] }, recipient: { type: string, format: email }, videoName: { type: string, minLength: 1, maxLength: 512 } } } }

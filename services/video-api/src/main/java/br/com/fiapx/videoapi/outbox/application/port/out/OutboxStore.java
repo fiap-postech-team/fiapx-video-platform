@@ -18,6 +18,10 @@ public interface OutboxStore {
                         Instant occurredAt, UUID correlationId) {
         append(eventId, jobId, userId, videoId, sourceKey, occurredAt);
     }
+    default void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,
+                        Instant occurredAt, UUID correlationId, String recipient, String videoName) {
+        append(eventId, jobId, userId, videoId, sourceKey, occurredAt, correlationId);
+    }
     default List<OutboxClaim> claimReady(int limit, String instanceId, Instant now, Instant expiresAt) {
         throw new UnsupportedOperationException();
     }

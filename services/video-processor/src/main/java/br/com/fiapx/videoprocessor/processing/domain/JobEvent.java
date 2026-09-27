@@ -16,7 +16,9 @@ public record JobEvent(
         UUID correlationId,
         ResultLocation resultLocation,
         Boolean terminal,
-        String reason) {
+        String reason,
+        String recipient,
+        String videoName) {
 
     public JobEvent {
         Objects.requireNonNull(eventId, "eventId is required");
@@ -28,7 +30,8 @@ public record JobEvent(
 
     public static JobEvent processing(VideoJob job, Instant occurredAt) {
         return new JobEvent(
-                UUID.randomUUID(), job.jobId(), JobEventType.PROCESSING, occurredAt, job.correlationId(), null, null, null);
+                UUID.randomUUID(), job.jobId(), JobEventType.PROCESSING, occurredAt, job.correlationId(),
+                null, null, null, null, null);
     }
 
     public static JobEvent completed(VideoJob job, ResultLocation resultLocation, Instant occurredAt) {
@@ -41,10 +44,17 @@ public record JobEvent(
                 job.correlationId(),
                 resultLocation,
                 null,
-                null);
+                null,
+                job.recipient(),
+                job.videoName());
     }
 
     public static JobEvent failed(UUID jobId, UUID correlationId, String reason, boolean terminal, Instant occurredAt) {
+        return failed(jobId, correlationId, reason, terminal, occurredAt, null, null);
+    }
+
+    public static JobEvent failed(UUID jobId, UUID correlationId, String reason, boolean terminal, Instant occurredAt,
+                                  String recipient, String videoName) {
         return new JobEvent(
                 UUID.randomUUID(),
                 jobId,
@@ -53,7 +63,9 @@ public record JobEvent(
                 correlationId == null ? jobId : correlationId,
                 null,
                 terminal,
-                reason);
+                reason,
+                recipient,
+                videoName);
     }
 
     public String resultKey() {

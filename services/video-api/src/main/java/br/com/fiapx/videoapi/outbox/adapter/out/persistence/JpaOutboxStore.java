@@ -40,14 +40,22 @@ public class JpaOutboxStore implements OutboxStore {
 
     public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,
                        Instant occurredAt, UUID correlationId) {
+        append(eventId, jobId, userId, videoId, sourceKey, occurredAt, correlationId, null, null);
+    }
+
+    @Override
+    public void append(UUID eventId, UUID jobId, UUID userId, UUID videoId, String sourceKey,
+                       Instant occurredAt, UUID correlationId, String recipient, String videoName) {
         var effectiveCorrelationId = correlationId == null ? jobId : correlationId;
-        var payload = payload(eventId, jobId, userId, videoId, sourceKey, occurredAt, effectiveCorrelationId);
+        var payload = payload(eventId, jobId, userId, videoId, sourceKey, occurredAt, effectiveCorrelationId,
+            textOrNull(recipient), textOrNull(videoName));
         try { events.save(new OutboxEventEntity(eventId, jobId, json.writeValueAsString(payload), payload, occurredAt, effectiveCorrelationId)); }
         catch (Exception exception) { throw new IllegalStateException("Cannot serialize job event", exception); }
     }
 
     private Map<String, Object> payload(UUID eventId, UUID jobId, UUID userId, UUID videoId,
-                                        String sourceKey, Instant occurredAt, UUID correlationId) {
+                                        String sourceKey, Instant occurredAt, UUID correlationId,
+                                        String recipient, String videoName) {
         var payload = new LinkedHashMap<String, Object>();
         payload.put("eventId", eventId);
         payload.put("jobId", jobId);
@@ -58,7 +66,14 @@ public class JpaOutboxStore implements OutboxStore {
         payload.put("schemaVersion", 1);
         payload.put("occurredAt", occurredAt.toString());
         payload.put("correlationId", correlationId);
+        if (recipient != null) payload.put("recipient", recipient);
+        if (videoName != null) payload.put("videoName", videoName);
         return payload;
+    }
+
+    private static String textOrNull(String value) {
+        if (value == null || value.isBlank()) return null;
+        return value.trim();
     }
 
     @Transactional

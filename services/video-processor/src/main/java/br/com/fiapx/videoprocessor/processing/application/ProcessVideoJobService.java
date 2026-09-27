@@ -93,7 +93,9 @@ public class ProcessVideoJobService implements ProcessVideoJob {
             publisher.publish(JobEvent.completed(job, resultLocation, clock.instant()));
         } catch (TerminalProcessingException e) {
             log.warn("job {} failed permanently: {}", job.jobId(), e.reason());
-            publisher.publish(JobEvent.failed(job.jobId(), job.correlationId(), e.reason(), true, clock.instant()));
+            publisher.publish(JobEvent.failed(
+                    job.jobId(), job.correlationId(), e.reason(), true, clock.instant(),
+                    job.recipient(), job.videoName()));
         }
     }
 }

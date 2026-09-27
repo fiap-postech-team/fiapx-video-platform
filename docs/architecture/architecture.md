@@ -56,7 +56,7 @@ flowchart LR
 |-----------------------|-------------------------------------------------------------------------|----------------------------------|------------------------------------------------------------|
 | `video-api`           | cadastro/login/sessão, validar JWT, criar/consultar jobs do proprietário, registrar outbox e consumir resultados idempotentemente | usuários, sessões, vídeos, jobs, histórico, inbox, outbox | processar mídia ou acessar banco de notificações           |
 | `video-processor`     | validar vídeo, extrair frames, gerar ZIP, publicar resultados           | arquivos temporários efêmeros    | atualizar tabelas da API ou transportar binários no broker |
-| `notification-worker` | consumir falhas terminais, enviar e-mail, auditar entrega               | entregas de notificação          | consultar jobs/usuários diretamente no banco da API        |
+| `notification-worker` | consumir conclusão e falha, enviar e-mail, auditar entrega             | entregas de notificação          | consultar jobs/usuários diretamente no banco da API        |
 | RabbitMQ              | filas de trabalho, fan-out lógico, retry e DLQ                          | mensagens pequenas e temporárias | armazenar vídeos ou ZIPs                                   |
 | MinIO/S3              | objetos de entrada e saída                                              | vídeo e ZIP                      | atuar como fonte de verdade do estado do job               |
 
@@ -150,7 +150,7 @@ flowchart LR
     PQ -.->|retries esgotados| PDLQ[video.processing.dlq.v1]
     EX -->|started/completed/failed| AQ[video.api.results.v1]
     AQ -.->|retries esgotados| ADLQ[video.api.results.dlq.v1]
-    EX -->|video.job.failed.v1| NQ[video.notifications.failure.v1]
+    EX -->|completed/failed| NQ[video.notifications.failure.v1]
     NQ -.->|retries esgotados| NDLQ[video.notifications.failure.dlq.v1]
 ```
 

@@ -3,6 +3,7 @@ package br.com.fiapx.videoprocessor.processing.infrastructure.messaging.out;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import br.com.fiapx.videoprocessor.processing.domain.JobEvent;
@@ -11,6 +12,7 @@ import br.com.fiapx.videoprocessor.processing.domain.ResultLocation;
 import br.com.fiapx.videoprocessor.processing.domain.VideoJob;
 import br.com.fiapx.videoprocessor.processing.infrastructure.messaging.MessagingProperties;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -88,6 +90,30 @@ class RabbitJobEventPublisherTest {
         assertThat(payload.reason()).isEqualTo("The submitted video could not be decoded");
         assertThat(payload.resultKey()).isNull();
         assertThat(payload.correlationId()).isEqualTo(correlationId);
+        assertThat(payload.recipient()).isNull();
+        assertThat(payload.videoName()).isNull();
+    }
+
+    @Test
+    void copiesRecipientAndVideoNameFromTheJobOntoTerminalEvents() {
+        VideoJob job = new VideoJob(
+                UUID.randomUUID(), UUID.randomUUID(), "uploads/video.mp4", null, "person@example.test", "aula.mp4");
+        RabbitJobEventPublisher publisher = new RabbitJobEventPublisher(rabbitTemplate, PROPERTIES);
+
+        publisher.publish(JobEvent.completed(job, job.resultLocation(), OCCURRED_AT));
+        publisher.publish(JobEvent.failed(
+                job.jobId(), job.correlationId(), "failed", true, OCCURRED_AT, job.recipient(), job.videoName()));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(rabbitTemplate, times(2)).convertAndSend(
+                any(String.class), any(String.class), captor.capture(), any(MessagePostProcessor.class));
+        List<Object> payloads = captor.getAllValues();
+        JobResultMessage completed = (JobResultMessage) payloads.get(0);
+        JobResultMessage failed = (JobResultMessage) payloads.get(1);
+        assertThat(completed.recipient()).isEqualTo("person@example.test");
+        assertThat(completed.videoName()).isEqualTo("aula.mp4");
+        assertThat(failed.recipient()).isEqualTo("person@example.test");
+        assertThat(failed.videoName()).isEqualTo("aula.mp4");
     }
 
     @Test
