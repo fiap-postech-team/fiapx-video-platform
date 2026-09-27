@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { copy } from '../../product-copy'
@@ -144,6 +144,35 @@ describe('VideoList query controls', () => {
       scenario,
       query: { status: 'ALL', sort: 'UPDATED_AT', direction: 'DESC' },
     })
+  })
+
+  it('aligns action content consistently and marks only results still being prepared', async () => {
+    const items: VideoLibraryPage['items'] = [
+      {
+        videoRef: 'ref-processing', originalFilename: 'processando.mp4', status: 'PROCESSING', jobId: 'job-processing',
+        submittedAt: '2026-09-20T10:00:00Z', activityAt: '2026-09-20T10:00:00Z',
+      },
+      {
+        videoRef: 'ref-failed', originalFilename: 'falha.mp4', status: 'FAILED', jobId: 'job-failed',
+        submittedAt: '2026-09-20T09:00:00Z', activityAt: '2026-09-20T09:00:00Z',
+      },
+      {
+        videoRef: 'ref-available', originalFilename: 'pronto.mp4', status: 'AVAILABLE', jobId: 'job-available',
+        submittedAt: '2026-09-20T08:00:00Z', activityAt: '2026-09-20T08:00:00Z',
+      },
+    ]
+    const list = vi.fn().mockResolvedValue({ items, page: 1, pageSize: 5, totalItems: 3, totalPages: 1 })
+    render(
+      <VideoList videoService={serviceWith(list)} scenario={scenario} onOpen={vi.fn()} onUpload={vi.fn()} />,
+    )
+
+    const processingRow = await screen.findByRole('row', { name: /processando\.mp4/ })
+    expect(within(processingRow).getByLabelText(copy.videos.downloadPreparing)).toBeInTheDocument()
+    const failedRow = screen.getByRole('row', { name: /falha\.mp4/ })
+    expect(within(failedRow).queryByLabelText(copy.videos.downloadPreparing)).not.toBeInTheDocument()
+    const availableRow = screen.getByRole('row', { name: /pronto\.mp4/ })
+    expect(within(availableRow).getByRole('button', { name: copy.videos.download })).toBeInTheDocument()
+    expect(within(availableRow).queryByLabelText(copy.videos.downloadPreparing)).not.toBeInTheDocument()
   })
 
   it('distinguishes a filtered empty state and retries with the active criteria', async () => {

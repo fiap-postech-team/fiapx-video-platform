@@ -206,7 +206,8 @@ Gap `1.25rem`. Horizontal padding `1.15rem`. Vertical padding `0.9rem`. `align-i
 
 - Date, status, and action tracks are shared widths, not per-row `max-content`.
 - Status header, status cell, and badge left edges share the same x.
-- The action header may be visually empty but must occupy the fourth track with the same padding as `Ver detalhes`.
+- The action header and every `Ver detalhes` label share the fourth track's left edge; retain the button hit area with an optical negative margin rather than shifting the text.
+- The action track reserves a stable icon slot after `Ver detalhes`: show download when the result is available, a compact loading indicator only while the result can still become available, and no misleading loading state for terminal failures.
 - Filename uses `minmax(0, 1fr)`, `nowrap`, `ellipsis` — never `overflow-wrap: anywhere`.
 
 **The Shared Grid Rule.** Independent CSS grids that size columns from their own content are forbidden for this table. Header and rows must paint on one template.

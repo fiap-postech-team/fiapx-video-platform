@@ -3,6 +3,7 @@ import { copy, interpolate } from '../../product-copy'
 import { formatDateTime } from '../application/format-datetime'
 import { lifecycleStatusLabel, lifecycleTone } from '../application/product-status'
 import type {
+  ProductVideoStatus,
   PrototypeScenario,
   VideoLibraryItem,
   VideoLibraryQuery,
@@ -58,6 +59,25 @@ function SortIcon({ direction }: { direction: VideoLibrarySortDirection }) {
       <path className="sort-up" d="m5 7 3-3 3 3" />
       <path className="sort-down" d="m5 9 3 3 3-3" />
     </svg>
+  )
+}
+
+function isDownloadPreparing(status: ProductVideoStatus) {
+  return status === 'AWAITING_UPLOAD' || status === 'UPLOADED' || status === 'PROCESSING'
+}
+
+function DownloadPreparingIndicator() {
+  return (
+    <span
+      className="download-preparing"
+      role="img"
+      aria-label={copy.videos.downloadPreparing}
+      title={copy.videos.downloadPreparing}
+    >
+      <svg className="loading-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <circle cx="10" cy="10" r="6.5" />
+      </svg>
+    </span>
   )
 }
 
@@ -343,6 +363,7 @@ export function VideoList({ videoService, scenario, onOpen, onUpload }: VideoLis
                         iconOnly
                       />
                     )}
+                    {isDownloadPreparing(video.status) && <DownloadPreparingIndicator />}
                   </span>
                 </div>
               )
