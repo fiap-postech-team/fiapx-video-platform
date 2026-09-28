@@ -25,6 +25,7 @@ app:
     local-allowed-origin: ${APP_VIDEO_LOCAL_ALLOWED_ORIGIN:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
     storage-mode: ${APP_VIDEO_STORAGE_MODE:mock}
     # Demonstrative local lifecycle only; no media processing is performed.
+    # A terminal transition is published so the notification worker can email the owner.
     local-result-simulator-enabled: ${APP_VIDEO_LOCAL_RESULT_SIMULATOR_ENABLED:true}
     local-result-simulator-result: ${APP_VIDEO_LOCAL_RESULT_SIMULATOR_RESULT:COMPLETED}
     internal-endpoint: ${S3_ENDPOINT:http://localhost:9000}
