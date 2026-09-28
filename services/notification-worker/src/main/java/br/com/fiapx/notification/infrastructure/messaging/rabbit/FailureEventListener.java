@@ -28,7 +28,7 @@ public class FailureEventListener {
     private final NotifyProcessingFailureUseCase useCase;
     private final NotificationProperties properties;
 
-    @RabbitListener(queues = RabbitMessagingConfiguration.FAILURE_QUEUE)
+    @RabbitListener(queues = RabbitMessagingConfiguration.STATUS_QUEUE)
     public void consume(Message message) throws JsonProcessingException {
         String body = new String(message.getBody(), StandardCharsets.UTF_8);
         FailureEventMessage event = objectMapper.readValue(body, FailureEventMessage.class);
@@ -38,7 +38,7 @@ public class FailureEventListener {
         NotificationResult result = useCase.notify(failure);
 
         log.info(
-                "Failure notification handled eventId={} jobId={} result={}",
+                "Status notification handled eventId={} jobId={} result={}",
                 failure.getEventId(),
                 failure.getJobId(),
                 result

@@ -115,9 +115,13 @@ com Lombok para getters, setters e construtores quando apropriado; não são uti
 
 ## Eventos e persistência
 
-- Consome `video.job.completed.v1` e `video.job.failed.v1` pela fila `video.notifications.failure.v1`.
-- DLQ: `video.notifications.failure.dlq.v1`.
+- Consome `video.job.completed.v1` e `video.job.failed.v1` pela fila própria `video.notifications.status.v1` (não compartilha a fila de resultados da API).
+- DLQ: `video.notifications.status.dlq.v1`.
 - Tabela própria: `notification_deliveries`, com unicidade em `event_id`.
+
+Na implantação sobre um broker existente, drene ou faça replay das mensagens pendentes nas antigas filas
+`video.notifications.failure.v1` e `video.notifications.failure.dlq.v1` antes de remover suas filas e bindings.
+O worker não as exclui automaticamente.
 
 `recipient` e `videoName` são opcionais. Sem destinatário, o worker usa `app.notification.default-recipient`.
 Sem nome do vídeo, o texto fala em "seu vídeo". O id do job não entra no e-mail. `video.job.started.v1` não gera e-mail.

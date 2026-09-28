@@ -15,8 +15,8 @@ public class RabbitMessagingConfiguration {
     public static final String EVENTS_EXCHANGE = "video.events";
     public static final String COMPLETED_ROUTING_KEY = "video.job.completed.v1";
     public static final String FAILURE_ROUTING_KEY = "video.job.failed.v1";
-    public static final String FAILURE_QUEUE = "video.notifications.failure.v1";
-    public static final String FAILURE_DLQ = "video.notifications.failure.dlq.v1";
+    public static final String STATUS_QUEUE = "video.notifications.status.v1";
+    public static final String STATUS_DLQ = "video.notifications.status.dlq.v1";
 
     @Bean
     TopicExchange videoEventsExchange() {
@@ -24,21 +24,21 @@ public class RabbitMessagingConfiguration {
     }
 
     @Bean
-    Queue failureNotificationQueue() {
-        return QueueBuilder.durable(FAILURE_QUEUE)
+    Queue statusNotificationQueue() {
+        return QueueBuilder.durable(STATUS_QUEUE)
                 .deadLetterExchange(EVENTS_EXCHANGE)
-                .deadLetterRoutingKey(FAILURE_DLQ)
+                .deadLetterRoutingKey(STATUS_DLQ)
                 .build();
     }
 
     @Bean
-    Queue failureNotificationDeadLetterQueue() {
-        return QueueBuilder.durable(FAILURE_DLQ).build();
+    Queue statusNotificationDeadLetterQueue() {
+        return QueueBuilder.durable(STATUS_DLQ).build();
     }
 
     @Bean
-    Binding failureNotificationBinding(
-            @Qualifier("failureNotificationQueue") Queue queue,
+    Binding failedStatusNotificationBinding(
+            @Qualifier("statusNotificationQueue") Queue queue,
             TopicExchange videoEventsExchange
     ) {
         return BindingBuilder.bind(queue)
@@ -48,7 +48,7 @@ public class RabbitMessagingConfiguration {
 
     @Bean
     Binding completionNotificationBinding(
-            @Qualifier("failureNotificationQueue") Queue queue,
+            @Qualifier("statusNotificationQueue") Queue queue,
             TopicExchange videoEventsExchange
     ) {
         return BindingBuilder.bind(queue)
@@ -57,12 +57,12 @@ public class RabbitMessagingConfiguration {
     }
 
     @Bean
-    Binding failureNotificationDeadLetterBinding(
-            @Qualifier("failureNotificationDeadLetterQueue") Queue deadLetterQueue,
+    Binding statusNotificationDeadLetterBinding(
+            @Qualifier("statusNotificationDeadLetterQueue") Queue deadLetterQueue,
             TopicExchange videoEventsExchange
     ) {
         return BindingBuilder.bind(deadLetterQueue)
                 .to(videoEventsExchange)
-                .with(FAILURE_DLQ);
+                .with(STATUS_DLQ);
     }
 }
