@@ -150,8 +150,8 @@ flowchart LR
     PQ -.->|retries esgotados| PDLQ[video.processing.dlq.v1]
     EX -->|started/completed/failed| AQ[video.api.results.v1]
     AQ -.->|retries esgotados| ADLQ[video.api.results.dlq.v1]
-    EX -->|completed/failed| NQ[video.notifications.failure.v1]
-    NQ -.->|retries esgotados| NDLQ[video.notifications.failure.dlq.v1]
+    EX -->|completed/failed| NQ[video.notifications.status.v1]
+    NQ -.->|retries esgotados| NDLQ[video.notifications.status.dlq.v1]
 ```
 
 ## Diagrama de implantação local

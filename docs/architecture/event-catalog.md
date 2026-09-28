@@ -77,11 +77,11 @@ ser seguro para exibição e não conter stack trace, segredo, comando ou dados 
 
 ## Retry e DLQ
 
-| Fila                             | DLQ                                  | Owner operacional     |
-|----------------------------------|--------------------------------------|-----------------------|
-| `video.processing.v1`            | `video.processing.dlq.v1`            | time de processamento |
-| `video.api.results.v1`           | `video.api.results.dlq.v1`           | time da API           |
-| `video.notifications.failure.v1` | `video.notifications.failure.dlq.v1` | time de notificações  |
+| Fila                            | DLQ                                 | Owner operacional     |
+|---------------------------------|-------------------------------------|-----------------------|
+| `video.processing.v1`           | `video.processing.dlq.v1`           | time de processamento |
+| `video.api.results.v1`          | `video.api.results.dlq.v1`          | time da API           |
+| `video.notifications.status.v1` | `video.notifications.status.dlq.v1` | time de notificações  |
 
 Replay de DLQ exige corrigir a causa, verificar idempotência, registrar operador/motivo e acompanhar o resultado. Nunca
 mova mensagens em massa sem limitar taxa e observar os consumidores.
